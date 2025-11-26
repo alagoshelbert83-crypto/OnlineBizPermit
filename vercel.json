@@ -1,43 +1,39 @@
 {
   "version": 2,
-  "functions": {
-    "Admin-dashboard/**/*.php": {
-      "runtime": "now-php@1.0.0"
-    },
-    "Applicant-dashboard/**/*.php": {
-      "runtime": "now-php@1.0.0"
-    },
-    "Staff-dashboard/**/*.php": {
-      "runtime": "now-php@1.0.0"
-    },
-    "**/*.php": {
-      "runtime": "now-php@1.0.0"
+  "builds": [
+    {
+      "src": "**/*.php",
+      "use": "now-php@1.0.0"
     }
-  },
-  "rewrites": [
+  ],
+  "routes": [
     {
-      "source": "/admin/(.*)",
-      "destination": "/Admin-dashboard/$1"
+      "src": "/admin/(.*)",
+      "dest": "/Admin-dashboard/$1"
     },
     {
-      "source": "/applicant/(.*)",
-      "destination": "/Applicant-dashboard/$1"
+      "src": "/applicant/(.*)",
+      "dest": "/Applicant-dashboard/$1"
     },
     {
-      "source": "/staff/(.*)",
-      "destination": "/Staff-dashboard/$1"
+      "src": "/staff/(.*)",
+      "dest": "/Staff-dashboard/$1"
     },
     {
-      "source": "/Admin-dashboard/(.*)",
-      "destination": "/Admin-dashboard/$1"
+      "src": "/Admin-dashboard/(.*)",
+      "dest": "/Admin-dashboard/$1"
     },
     {
-      "source": "/Applicant-dashboard/(.*)",
-      "destination": "/Applicant-dashboard/$1"
+      "src": "/Applicant-dashboard/(.*)",
+      "dest": "/Applicant-dashboard/$1"
     },
     {
-      "source": "/Staff-dashboard/(.*)",
-      "destination": "/Staff-dashboard/$1"
+      "src": "/Staff-dashboard/(.*)",
+      "dest": "/Staff-dashboard/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
     }
   ]
 }
