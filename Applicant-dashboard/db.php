@@ -6,9 +6,9 @@
 // --- Database Configuration for Supabase ---
 // IMPORTANT: These values are set via environment variables in Vercel
 
-$host = getenv('DB_HOST') ?: 'db.xxxxx.supabase.co';
+$host = getenv('DB_HOST') ?: 'https://sresyzzffqdvumywjpcj.supabase.co';
 $user = getenv('DB_USER') ?: 'postgres';
-$pass = getenv('DB_PASS') ?: 'your-password';
+$pass = getenv('DB_PASS') ?: 'alagoshelbert21';
 $dbname = getenv('DB_NAME') ?: 'postgres';
 $port = 5432;
 
