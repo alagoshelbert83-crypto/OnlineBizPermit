@@ -5,7 +5,7 @@ This guide explains how to deploy the OnlineBizPermit system to Vercel with PHP 
 ## Prerequisites
 
 1. **Vercel Account**: Sign up at [vercel.com](https://vercel.com)
-2. **PlanetScale Account**: Sign up at [planetscale.com](https://planetscale.com) for MySQL database
+2. **Supabase Account**: Sign up at [supabase.com](https://supabase.com) for PostgreSQL database
 3. **GitHub Repository**: Push your code to a GitHub repository
 
 ## Step 1: Database Migration
@@ -16,14 +16,13 @@ This guide explains how to deploy the OnlineBizPermit system to Vercel with PHP 
 3. Select your database (`if0_40313162_onlinebizpermit`)
 4. Click "Export" and download the SQL file
 
-### Set up PlanetScale Database
-1. Create a PlanetScale account
-2. Create a new database
-3. Import your SQL export:
-   ```bash
-   psql import mysql://<connection-string> < your-export.sql
-   ```
-4. Note down the connection details (host, username, password, database name)
+### Set up Supabase Database
+1. Create a Supabase account
+2. Create a new project
+3. Go to SQL Editor in Supabase dashboard
+4. Run the provided `supabase_schema.sql` to create tables
+5. For data migration: You may need to convert MySQL export to PostgreSQL format or manually migrate data
+6. Note down the connection details from Supabase project settings (host, username, password, database name)
 
 ## Step 2: Vercel Blob Setup (Optional for File Uploads)
 
@@ -48,10 +47,10 @@ This guide explains how to deploy the OnlineBizPermit system to Vercel with PHP 
 Set these in Vercel project settings:
 
 ```
-DB_HOST=your-planetscale-host
-DB_USER=your-planetscale-user
-DB_PASS=your-planetscale-password
-DB_NAME=your-planetscale-database
+DB_HOST=your-supabase-host.supabase.co
+DB_USER=postgres
+DB_PASS=your-supabase-password
+DB_NAME=postgres
 STORAGE_TYPE=local  # or 'blob' if using Vercel Blob
 BLOB_READ_WRITE_TOKEN=your-blob-token  # if using blob
 ```
@@ -79,9 +78,9 @@ BLOB_READ_WRITE_TOKEN=your-blob-token  # if using blob
 ## Troubleshooting
 
 ### Database Connection Issues
-- Verify PlanetScale connection string
-- Ensure IP whitelisting if required
+- Verify Supabase connection details from project settings
 - Check environment variables are set correctly
+- Ensure the database schema has been created
 
 ### File Upload Issues
 - If using local storage, files may not persist across deployments

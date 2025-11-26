@@ -1,26 +1,27 @@
 <?php
 /**
- * Database Connection for Staff Dashboard
+ * Database Connection for Admin Dashboard - PostgreSQL (Supabase)
  */
 
-// --- Database Configuration for your Hosting Provider (e.g., InfinityFree) ---
-// IMPORTANT: Replace the placeholder values below with the actual credentials
-// you get from your hosting provider's control panel after creating the database.
+// --- Database Configuration for Supabase ---
+// IMPORTANT: These values are set via environment variables in Vercel
 
-define('DB_HOST', 'sql302.infinityfree.com'); // <-- Your MySQL Host from InfinityFree
-define('DB_USER', 'if0_40313162');      // <-- Your MySQL User from InfinityFree
-define('DB_PASS', '83870oEAzLrDVmd'); // <-- Your InfinityFree account password
-define('DB_NAME', 'if0_40313162_onlinebizpermit'); // <-- Your MySQL Database name from InfinityFree
+$host = getenv('DB_HOST') ?: 'your-supabase-host.supabase.co';
+$user = getenv('DB_USER') ?: 'postgres';
+$pass = getenv('DB_PASS') ?: 'your-supabase-password';
+$dbname = getenv('DB_NAME') ?: 'postgres';
+$port = 5432;
 
-// --- Establish the Connection ---
-$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-
-// --- Check for Connection Errors ---
-if ($conn->connect_error) {
+// --- Establish PostgreSQL Connection ---
+try {
+    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;user=$user;password=$pass";
+    $conn = new PDO($dsn);
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+} catch(PDOException $e) {
     // Use a more generic error in production
     $error_message = "Database connection failed.";
+    error_log("Database connection error: " . $e->getMessage());
     die($error_message);
 }
-
-$conn->set_charset("utf8mb4");
 ?>

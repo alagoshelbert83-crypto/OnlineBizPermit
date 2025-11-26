@@ -12,63 +12,52 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
         $this->conn = $dbConnection;
     }
 
-    public function open($savePath, $sessionName) {
-        // Create sessions table if it doesn't exist
+    public function open($savePath, $sessionName): bool {
+        // Create sessions table if it doesn't exist (PostgreSQL syntax)
         $sql = "CREATE TABLE IF NOT EXISTS {$this->table} (
             session_id VARCHAR(255) PRIMARY KEY,
             session_data TEXT,
-            session_expires TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            session_expires TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )";
-        $this->conn->query($sql);
+        $this->conn->exec($sql);
         return true;
     }
 
-    public function close() {
+    public function close(): bool {
         return true;
     }
 
-    public function read($sessionId) {
-        $stmt = $this->conn->prepare("SELECT session_data FROM {$this->table} WHERE session_id = ? AND session_expires > NOW()");
-        $stmt->bind_param("s", $sessionId);
-        $stmt->execute();
-        $data = '';
-        $stmt->bind_result($data);
-        if ($stmt->fetch()) {
-            $stmt->close();
-            return $data;
-        }
-        $stmt->close();
-        return '';
+    public function read($sessionId): string {
+        $stmt = $this->conn->prepare("SELECT session_data FROM {$this->table} WHERE session_id = :session_id AND session_expires > NOW()");
+        $stmt->execute(['session_id' => $sessionId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ? $result['session_data'] : '';
     }
 
-    public function write($sessionId, $data) {
+    public function write($sessionId, $data): bool {
         // Set session to expire in 24 hours
         $expires = date('Y-m-d H:i:s', strtotime('+24 hours'));
-        $stmt = $this->conn->prepare("INSERT INTO {$this->table} (session_id, session_data, session_expires) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE session_data = VALUES(session_data), session_expires = VALUES(session_expires)");
-        $stmt->bind_param("sss", $sessionId, $data, $expires);
-        $result = $stmt->execute();
-        $stmt->close();
-        return $result;
+        $stmt = $this->conn->prepare("INSERT INTO {$this->table} (session_id, session_data, session_expires) VALUES (:session_id, :session_data, :session_expires) ON CONFLICT (session_id) DO UPDATE SET session_data = EXCLUDED.session_data, session_expires = EXCLUDED.session_expires");
+        return $stmt->execute([
+            'session_id' => $sessionId,
+            'session_data' => $data,
+            'session_expires' => $expires
+        ]);
     }
 
-    public function destroy($sessionId) {
-        $stmt = $this->conn->prepare("DELETE FROM {$this->table} WHERE session_id = ?");
-        $stmt->bind_param("s", $sessionId);
-        $result = $stmt->execute();
-        $stmt->close();
-        return $result;
+    public function destroy($sessionId): bool {
+        $stmt = $this->conn->prepare("DELETE FROM {$this->table} WHERE session_id = :session_id");
+        return $stmt->execute(['session_id' => $sessionId]);
     }
 
-    public function gc($maxLifetime) {
+    public function gc($maxLifetime): bool {
         $stmt = $this->conn->prepare("DELETE FROM {$this->table} WHERE session_expires < NOW()");
-        $result = $stmt->execute();
-        $stmt->close();
-        return $result;
+        return $stmt->execute();
     }
 }
 
 // Initialize custom session handler if database connection exists
-if (isset($conn) && $conn instanceof mysqli) {
+if (isset($conn) && $conn instanceof PDO) {
     $sessionHandler = new DatabaseSessionHandler($conn);
     session_set_save_handler($sessionHandler, true);
 }

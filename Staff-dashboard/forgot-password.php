@@ -17,26 +17,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         // To prevent user enumeration, we will always show a success message.
         // The database and email operations only run if the user actually exists.
         $stmt = $conn->prepare("SELECT id FROM users WHERE email=? AND (role = 'staff' OR role = 'admin') LIMIT 1");
-        $stmt->bind_param("s", $email);
-        $stmt->execute();
-        $result = $stmt->get_result();
+        $stmt->execute([$email]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($user = $result->fetch_assoc()) {
+        if ($user) {
             // User exists, proceed with token generation.
             $token = bin2hex(random_bytes(32));
             $expires = time() + 1800; // Token expires in 30 minutes
 
-            $conn->begin_transaction();
+            $conn->beginTransaction();
             try {
                 // Delete any previous tokens for this email
                 $delStmt = $conn->prepare("DELETE FROM password_resets WHERE email = ?");
-                $delStmt->bind_param("s", $email);
-                $delStmt->execute();
+                $delStmt->execute([$email]);
 
                 // Insert the new token
                 $insStmt = $conn->prepare("INSERT INTO password_resets (email, token, expires) VALUES (?, ?, ?)");
-                $insStmt->bind_param("ssi", $email, $token, $expires);
-                $insStmt->execute();
+                $insStmt->execute([$email, $token, $expires]);
 
                 $conn->commit();
 
@@ -46,7 +43,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $resetLink = "http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']) . "/reset-password.php?token=" . $token;
                 $message = "If an account with that email exists, a password reset link has been sent.<br><br><strong>For Demonstration Only:</strong> <a href='$resetLink'>Reset Password Link</a>";
 
-            } catch (mysqli_sql_exception $exception) {
+            } catch (PDOException $exception) {
                 $conn->rollback();
                 // In production, log this error but show the generic message.
                 $message = "An error occurred. Please try again later.";
