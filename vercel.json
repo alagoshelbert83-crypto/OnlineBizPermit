@@ -26,6 +26,10 @@
     {
       "source": "/staff/(.*)",
       "destination": "/Staff-dashboard/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/$1"
     }
   ]
 }
