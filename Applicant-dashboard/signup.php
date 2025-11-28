@@ -425,19 +425,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const password = document.getElementById('password').value;
             const confirmPassword = document.getElementById('confirm_password').value;
             const terms = document.getElementById('terms').checked;
-            
+
             if (password !== confirmPassword) {
                 e.preventDefault();
                 alert('Passwords do not match.');
                 return;
             }
-            
+
             if (!terms) {
                 e.preventDefault();
                 alert('Please accept the terms and conditions.');
                 return;
             }
+
+            // Firebase Analytics: Track signup attempt
+            if (window.firebaseAnalytics) {
+                firebase.analytics().logEvent('sign_up', {
+                    method: 'email_password'
+                });
+            }
         });
+
+        // Firebase Analytics: Track page view
+        if (window.firebaseAnalytics) {
+            firebase.analytics().logEvent('page_view', {
+                page_title: 'Applicant Signup',
+                page_location: window.location.href
+            });
+        }
 
         // Auto-hide error messages
         setTimeout(() => {

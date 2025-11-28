@@ -122,6 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         window.firebaseAuth = auth;
         window.firebaseDb = db;
         window.firebaseStorage = storage;
+        window.firebaseAnalytics = analytics;
     </script>
 </head>
 <body>
@@ -288,7 +289,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 alert('Please enter a valid email address.');
                 return;
             }
+
+            // Firebase Analytics: Track login attempt
+            if (window.firebaseAnalytics) {
+                firebase.analytics().logEvent('login_attempt', {
+                    method: 'email_password'
+                });
+            }
         });
+
+        // Firebase Analytics: Track page view
+        if (window.firebaseAnalytics) {
+            firebase.analytics().logEvent('page_view', {
+                page_title: 'Applicant Login',
+                page_location: window.location.href
+            });
+        }
     </script>
 </body>
 </html>
