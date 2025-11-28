@@ -2,7 +2,19 @@
   "version": 2,
   "builds": [
     {
-      "src": "**/*.php",
+      "src": "api/**/*.php",
+      "use": "@vercel/php"
+    },
+    {
+      "src": "Applicant-dashboard/**/*.php",
+      "use": "@vercel/php"
+    },
+    {
+      "src": "Admin-dashboard/**/*.php",
+      "use": "@vercel/php"
+    },
+    {
+      "src": "Staff-dashboard/**/*.php",
       "use": "@vercel/php"
     },
     {
@@ -16,8 +28,16 @@
       "dest": "/api/$1"
     },
     {
-      "src": "/(.*\\.php)$",
-      "dest": "/$1"
+      "src": "/Applicant-dashboard/(.*)",
+      "dest": "/Applicant-dashboard/$1"
+    },
+    {
+      "src": "/Admin-dashboard/(.*)",
+      "dest": "/Admin-dashboard/$1"
+    },
+    {
+      "src": "/Staff-dashboard/(.*)",
+      "dest": "/Staff-dashboard/$1"
     },
     {
       "src": "/(.*)",
