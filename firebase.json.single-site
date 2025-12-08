@@ -1,0 +1,56 @@
+{
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "**/vendor/**",
+      "**/api/**",
+      "**/*.php",
+      "**/composer.json",
+      "**/composer.lock",
+      "**/vercel.json",
+      "**/.git/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/admin/**",
+        "destination": "/Admin-dashboard/index.html"
+      },
+      {
+        "source": "/applicant/**",
+        "destination": "/Applicant-dashboard/index.html"
+      },
+      {
+        "source": "/staff/**",
+        "destination": "/Staff-dashboard/index.html"
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(jpg|jpeg|gif|png|svg|webp|ico)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=31536000"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(js|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=31536000"
+          }
+        ]
+      }
+    ]
+  }
+}
+

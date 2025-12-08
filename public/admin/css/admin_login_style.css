@@ -1,0 +1,255 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --primary-color: #0e8388;
+    --primary-hover-color: #1ab0b8;
+    --body-bg: #f0f2f5;
+    --form-bg: #ffffff;
+    --input-border-color: #d9d9d9;
+    --input-focus-border: #40a9ff;
+    --text-color: #2c3e50;
+    --text-muted: #8c8c8c;
+    --error-color: #d92121;
+    --error-bg: #fff1f0;
+    --error-border-color: #ffa39e;
+    --success-color: #27ae60;
+    --success-bg: #f6ffed;
+    --success-border-color: #b7eb8f;
+    --border-radius-lg: 12px;
+    --border-radius-md: 6px;
+    --font-family: 'Poppins', sans-serif;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+body {
+    font-family: var(--font-family);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    background-color: var(--body-bg);
+    color: var(--text-color);
+}
+
+.auth-container {
+    width: 100%;
+    max-width: 960px;
+    padding: 20px;
+}
+
+.container {
+    display: flex;
+    background: var(--form-bg);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.image {
+    flex: 1.2;
+    background: url('https://i.ibb.co/j8L7rV3/undraw-Fingerprint-login-re-t71l.png') center center/cover;
+    display: none; /* Initially hidden, shown on larger screens */
+}
+
+.form-box {
+    flex: 1;
+    padding: 50px 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.logo-container {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.logo-container img {
+    height: 50px;
+}
+
+h2 {
+    margin: 0 0 8px;
+    color: var(--text-color);
+    font-weight: 600;
+    font-size: 28px;
+    text-align: center;
+}
+
+.form-subtitle {
+    font-size: 16px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+form {
+    width: 100%;
+}
+
+.input-group {
+    margin-bottom: 20px;
+}
+
+.input-group label {
+    display: block;
+    font-weight: 500;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.input-wrapper {
+    position: relative;
+}
+
+input {
+    padding: 12px 20px;
+    border: 1px solid var(--input-border-color);
+    border-radius: var(--border-radius-md);
+    width: 100%;
+    font-size: 16px;
+    transition: all 0.3s;
+    box-sizing: border-box;
+}
+
+input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(14, 131, 136, 0.2);
+    outline: none;
+}
+
+.password-wrapper {
+    position: relative;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    padding: 0;
+    display: flex;
+}
+
+.toggle-password svg {
+    width: 20px;
+    height: 20px;
+}
+
+.form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    font-size: 14px;
+}
+
+.remember-me {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-muted);
+}
+
+a.forgot-password {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+a.forgot-password:hover {
+    color: var(--primary-hover-color);
+    text-decoration: underline;
+}
+
+button[type="submit"] {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(90deg, var(--primary-color), var(--primary-hover-color));
+    border: none;
+    color: white;
+    border-radius: var(--border-radius-md);
+    font-weight: 600;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(14, 131, 136, 0.2);
+}
+
+button[type="submit"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(14, 131, 136, 0.3);
+}
+
+.message {
+    padding: 12px;
+    margin-bottom: 20px;
+    border-radius: var(--border-radius-md);
+    font-size: 14px;
+    text-align: center;
+    border: 1px solid transparent;
+}
+
+.error {
+    color: var(--error-color);
+    background-color: var(--error-bg);
+    border-color: var(--error-border-color);
+}
+
+.success {
+    color: var(--success-color);
+    background-color: var(--success-bg);
+    border-color: var(--success-border-color);
+}
+
+.links-container {
+    text-align: center;
+    margin-top: 25px;
+    font-size: 14px;
+}
+
+.links-container a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+.links-container a:hover {
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+
+/* Responsive Design */
+@media (min-width: 768px) {
+    .image {
+        display: block;
+    }
+}
+
+@media (max-width: 992px) {
+    .form-box {
+        padding: 40px;
+    }
+}
+
+@media (max-width: 767px) {
+    .auth-container {
+        padding: 15px;
+    }
+    .container {
+        flex-direction: column;
+    }
+    .form-box {
+        padding: 30px;
+    }
+    h2 {
+        font-size: 24px;
+    }
+}

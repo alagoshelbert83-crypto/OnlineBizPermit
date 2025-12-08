@@ -1,0 +1,30 @@
+{
+  "projects": {
+    "default": "onlinebizpermit"
+  },
+  "targets": {
+    "onlinebizpermit": {
+      "hosting": {
+        "staff-dashboard": [
+          "staff-dashboard"
+        ],
+        "applicant-dashboard": [
+          "applicant-dashboard"
+        ],
+        "admin-dashboard": [
+          "admin-dashboard"
+        ],
+        "admin-dashboardbiz": [
+          "admin-dashboardbiz"
+        ],
+        "applicant-dashboardbiz": [
+          "applicant-dashboardbiz"
+        ],
+        "staff-dashboardbiz": [
+          "staff-dashboardbiz"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

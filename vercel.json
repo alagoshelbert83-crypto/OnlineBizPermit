@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "buildCommand": "echo 'Node.js project - no build needed'",
   "installCommand": "npm install",
   "framework": null,
@@ -8,6 +9,10 @@
     }
   },
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    },
     {
       "source": "/",
       "destination": "/api"

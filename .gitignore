@@ -4,3 +4,7 @@ node_modules/
 .DS_Store
 .vercel
 .env*.local
+
+# Firebase service account credentials (contains secrets)
+onlinebizpermit-firebase-adminsdk-*.json
+*firebase-adminsdk*.json

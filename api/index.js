@@ -18,11 +18,14 @@ const allowedOrigins = [
   'https://admin-dashboardbiz.web.app',
   'https://applicant-dashboardbiz.web.app',
   'https://staff-dashboardbiz.web.app',
+  // Vercel deployment domains (will be set via environment)
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+  process.env.VERCEL_BRANCH_URL ? `https://${process.env.VERCEL_BRANCH_URL}` : null,
   // Local development
   'http://localhost:5000',
   'http://localhost:3000',
   'http://127.0.0.1:5500' // For local testing with Live Server
-];
+].filter(Boolean); // Remove null values
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -89,8 +92,9 @@ const authenticateToken = (req, res, next) => {
 
 // Routes
 
-// Root route - serve landing page (handle both / and /api)
-app.get(['/', '/api'], (req, res) => {
+// Root route - serve landing page
+// In Vercel, this function is mounted at /api, so '/' here becomes /api
+app.get('/', (req, res) => {
   const landingPageHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -450,7 +454,7 @@ app.use('*', (req, res) => {
   });
 });
 
-// For Vercel serverless, export the app directly
+// For Vercel serverless, export the handler
 // For local development, start the server
 if (require.main === module) {
   app.listen(PORT, () => {
@@ -458,4 +462,6 @@ if (require.main === module) {
   });
 }
 
+// Export for Vercel serverless functions
+// Vercel expects the Express app to be exported directly
 module.exports = app;
