@@ -1,4 +1,11 @@
-require('dotenv').config();
+// Only load dotenv in local development (Vercel provides env vars automatically)
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  try {
+    require('dotenv').config();
+  } catch (e) {
+    // dotenv not available, continue without it
+  }
+}
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
