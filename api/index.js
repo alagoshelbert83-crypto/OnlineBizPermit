@@ -484,4 +484,5 @@ if (require.main === module) {
 
 // Export for Vercel serverless functions
 // Vercel expects the Express app to be exported directly
+// The function at api/index.js will be available at /api
 module.exports = app;
