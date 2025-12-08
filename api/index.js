@@ -115,6 +115,7 @@ const authenticateToken = (req, res, next) => {
 // Root route - serve landing page
 // In Vercel, this function is mounted at /api, so '/' here becomes /api
 app.get('/', (req, res) => {
+  console.log('Root route hit:', req.url, req.method);
   const landingPageHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -284,6 +285,7 @@ app.post('/auth/login', async (req, res) => {
 
 // Staff/Admin Login endpoint
 app.post('/auth/staff-login', async (req, res) => {
+  console.log('Staff login route hit:', req.url, req.method, req.body);
   try {
     const { email, password } = req.body;
 
@@ -454,6 +456,7 @@ app.get('/users/dashboard', authenticateToken, async (req, res) => {
 
 // Health check
 app.get('/health', (req, res) => {
+  console.log('Health check hit:', req.url, req.method);
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
@@ -466,11 +469,15 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
+// 404 handler - log all unmatched routes for debugging
 app.use('*', (req, res) => {
+  console.log('404 - Route not found:', req.method, req.url, 'Original URL:', req.originalUrl);
   res.status(404).json({
     success: false,
-    message: 'Endpoint not found'
+    message: 'Endpoint not found',
+    method: req.method,
+    url: req.url,
+    originalUrl: req.originalUrl
   });
 });
 
