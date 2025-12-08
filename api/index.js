@@ -125,7 +125,18 @@ app.use((req, res, next) => {
 
 // Apply CORS middleware for all other requests
 // The cors package automatically handles OPTIONS preflight requests
+// But we've already handled OPTIONS above, so this is for actual requests
 app.use(cors(corsOptions));
+
+// Ensure CORS headers are added to ALL responses (backup)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  next();
+});
 
 // --- START DEBUGGING MIDDLEWARE ---
 // This will log every request that hits the Express app
