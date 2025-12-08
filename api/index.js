@@ -100,7 +100,27 @@ app.use(express.urlencoded({ extended: true }));
 
 // Strip /api prefix if present (Vercel should do this, but just in case)
 // This MUST happen before routes are checked
+// IMPORTANT: Handle OPTIONS requests immediately to avoid CORS issues
 app.use((req, res, next) => {
+  // Handle OPTIONS preflight requests immediately
+  if (req.method === 'OPTIONS') {
+    const origin = req.headers.origin;
+    console.log('[OPTIONS in path middleware] Origin:', origin, 'URL:', req.url);
+    
+    if (!origin || allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin || '*');
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+      res.header('Access-Control-Allow-Credentials', 'true');
+      res.header('Access-Control-Max-Age', '86400');
+      console.log('[OPTIONS in path middleware] Allowed, sending 204');
+      return res.sendStatus(204);
+    } else {
+      console.log('[OPTIONS in path middleware] Blocked origin:', origin);
+      return res.sendStatus(403);
+    }
+  }
+  
   const originalUrl = req.url;
   if (req.url.startsWith('/api')) {
     req.url = req.url.replace(/^\/api/, '') || '/';
