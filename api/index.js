@@ -430,6 +430,23 @@ apiRouter.get('/', (req, res) => {
   });
 });
 
+// Handle OPTIONS on the router as well (in case path stripping affects it)
+apiRouter.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  console.log('[OPTIONS PREFLIGHT on Router] Origin:', origin);
+  
+  if (!origin || allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400');
+    res.sendStatus(204);
+  } else {
+    res.sendStatus(403);
+  }
+});
+
 // Mount the API router. Since Vercel routes /api/* to this file,
 // we mount the router at the root '/'.
 // Vercel strips the /api prefix, so /api/auth/login becomes /auth/login
