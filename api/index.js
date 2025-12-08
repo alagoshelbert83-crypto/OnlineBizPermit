@@ -197,7 +197,7 @@ app.get('/', (req, res) => {
 });
 
 // Applicant Login endpoint
-app.post('/api/auth/login', async (req, res) => {
+app.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -283,7 +283,7 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // Staff/Admin Login endpoint
-app.post('/api/auth/staff-login', async (req, res) => {
+app.post('/auth/staff-login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -347,7 +347,7 @@ app.post('/api/auth/staff-login', async (req, res) => {
 });
 
 // Signup endpoint
-app.post('/api/auth/signup', async (req, res) => {
+app.post('/auth/signup', async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
@@ -396,7 +396,7 @@ app.post('/api/auth/signup', async (req, res) => {
 });
 
 // Dashboard endpoint
-app.get('/api/users/dashboard', authenticateToken, async (req, res) => {
+app.get('/users/dashboard', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
 
@@ -453,7 +453,7 @@ app.get('/api/users/dashboard', authenticateToken, async (req, res) => {
 });
 
 // Health check
-app.get('/api/health', (req, res) => {
+app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
