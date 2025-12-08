@@ -9,25 +9,40 @@ const nodemailer = require('nodemailer');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+// Middleware - CORS configuration
+const allowedOrigins = [
+  // Default Firebase domains
+  'https://onlinebizpermit.web.app',
+  'https://onlinebizpermit.firebaseapp.com',
+  // Firebase dashboard domains
+  'https://admin-dashboardbiz.web.app',
+  'https://applicant-dashboardbiz.web.app',
+  'https://staff-dashboardbiz.web.app',
+  // Local development
+  'http://localhost:5000',
+  'http://localhost:3000',
+  'http://127.0.0.1:5500' // For local testing with Live Server
+];
+
 app.use(cors({
-  origin: [
-    // Default Firebase domains
-    'https://onlinebizpermit.web.app',
-    'https://onlinebizpermit.firebaseapp.com',
-    // Firebase dashboard domains
-    'https://admin-dashboardbiz.web.app',
-    'https://applicant-dashboardbiz.web.app',
-    'https://staff-dashboardbiz.web.app',
-    // Local development
-    'http://localhost:5000',
-    'http://localhost:3000',
-    'http://127.0.0.1:5500' // For local testing with Live Server
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
+
+// Handle preflight requests explicitly
+app.options('*', cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
