@@ -16,55 +16,29 @@ const nodemailer = require('nodemailer');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware - CORS configuration
-const allowedOrigins = [
-  // Default Firebase domains
-  'https://onlinebizpermit.web.app',
-  'https://onlinebizpermit.firebaseapp.com',
-  // Firebase dashboard domains
-  'https://admin-dashboardbiz.web.app',
-  'https://applicant-dashboardbiz.web.app',
-  'https://staff-dashboardbiz.web.app',
-  // Vercel deployment domains (will be set via environment)
-  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
-  process.env.VERCEL_BRANCH_URL ? `https://${process.env.VERCEL_BRANCH_URL}` : null,
-  // Local development
-  'http://localhost:5000',
-  'http://localhost:3000',
-  'http://127.0.0.1:5500' // For local testing with Live Server
-].filter(Boolean); // Remove null values
-
-// CORS configuration
+// CORS configuration - Simplified for Firebase domains
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      return callback(null, true);
-    }
-    
-    // Check if origin is in allowed list
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      // Log for debugging
-      console.log('CORS: Blocked origin:', origin);
-      console.log('CORS: Allowed origins:', allowedOrigins);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: [
+    'https://onlinebizpermit.web.app',
+    'https://onlinebizpermit.firebaseapp.com',
+    'https://admin-dashboardbiz.web.app',
+    'https://applicant-dashboardbiz.web.app',
+    'https://staff-dashboardbiz.web.app',
+    'http://localhost:5000',
+    'http://localhost:3000',
+    'http://127.0.0.1:5500'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   exposedHeaders: ['Content-Length', 'Content-Type'],
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-  maxAge: 86400 // 24 hours
+  optionsSuccessStatus: 200
 };
 
 // Apply CORS middleware FIRST, before any other middleware
 app.use(cors(corsOptions));
 
-// Explicitly handle OPTIONS preflight requests for all routes
+// Handle preflight requests
 app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
