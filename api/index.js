@@ -68,6 +68,16 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Strip /api prefix if present (Vercel should do this, but just in case)
+app.use((req, res, next) => {
+  if (req.url.startsWith('/api/')) {
+    req.url = req.url.replace('/api', '');
+    req.originalUrl = req.originalUrl.replace('/api', '');
+    console.log(`[PATH STRIPPED] New URL: ${req.url}`);
+  }
+  next();
+});
+
 // Initialize PostgreSQL connection (Neon)
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
