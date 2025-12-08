@@ -62,8 +62,24 @@ const corsOptions = {
 // Apply CORS middleware FIRST, before any other middleware
 app.use(cors(corsOptions));
 
-// Handle preflight requests
-app.options('*', cors(corsOptions));
+// Explicitly handle OPTIONS preflight requests BEFORE other routes
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  console.log('[OPTIONS PREFLIGHT] Origin:', origin);
+  
+  if (!origin || allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400');
+    console.log('[OPTIONS PREFLIGHT] Allowed, sending 204');
+    res.sendStatus(204);
+  } else {
+    console.log('[OPTIONS PREFLIGHT] Blocked origin:', origin);
+    res.sendStatus(403);
+  }
+});
 
 // --- START DEBUGGING MIDDLEWARE ---
 // This will log every request that hits the Express app
