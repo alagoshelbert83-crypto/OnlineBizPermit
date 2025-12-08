@@ -1,22 +1,13 @@
-# Ignore everything except API
-**/*
-!api/
-!api/**
-!package.json
-!package-lock.json
-!vercel.json
-!.vercelignore
-!node_modules/
-
-# Explicitly ignore PHP files
+# Ignore all PHP files and directories
+*.php
 **/*.php
-**/Admin-dashboard/**
-**/Applicant-dashboard/**
-**/Staff-dashboard/**
-**/vendor/**
-**/public/**
-**/uploads/**
-**/cron/**
+Admin-dashboard/
+Applicant-dashboard/
+Staff-dashboard/
+vendor/
+public/
+uploads/
+cron/
 composer.json
 composer.lock
 *.md
