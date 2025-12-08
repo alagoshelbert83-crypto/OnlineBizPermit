@@ -1,27 +1,6 @@
-# Ignore ALL PHP files everywhere
+# Ignore ALL PHP files everywhere - use glob patterns
 *.php
 **/*.php
-**/**/*.php
-**/**/**/*.php
-
-# Ignore specific root PHP files
-index.php
-db.php
-config_mail.php
-session_handler.php
-file_upload_helper.php
-simple_proxy.php
-test_*.php
-testmail.php
-test_email.php
-testerror.php
-fpdf*.php
-fpdi*.php
-pdf_*.php
-Filter*.php
-create_renewal_test_data.php
-enhance_database_for_comprehensive_form.php
-setup_renewal_system.php
 
 # Ignore PHP directories completely
 Admin-dashboard/
@@ -32,7 +11,7 @@ public/
 uploads/
 cron/
 
-# Ignore PHP-related files
+# Ignore PHP-related files that trigger PHP detection
 composer.json
 composer.lock
 
@@ -50,6 +29,6 @@ onlinebizpermit-firebase-adminsdk-*.json
 # Ignore database files
 *.sql
 
-# Ignore config files that might confuse Vercel
+# Ignore config files
 config
 description
