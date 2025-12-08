@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const admin = require('firebase-admin');
+const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
@@ -10,30 +10,46 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    // Default Firebase domains
+    'https://onlinebizpermit.web.app',
+    'https://onlinebizpermit.firebaseapp.com',
+    // Add your custom domains here after setting them up in Firebase
+    // 'https://admin.yourdomain.com',
+    // 'https://applicant.yourdomain.com',
+    // 'https://staff.yourdomain.com',
+    // Or if using Firebase subdomains:
+    // 'https://admin-dashboard.web.app',
+    // 'https://applicant-dashboard.web.app',
+    // 'https://staff-dashboard.web.app',
+    // Local development
+    'http://localhost:5000',
+    'http://localhost:3000',
+    'http://127.0.0.1:5500' // For local testing with Live Server
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Initialize Firebase Admin
-const serviceAccount = {
-  type: "service_account",
-  project_id: "onlinebizpermit",
-  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-  private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  client_email: process.env.FIREBASE_CLIENT_EMAIL,
-  client_id: process.env.FIREBASE_CLIENT_ID,
-  auth_uri: "https://accounts.google.com/o/oauth2/auth",
-  token_uri: "https://oauth2.googleapis.com/token",
-  auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-  client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL
-};
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: `https://onlinebizpermit.firebaseio.com`
+// Initialize PostgreSQL connection (Neon)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL?.includes('sslmode=require') ? { rejectUnauthorized: false } : false
 });
 
-const db = admin.firestore();
+// Test database connection
+pool.on('connect', () => {
+  console.log('Connected to PostgreSQL database');
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
+  process.exit(-1);
+});
 
 // Email configuration
 const emailTransporter = nodemailer.createTransport({
@@ -157,24 +173,24 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // Query Firestore for user by email
-    const usersRef = db.collection('users');
-    const querySnapshot = await usersRef.where('email', '==', email).limit(1).get();
+    // Query PostgreSQL for user by email
+    const result = await pool.query(
+      'SELECT id, name, email, password, role, is_approved FROM users WHERE email = $1 LIMIT 1',
+      [email]
+    );
 
-    if (querySnapshot.empty) {
+    if (result.rows.length === 0) {
+      // Timing attack protection - hash dummy password
+      await bcrypt.hash('dummy', 10);
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
       });
     }
 
-    const userDoc = querySnapshot.docs[0];
-    const user = { id: userDoc.id, ...userDoc.data() };
+    const user = result.rows[0];
 
-    // Timing attack protection
-    const passwordHash = user ? user.password : await bcrypt.hash('dummy', 10);
-
-    if (!(await bcrypt.compare(password, passwordHash))) {
+    if (!(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
@@ -243,19 +259,20 @@ app.post('/api/auth/staff-login', async (req, res) => {
       });
     }
 
-    // Query Firestore for staff/admin user by email
-    const usersRef = db.collection('users');
-    const querySnapshot = await usersRef.where('email', '==', email).where('role', 'in', ['staff', 'admin']).limit(1).get();
+    // Query PostgreSQL for staff/admin user by email
+    const result = await pool.query(
+      'SELECT id, name, email, password, role FROM users WHERE email = $1 AND role IN ($2, $3) LIMIT 1',
+      [email, 'staff', 'admin']
+    );
 
-    if (querySnapshot.empty) {
+    if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
       });
     }
 
-    const userDoc = querySnapshot.docs[0];
-    const user = { id: userDoc.id, ...userDoc.data() };
+    const user = result.rows[0];
 
     if (!(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({
@@ -307,10 +324,12 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 
     // Check if user already exists
-    const usersRef = db.collection('users');
-    const existingQuery = await usersRef.where('email', '==', email).limit(1).get();
+    const existingUser = await pool.query(
+      'SELECT id FROM users WHERE email = $1',
+      [email]
+    );
 
-    if (!existingQuery.empty) {
+    if (existingUser.rows.length > 0) {
       return res.status(409).json({
         success: false,
         message: 'User already exists with this email'
@@ -320,22 +339,16 @@ app.post('/api/auth/signup', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user document
-    const newUser = {
-      name,
-      email,
-      password: hashedPassword,
-      role: 'user',
-      is_approved: 0,
-      created_at: admin.firestore.FieldValue.serverTimestamp()
-    };
-
-    const docRef = await usersRef.add(newUser);
+    // Create new user
+    const result = await pool.query(
+      'INSERT INTO users (name, email, password, role, is_approved) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+      [name, email, hashedPassword, 'user', 0]
+    );
 
     res.status(201).json({
       success: true,
       message: 'Registration successful! Please wait for admin approval.',
-      data: { userId: docRef.id }
+      data: { userId: result.rows[0].id }
     });
 
   } catch (error) {
@@ -352,38 +365,35 @@ app.get('/api/users/dashboard', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    // Get user info from Firestore
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) {
+    // Get user info from PostgreSQL
+    const userResult = await pool.query(
+      'SELECT id, name, email FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
-    const user = { id: userDoc.id, ...userDoc.data() };
+    const user = userResult.rows[0];
 
-    // Get user applications from Firestore
-    const applicationsSnapshot = await db.collection('applications')
-      .where('user_id', '==', userId)
-      .orderBy('submitted_at', 'desc')
-      .get();
+    // Get user applications from PostgreSQL
+    const applicationsResult = await pool.query(
+      'SELECT * FROM applications WHERE user_id = $1 ORDER BY submitted_at DESC',
+      [userId]
+    );
 
-    const applications = applicationsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    const applications = applicationsResult.rows;
 
-    // Get user notifications from Firestore
-    const notificationsSnapshot = await db.collection('notifications')
-      .where('user_id', '==', userId)
-      .orderBy('created_at', 'desc')
-      .limit(5)
-      .get();
+    // Get user notifications from PostgreSQL
+    const notificationsResult = await pool.query(
+      'SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 5',
+      [userId]
+    );
 
-    const notifications = notificationsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    const notifications = notificationsResult.rows;
 
     res.json({
       success: true,
@@ -429,8 +439,12 @@ app.use('*', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// For Vercel serverless, export the app directly
+// For local development, start the server
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
 
 module.exports = app;
