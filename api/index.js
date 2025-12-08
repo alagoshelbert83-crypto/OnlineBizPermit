@@ -474,7 +474,6 @@ app.use('*', (req, res) => {
   });
 });
 
-// For Vercel serverless, export the handler
 // For local development, start the server
 if (require.main === module) {
   app.listen(PORT, () => {
@@ -483,6 +482,6 @@ if (require.main === module) {
 }
 
 // Export for Vercel serverless functions
-// Vercel expects the Express app to be exported directly
-// The function at api/index.js will be available at /api
+// Vercel automatically detects api/index.js and mounts it at /api
+// Routes should be relative (e.g., '/auth/login' not '/api/auth/login')
 module.exports = app;

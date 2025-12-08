@@ -1,47 +1,32 @@
-# Ignore everything except API
-
-**/*
-
-!api/
-
-!api/**
-
-!package.json
-
-!package-lock.json
-
-!vercel.json
-
-!.vercelignore
-
-!node_modules/
-
-# Explicitly ignore PHP files
-
+# Ignore PHP files and directories
+*.php
 **/*.php
+Admin-dashboard/
+Applicant-dashboard/
+Staff-dashboard/
+vendor/
+public/
+uploads/
+cron/
 
-**/Admin-dashboard/**
-
-**/Applicant-dashboard/**
-
-**/Staff-dashboard/**
-
-**/vendor/**
-
-**/public/**
-
-**/uploads/**
-
-**/cron/**
-
+# Ignore PHP-related files
 composer.json
-
 composer.lock
 
+# Ignore other files
 *.md
-
 firebase.json
-
 .firebase/
-
 onlinebizpermit-firebase-adminsdk-*.json
+
+# Ignore Git files
+.git/
+.gitignore
+.gitattributes
+
+# Ignore database files
+*.sql
+
+# Ignore config files
+config
+description
