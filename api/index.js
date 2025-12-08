@@ -60,26 +60,8 @@ const corsOptions = {
 };
 
 // Apply CORS middleware FIRST, before any other middleware
+// The cors package automatically handles OPTIONS preflight requests
 app.use(cors(corsOptions));
-
-// Explicitly handle OPTIONS preflight requests BEFORE other routes
-app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  console.log('[OPTIONS PREFLIGHT] Origin:', origin);
-  
-  if (!origin || allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400');
-    console.log('[OPTIONS PREFLIGHT] Allowed, sending 204');
-    res.sendStatus(204);
-  } else {
-    console.log('[OPTIONS PREFLIGHT] Blocked origin:', origin);
-    res.sendStatus(403);
-  }
-});
 
 // --- START DEBUGGING MIDDLEWARE ---
 // This will log every request that hits the Express app
@@ -100,27 +82,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Strip /api prefix if present (Vercel should do this, but just in case)
 // This MUST happen before routes are checked
-// IMPORTANT: Handle OPTIONS requests immediately to avoid CORS issues
 app.use((req, res, next) => {
-  // Handle OPTIONS preflight requests immediately
-  if (req.method === 'OPTIONS') {
-    const origin = req.headers.origin;
-    console.log('[OPTIONS in path middleware] Origin:', origin, 'URL:', req.url);
-    
-    if (!origin || allowedOrigins.includes(origin)) {
-      res.header('Access-Control-Allow-Origin', origin || '*');
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-      res.header('Access-Control-Allow-Credentials', 'true');
-      res.header('Access-Control-Max-Age', '86400');
-      console.log('[OPTIONS in path middleware] Allowed, sending 204');
-      return res.sendStatus(204);
-    } else {
-      console.log('[OPTIONS in path middleware] Blocked origin:', origin);
-      return res.sendStatus(403);
-    }
-  }
-  
   const originalUrl = req.url;
   if (req.url.startsWith('/api')) {
     req.url = req.url.replace(/^\/api/, '') || '/';
@@ -448,23 +410,6 @@ apiRouter.get('/', (req, res) => {
     message: 'API is working!',
     routes: ['/auth/login', '/auth/staff-login', '/auth/signup', '/health']
   });
-});
-
-// Handle OPTIONS on the router as well (in case path stripping affects it)
-apiRouter.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  console.log('[OPTIONS PREFLIGHT on Router] Origin:', origin);
-  
-  if (!origin || allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400');
-    res.sendStatus(204);
-  } else {
-    res.sendStatus(403);
-  }
 });
 
 // Mount the API router. Since Vercel routes /api/* to this file,
