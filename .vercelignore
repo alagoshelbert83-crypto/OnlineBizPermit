@@ -1,0 +1,25 @@
+# Ignore everything except API
+**/*
+!api/
+!api/**
+!package.json
+!package-lock.json
+!vercel.json
+!.vercelignore
+!node_modules/
+
+# Explicitly ignore PHP files
+**/*.php
+**/Admin-dashboard/**
+**/Applicant-dashboard/**
+**/Staff-dashboard/**
+**/vendor/**
+**/public/**
+**/uploads/**
+**/cron/**
+composer.json
+composer.lock
+*.md
+firebase.json
+.firebase/
+onlinebizpermit-firebase-adminsdk-*.json
