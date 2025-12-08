@@ -1,6 +1,29 @@
-# Ignore all PHP files and directories
+# Ignore ALL PHP files everywhere
 *.php
 **/*.php
+**/**/*.php
+**/**/**/*.php
+
+# Ignore specific root PHP files
+index.php
+db.php
+config_mail.php
+session_handler.php
+file_upload_helper.php
+simple_proxy.php
+test_*.php
+testmail.php
+test_email.php
+testerror.php
+fpdf*.php
+fpdi*.php
+pdf_*.php
+Filter*.php
+create_renewal_test_data.php
+enhance_database_for_comprehensive_form.php
+setup_renewal_system.php
+
+# Ignore PHP directories completely
 Admin-dashboard/
 Applicant-dashboard/
 Staff-dashboard/
@@ -8,9 +31,25 @@ vendor/
 public/
 uploads/
 cron/
+
+# Ignore PHP-related files
 composer.json
 composer.lock
+
+# Ignore other files
 *.md
 firebase.json
 .firebase/
 onlinebizpermit-firebase-adminsdk-*.json
+
+# Ignore Git files
+.git/
+.gitignore
+.gitattributes
+
+# Ignore database files
+*.sql
+
+# Ignore config files that might confuse Vercel
+config
+description

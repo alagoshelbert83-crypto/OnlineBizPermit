@@ -1,4 +1,7 @@
 {
+  "buildCommand": "echo 'Node.js project - no build needed'",
+  "installCommand": "npm install",
+  "framework": null,
   "functions": {
     "api/index.js": {
       "runtime": "nodejs24.x"
