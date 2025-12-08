@@ -69,12 +69,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Strip /api prefix if present (Vercel should do this, but just in case)
+// This MUST happen before routes are checked
 app.use((req, res, next) => {
-  if (req.url.startsWith('/api/')) {
-    req.url = req.url.replace('/api', '');
-    req.originalUrl = req.originalUrl.replace('/api', '');
-    console.log(`[PATH STRIPPED] New URL: ${req.url}`);
+  const originalUrl = req.url;
+  if (req.url.startsWith('/api')) {
+    req.url = req.url.replace(/^\/api/, '') || '/';
+    req.originalUrl = req.originalUrl.replace(/^\/api/, '') || '/';
+    console.log(`[PATH STRIPPED] ${originalUrl} -> ${req.url}`);
   }
+  console.log(`[BEFORE ROUTES] Method: ${req.method}, URL: ${req.url}, Original: ${req.originalUrl}`);
   next();
 });
 
@@ -124,6 +127,9 @@ const apiRouter = express.Router();
 
 // Applicant Login endpoint
 apiRouter.post('/auth/login', async (req, res) => {
+  console.log('✅ Applicant login route MATCHED!');
+  console.log('  URL:', req.url);
+  console.log('  Method:', req.method);
   try {
     const { email, password } = req.body;
 
