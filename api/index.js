@@ -68,31 +68,56 @@ const corsOptions = {
   optionsSuccessStatus: 204
 };
 
-// CRITICAL: Handle OPTIONS requests FIRST, before CORS middleware
+// CRITICAL: Handle OPTIONS requests FIRST, before ANY other middleware
 // This ensures preflight requests get CORS headers immediately
+// Must be at the very top to catch all OPTIONS requests
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  console.log('[OPTIONS HANDLER] Preflight request from:', origin);
+  console.log('[OPTIONS HANDLER] Request URL:', req.url);
+  console.log('[OPTIONS HANDLER] Allowed origins:', allowedOrigins);
+  
+  // Check if origin is allowed
+  if (!origin || allowedOrigins.includes(origin)) {
+    // Send CORS headers for allowed origin
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    console.log('[OPTIONS HANDLER] Allowed, sending CORS headers, status 204');
+    return res.status(204).end();
+  } else {
+    console.log('[OPTIONS HANDLER] Blocked origin:', origin);
+    return res.status(403).end();
+  }
+});
+
+// Also handle OPTIONS in middleware for any edge cases
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
     const origin = req.headers.origin;
-    console.log('[OPTIONS HANDLER] Preflight request from:', origin);
-    console.log('[OPTIONS HANDLER] Request URL:', req.url);
+    console.log('[OPTIONS MIDDLEWARE] Preflight request from:', origin);
     
-    // Check if origin is allowed
     if (!origin || allowedOrigins.includes(origin)) {
-      // Send CORS headers for allowed origin
       if (origin) {
-        res.header('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Origin', origin);
       } else {
-        res.header('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Origin', '*');
       }
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-      res.header('Access-Control-Allow-Credentials', 'true');
-      res.header('Access-Control-Max-Age', '86400');
-      console.log('[OPTIONS HANDLER] Allowed, sending CORS headers, status 204');
-      return res.sendStatus(204);
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Max-Age', '86400');
+      console.log('[OPTIONS MIDDLEWARE] Allowed, sending CORS headers, status 204');
+      return res.status(204).end();
     } else {
-      console.log('[OPTIONS HANDLER] Blocked origin:', origin);
-      return res.sendStatus(403);
+      console.log('[OPTIONS MIDDLEWARE] Blocked origin:', origin);
+      return res.status(403).end();
     }
   }
   next();
