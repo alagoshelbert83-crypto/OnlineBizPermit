@@ -1,14 +1,8 @@
 {
   "version": 2,
-  "framework": null,
-  "buildCommand": "echo 'Node.js project - no build needed'",
-  "installCommand": "npm install",
   "functions": {
     "api/index.js": {
-      "runtime": "nodejs24.x",
-      "maxDuration": 10
+      "runtime": "nodejs24.x"
     }
-  },
-  "regions": ["sin1"],
-  "outputDirectory": null
+  }
 }
