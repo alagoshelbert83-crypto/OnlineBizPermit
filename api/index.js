@@ -76,15 +76,23 @@ app.use((req, res, next) => {
     console.log('[OPTIONS HANDLER] Preflight request from:', origin);
     console.log('[OPTIONS HANDLER] Request URL:', req.url);
     
-    // Always allow OPTIONS for CORS preflight
-    if (origin) {
-      res.header('Access-Control-Allow-Origin', origin);
+    // Check if origin is allowed
+    if (!origin || allowedOrigins.includes(origin)) {
+      // Send CORS headers for allowed origin
+      if (origin) {
+        res.header('Access-Control-Allow-Origin', origin);
+      } else {
+        res.header('Access-Control-Allow-Origin', '*');
+      }
       res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
       res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
       res.header('Access-Control-Allow-Credentials', 'true');
       res.header('Access-Control-Max-Age', '86400');
-      console.log('[OPTIONS HANDLER] Sending CORS headers, status 204');
+      console.log('[OPTIONS HANDLER] Allowed, sending CORS headers, status 204');
       return res.sendStatus(204);
+    } else {
+      console.log('[OPTIONS HANDLER] Blocked origin:', origin);
+      return res.sendStatus(403);
     }
   }
   next();
