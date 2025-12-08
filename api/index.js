@@ -68,7 +68,29 @@ const corsOptions = {
   optionsSuccessStatus: 204
 };
 
-// Apply CORS middleware FIRST, before any other middleware
+// CRITICAL: Handle OPTIONS requests FIRST, before CORS middleware
+// This ensures preflight requests get CORS headers immediately
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    const origin = req.headers.origin;
+    console.log('[OPTIONS HANDLER] Preflight request from:', origin);
+    console.log('[OPTIONS HANDLER] Request URL:', req.url);
+    
+    // Always allow OPTIONS for CORS preflight
+    if (origin) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+      res.header('Access-Control-Allow-Credentials', 'true');
+      res.header('Access-Control-Max-Age', '86400');
+      console.log('[OPTIONS HANDLER] Sending CORS headers, status 204');
+      return res.sendStatus(204);
+    }
+  }
+  next();
+});
+
+// Apply CORS middleware for all other requests
 // The cors package automatically handles OPTIONS preflight requests
 app.use(cors(corsOptions));
 
