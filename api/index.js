@@ -386,7 +386,17 @@ apiRouter.get('/', (req, res) => {
 
 // Mount the API router. Since Vercel routes /api/* to this file,
 // we mount the router at the root '/'.
+// Vercel strips the /api prefix, so /api/auth/login becomes /auth/login
 app.use('/', apiRouter);
+
+// Debug: Log all registered routes
+console.log('=== REGISTERED ROUTES ===');
+apiRouter.stack.forEach((r) => {
+  if (r.route) {
+    console.log(`${Object.keys(r.route.methods).join(', ').toUpperCase()} ${r.route.path}`);
+  }
+});
+console.log('========================');
 
 // Error handling middleware
 app.use((err, req, res, next) => {
