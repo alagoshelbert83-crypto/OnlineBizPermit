@@ -36,19 +36,28 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: function (origin, callback) {
+    // Log all CORS requests for debugging
+    console.log('[CORS CHECK] Origin:', origin);
+    console.log('[CORS CHECK] Allowed origins:', allowedOrigins);
+    
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) {
+      console.log('[CORS CHECK] No origin, allowing');
       return callback(null, true);
     }
     
     // Check if origin is in allowed list
     if (allowedOrigins.includes(origin)) {
+      console.log('[CORS CHECK] Origin allowed:', origin);
       callback(null, true);
     } else {
       // Log for debugging
-      console.log('CORS: Blocked origin:', origin);
-      console.log('CORS: Allowed origins:', allowedOrigins);
-      callback(new Error('Not allowed by CORS'));
+      console.log('[CORS CHECK] Blocked origin:', origin);
+      console.log('[CORS CHECK] Allowed origins:', allowedOrigins);
+      // Temporarily allow all to debug - change back after testing
+      console.log('[CORS CHECK] Temporarily allowing for debugging');
+      callback(null, true);
+      // callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
