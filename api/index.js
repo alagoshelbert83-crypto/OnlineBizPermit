@@ -15,14 +15,10 @@ app.use(cors({
     // Default Firebase domains
     'https://onlinebizpermit.web.app',
     'https://onlinebizpermit.firebaseapp.com',
-    // Add your custom domains here after setting them up in Firebase
-    // 'https://admin.yourdomain.com',
-    // 'https://applicant.yourdomain.com',
-    // 'https://staff.yourdomain.com',
-    // Or if using Firebase subdomains:
-    // 'https://admin-dashboard.web.app',
-    // 'https://applicant-dashboard.web.app',
-    // 'https://staff-dashboard.web.app',
+    // Firebase dashboard domains
+    'https://admin-dashboardbiz.web.app',
+    'https://applicant-dashboardbiz.web.app',
+    'https://staff-dashboardbiz.web.app',
     // Local development
     'http://localhost:5000',
     'http://localhost:3000',
