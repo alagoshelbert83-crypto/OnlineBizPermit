@@ -78,8 +78,8 @@ const authenticateToken = (req, res, next) => {
 
 // Routes
 
-// Root route - serve landing page
-app.get('/', (req, res) => {
+// Root route - serve landing page (handle both / and /api)
+app.get(['/', '/api'], (req, res) => {
   const landingPageHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
