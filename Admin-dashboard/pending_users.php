@@ -36,8 +36,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'link_app' && isset($_GET['use
     $target_user_email = $target_user['email'] ?? null;
 
     if ($app_details && $target_user) {
-        $conn->beginTransaction();
+        // Check if we're already in a transaction and rollback if needed
+        if ($conn->inTransaction()) {
+            try {
+                $conn->rollBack();
+            } catch (PDOException $e) {
+                // Ignore if already rolled back
+            }
+        }
+        
         try {
+            $conn->beginTransaction();
+            
             // 1. Update the application's user_id
             $update_stmt = $conn->prepare("UPDATE applications SET user_id = ? WHERE id = ?");
             $update_stmt->execute([$target_user_id, $app_to_link_id]);
@@ -108,9 +118,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'link_app' && isset($_GET['use
 
             $conn->commit();
             $message = '<div class="message success">Application linked successfully to ' . htmlspecialchars($target_user_name) . '. They have been notified.</div>';
+        } catch (PDOException $e) {
+            if ($conn->inTransaction()) {
+                $conn->rollBack();
+            }
+            error_log("Transaction error: " . $e->getMessage());
+            $message = '<div class="message error">Failed to link application: ' . htmlspecialchars($e->getMessage()) . '</div>';
         } catch (Exception $e) {
-            $conn->rollBack();
-            $message = '<div class="message error">Failed to link application: ' . $e->getMessage() . '</div>';
+            if ($conn->inTransaction()) {
+                $conn->rollBack();
+            }
+            error_log("General error: " . $e->getMessage());
+            $message = '<div class="message error">Failed to link application: ' . htmlspecialchars($e->getMessage()) . '</div>';
         }
     } else {
         $message = '<div class="message error">Could not find the specified user or application to link.</div>';
@@ -130,8 +149,18 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
     }
 
     if (isset($is_approved)) {
-        $conn->beginTransaction();
+        // Check if we're already in a transaction and rollback if needed
+        if ($conn->inTransaction()) {
+            try {
+                $conn->rollBack();
+            } catch (PDOException $e) {
+                // Ignore if already rolled back
+            }
+        }
+        
         try {
+            $conn->beginTransaction();
+            
             // Update user approval status
             $stmt = $conn->prepare("UPDATE users SET is_approved = ? WHERE id = ? AND role = 'user'");
             
@@ -182,9 +211,18 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
             $conn->commit();
             $status_text = $is_approved === 1 ? 'approved' : 'rejected';
             $message = '<div class="message success">User has been ' . $status_text . '. They have been notified.</div>';
+        } catch (PDOException $e) {
+            if ($conn->inTransaction()) {
+                $conn->rollBack();
+            }
+            error_log("Transaction error: " . $e->getMessage());
+            $message = '<div class="message error">Failed to update user status: ' . htmlspecialchars($e->getMessage()) . '</div>';
         } catch (Exception $e) {
-            $conn->rollBack();
-            $message = '<div class="message error">Failed to update user status: ' . $e->getMessage() . '</div>';
+            if ($conn->inTransaction()) {
+                $conn->rollBack();
+            }
+            error_log("General error: " . $e->getMessage());
+            $message = '<div class="message error">Failed to update user status: ' . htmlspecialchars($e->getMessage()) . '</div>';
         }
     }
 }
@@ -253,31 +291,36 @@ require_once __DIR__ . '/admin_sidebar.php';
                         <?php
                             $potential_apps = [];
                             // PostgreSQL JSON query - cast TEXT to JSON first, then use -> operator
-                            $sql_potential = "SELECT a.id, a.business_name, a.status, u.name as current_owner_name
-                                FROM applications a
-                                LEFT JOIN users u ON a.user_id = u.id
-                                WHERE (
-                                    a.form_details::json->>'owner_name' = ?
-                                    OR
-                                    TRIM(CONCAT(
-                                        COALESCE(a.form_details::json->>'first_name', ''),
-                                        ' ',
-                                        COALESCE(a.form_details::json->>'middle_name', ''),
-                                        ' ',
-                                        COALESCE(a.form_details::json->>'last_name', '')
-                                    )) = ?
-                                )
-                                AND (a.user_id IS NULL OR a.user_id != ?)
-                                AND a.form_details IS NOT NULL
-                                AND a.form_details != ''";
+                            // Wrap in try-catch to handle invalid JSON gracefully
+                            try {
+                                $sql_potential = "SELECT a.id, a.business_name, a.status, u.name as current_owner_name
+                                    FROM applications a
+                                    LEFT JOIN users u ON a.user_id = u.id
+                                    WHERE (
+                                        (a.form_details IS NOT NULL AND a.form_details != '' AND a.form_details::json->>'owner_name' = ?)
+                                        OR
+                                        (a.form_details IS NOT NULL AND a.form_details != '' AND TRIM(CONCAT(
+                                            COALESCE(a.form_details::json->>'first_name', ''),
+                                            ' ',
+                                            COALESCE(a.form_details::json->>'middle_name', ''),
+                                            ' ',
+                                            COALESCE(a.form_details::json->>'last_name', '')
+                                        )) = ?)
+                                    )
+                                    AND (a.user_id IS NULL OR a.user_id != ?)";
 
-                            $potential_apps_stmt = $conn->prepare($sql_potential);
+                                $potential_apps_stmt = $conn->prepare($sql_potential);
 
-                            if ($potential_apps_stmt) {
-                                $potential_apps_stmt->execute([$user['name'], $user['name'], $user['id']]);
-                                $potential_apps = $potential_apps_stmt->fetchAll(PDO::FETCH_ASSOC);
+                                if ($potential_apps_stmt) {
+                                    $potential_apps_stmt->execute([$user['name'], $user['name'], $user['id']]);
+                                    $potential_apps = $potential_apps_stmt->fetchAll(PDO::FETCH_ASSOC);
+                                }
+                            } catch (PDOException $e) {
+                                // Silently fail if JSON is invalid or query fails
+                                // Log error for debugging but don't break the page
+                                error_log("Error fetching potential apps for user {$user['id']}: " . $e->getMessage());
+                                $potential_apps = [];
                             }
-                            // Silently fail if JSON functions are not supported, or log the error
                         ?>
                         <div class="user-card">
                             <div class="card-section">
