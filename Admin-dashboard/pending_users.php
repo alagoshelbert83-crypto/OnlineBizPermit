@@ -195,21 +195,69 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
             $conn->beginTransaction();
             
             // Update user approval status
-            $stmt = $conn->prepare("UPDATE users SET is_approved = ? WHERE id = ? AND role = 'user'");
-            $stmt->execute([$is_approved, $userId]);
-            
-            // Check if update actually affected a row
-            if ($stmt->rowCount() === 0) {
-                throw new Exception("No user found with ID {$userId} or user is not a regular user");
+            try {
+                $stmt = $conn->prepare("UPDATE users SET is_approved = ? WHERE id = ? AND role = 'user'");
+                $result = $stmt->execute([$is_approved, $userId]);
+                
+                // Check for errors even if no exception was thrown
+                if ($result === false) {
+                    $error_info = $stmt->errorInfo();
+                    $conn->rollBack();
+                    throw new Exception("UPDATE failed: " . ($error_info[2] ?? "Unknown error"));
+                }
+                
+                // Check if update actually affected a row
+                $rows_affected = $stmt->rowCount();
+                if ($rows_affected === 0) {
+                    $conn->rollBack();
+                    throw new Exception("No user found with ID {$userId} or user is not a regular user");
+                }
+            } catch (PDOException $e) {
+                // If UPDATE fails, rollback immediately and rethrow
+                if ($conn->inTransaction()) {
+                    try {
+                        $conn->rollBack();
+                    } catch (PDOException $rollback_e) {
+                        // Ignore rollback errors - transaction might already be rolled back
+                        error_log("Rollback error (ignored): " . $rollback_e->getMessage());
+                    }
+                }
+                throw new Exception("Failed to update user status: " . $e->getMessage());
+            } catch (Exception $e) {
+                // If validation fails, rollback immediately and rethrow
+                if ($conn->inTransaction()) {
+                    try {
+                        $conn->rollBack();
+                    } catch (PDOException $rollback_e) {
+                        // Ignore rollback errors
+                        error_log("Rollback error (ignored): " . $rollback_e->getMessage());
+                    }
+                }
+                throw $e;
             }
             
             // Get user details for notification
-            $stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
-            $stmt->execute([$userId]);
-            $userDetails = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$userDetails) {
-                throw new Exception("User details not found after update");
+            $userDetails = null;
+            try {
+                $stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
+                $stmt->execute([$userId]);
+                $userDetails = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$userDetails) {
+                    $conn->rollBack();
+                    throw new Exception("User details not found after update");
+                }
+            } catch (PDOException $e) {
+                // If SELECT fails, rollback immediately and rethrow
+                if ($conn->inTransaction()) {
+                    try {
+                        $conn->rollBack();
+                    } catch (PDOException $rollback_e) {
+                        // Ignore rollback errors
+                        error_log("Rollback error (ignored): " . $rollback_e->getMessage());
+                    }
+                }
+                throw new Exception("Failed to fetch user details: " . $e->getMessage());
             }
             
             // Send notification
@@ -223,8 +271,22 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                 $notificationMessage = "Your account registration has been rejected. Please contact support for more information.";
                 $link = null; // No link for rejection
             }
-            $notifyStmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
-            $notifyStmt->execute([$userId, $notificationMessage, $link]);
+            
+            try {
+                $notifyStmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
+                $notifyStmt->execute([$userId, $notificationMessage, $link]);
+            } catch (PDOException $e) {
+                // If INSERT fails, rollback immediately and rethrow
+                if ($conn->inTransaction()) {
+                    try {
+                        $conn->rollBack();
+                    } catch (PDOException $rollback_e) {
+                        // Ignore rollback errors
+                        error_log("Rollback error (ignored): " . $rollback_e->getMessage());
+                    }
+                }
+                throw new Exception("Failed to create notification: " . $e->getMessage());
+            }
             
             // Commit the transaction first before sending email
             $conn->commit();
