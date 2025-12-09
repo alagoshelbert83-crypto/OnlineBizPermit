@@ -215,36 +215,37 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
         }
         
         try {
+            // Use a transaction for atomicity
             $conn->beginTransaction();
             
-            // Update user approval status using RETURNING to verify it worked
+            // Update user approval status using RETURNING to get user details in one query
             $stmt = $conn->prepare("UPDATE users SET is_approved = ? WHERE id = ? AND role = 'user' RETURNING id, name, email");
-            $stmt->execute([$is_approved, $userId]);
             
-            // Check transaction state immediately after execute
-            // If transaction was aborted, rollback before trying to fetch
-            if (!$conn->inTransaction()) {
-                // Transaction was aborted - try to rollback and throw error
-                try {
-                    $conn->exec("ROLLBACK");
-                } catch (PDOException $rollback_e) {
-                    // Ignore rollback errors
-                }
-                throw new Exception("Transaction was aborted during UPDATE. The user may not exist or there was a constraint violation.");
+            // Execute UPDATE - catch any errors immediately
+            try {
+                $stmt->execute([$is_approved, $userId]);
+            } catch (PDOException $execute_e) {
+                // If execute fails, rollback immediately
+                $conn->rollBack();
+                throw new Exception("UPDATE failed: " . $execute_e->getMessage());
             }
             
-            // Transaction is still active, safe to fetch
-            $userDetails = $stmt->fetch(PDO::FETCH_ASSOC);
+            // Fetch the result - wrap in try-catch in case transaction was aborted
+            try {
+                $userDetails = $stmt->fetch(PDO::FETCH_ASSOC);
+            } catch (PDOException $fetch_e) {
+                // If fetch fails, transaction was likely aborted
+                $conn->rollBack();
+                throw new Exception("Failed to retrieve updated user data. The UPDATE may have failed: " . $fetch_e->getMessage());
+            }
             
             if (!$userDetails) {
-                // No rows were updated
+                // No rows were updated - rollback and throw
                 $conn->rollBack();
                 throw new Exception("No user found with ID {$userId} or user is not a regular user");
             }
             
-            // Update succeeded and we have the user details
-            
-            // Send notification
+            // Update succeeded - now create notification
             $status_text = $is_approved === 1 ? 'approved' : 'rejected';
             
             // 1. Create in-app notification
@@ -256,21 +257,10 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                 $link = null; // No link for rejection
             }
             
-            try {
-                $notifyStmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
-                $notifyStmt->execute([$userId, $notificationMessage, $link]);
-            } catch (PDOException $e) {
-                // If INSERT fails, rollback immediately using exec() which works even if transaction is aborted
-                try {
-                    $conn->exec("ROLLBACK");
-                } catch (PDOException $rollback_e) {
-                    // Ignore rollback errors - transaction might already be rolled back
-                    error_log("Rollback error during INSERT (ignored): " . $rollback_e->getMessage());
-                }
-                throw new Exception("Failed to create notification: " . $e->getMessage());
-            }
+            $notifyStmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
+            $notifyStmt->execute([$userId, $notificationMessage, $link]);
             
-            // Commit the transaction first before sending email
+            // Commit the transaction
             $conn->commit();
             
             // Send email notification AFTER transaction is committed
@@ -298,23 +288,25 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
             }
             $status_text = $is_approved === 1 ? 'approved' : 'rejected';
             $message = '<div class="message success">User has been ' . $status_text . '. They have been notified.</div>';
-        } catch (Exception $e) {
-            // Ensure transaction is rolled back (in case inner catch didn't handle it)
-            // Use exec() which works even if transaction is in an aborted state
+        } catch (PDOException $e) {
+            // PDO exception - rollback immediately using exec() which works even if transaction is aborted
             try {
                 $conn->exec("ROLLBACK");
             } catch (PDOException $rollback_e) {
-                // Ignore rollback errors - transaction might already be rolled back
-                error_log("Final rollback error (ignored): " . $rollback_e->getMessage());
+                // Ignore rollback errors
+                error_log("Rollback error (ignored): " . $rollback_e->getMessage());
+            }
+            error_log("User approval PDO error: " . $e->getMessage());
+            $message = '<div class="message error">Failed to update user status: ' . htmlspecialchars($e->getMessage()) . '</div>';
+        } catch (Exception $e) {
+            // General exception - also rollback
+            try {
+                $conn->exec("ROLLBACK");
+            } catch (PDOException $rollback_e) {
+                error_log("Rollback error (ignored): " . $rollback_e->getMessage());
             }
             error_log("User approval error: " . $e->getMessage());
-            // Don't double-wrap the error message - use the message from the exception as-is
-            $error_msg = $e->getMessage();
-            // Remove "Failed to update user status: " prefix if it's already there to avoid duplication
-            if (strpos($error_msg, "Failed to update user status: ") === 0) {
-                $error_msg = substr($error_msg, strlen("Failed to update user status: "));
-            }
-            $message = '<div class="message error">Failed to update user status: ' . htmlspecialchars($error_msg) . '</div>';
+            $message = '<div class="message error">Failed to update user status: ' . htmlspecialchars($e->getMessage()) . '</div>';
         }
         skip_approval:
     }
