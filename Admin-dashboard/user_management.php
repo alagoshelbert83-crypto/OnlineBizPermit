@@ -31,38 +31,30 @@ if (isset($_GET['action']) && $_GET['action'] === 'link_app' && isset($_GET['use
 
     // Get app details before changing anything
     $app_details_stmt = $conn->prepare("SELECT user_id, business_name FROM applications WHERE id = ?");
-    $app_details_stmt->bind_param("i", $app_to_link_id);
-    $app_details_stmt->execute();
-    $app_details = $app_details_stmt->get_result()->fetch_assoc();
+    $app_details_stmt->execute([$app_to_link_id]);
+    $app_details = $app_details_stmt->fetch(PDO::FETCH_ASSOC);
     $original_user_id = $app_details['user_id'] ?? null;
     $business_name = $app_details['business_name'] ?? 'Unknown Application';
-    $app_details_stmt->close();
 
     // Get target user details
     $user_details_stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
-    $user_details_stmt->bind_param("i", $target_user_id);
-    $user_details_stmt->execute();
-    $target_user = $user_details_stmt->get_result()->fetch_assoc();
+    $user_details_stmt->execute([$target_user_id]);
+    $target_user = $user_details_stmt->fetch(PDO::FETCH_ASSOC);
     $target_user_name = $target_user['name'] ?? 'the new user';
     $target_user_email = $target_user['email'] ?? null;
-    $user_details_stmt->close();
 
     if ($app_details && $target_user) {
-        $conn->begin_transaction();
+        $conn->beginTransaction();
         try {
             // 1. Update the application's user_id
             $update_stmt = $conn->prepare("UPDATE applications SET user_id = ? WHERE id = ?");
-            $update_stmt->bind_param("ii", $target_user_id, $app_to_link_id);
-            $update_stmt->execute();
-            $update_stmt->close();
+            $update_stmt->execute([$target_user_id, $app_to_link_id]);
 
             // 2. Notify the new user
             $new_user_message = "An existing application for '{$business_name}' has been linked to your account by an administrator.";
             $link = "../Applicant-dashboard/view_my_application.php?id={$app_to_link_id}";
             $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
-            $notify_stmt->bind_param("iss", $target_user_id, $new_user_message, $link);
-            $notify_stmt->execute();
-            $notify_stmt->close();
+            $notify_stmt->execute([$target_user_id, $new_user_message, $link]);
 
             // Email the new user
             if (function_exists('sendApplicationEmail') && $target_user_email) {
@@ -93,16 +85,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'link_app' && isset($_GET['use
             // 3. Notify the original user if there was one and it's a different user
             if ($original_user_id && $original_user_id !== $target_user_id) {
                 $original_user_stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
-                $original_user_stmt->bind_param("i", $original_user_id);
-                $original_user_stmt->execute();
-                $original_user = $original_user_stmt->get_result()->fetch_assoc();
-                $original_user_stmt->close();
+                $original_user_stmt->execute([$original_user_id]);
+                $original_user = $original_user_stmt->fetch(PDO::FETCH_ASSOC);
 
                 $original_user_message = "Your application for '{$business_name}' has been reassigned to '{$target_user_name}' by an administrator.";
                 $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message) VALUES (?, ?)");
-                $notify_stmt->bind_param("is", $original_user_id, $original_user_message);
-                $notify_stmt->execute();
-                $notify_stmt->close();
+                $notify_stmt->execute([$original_user_id, $original_user_message]);
 
                 // Email the original user
                 if ($original_user && !empty($original_user['email']) && function_exists('sendApplicationEmail')) {
@@ -150,15 +138,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_user'])) {
         $message = '<div class="message error">Password must be at least 8 characters long.</div>';
     } else {
         $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
-        $stmt->bind_param("s", $email);
-        $stmt->execute();
-        if ($stmt->get_result()->num_rows > 0) {
+        $stmt->execute([$email]);
+        if ($stmt->fetch()) {
             $message = '<div class="message error">An account with this email already exists.</div>';
         } else {
             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
             $insertStmt = $conn->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)");
-            $insertStmt->bind_param("ssss", $name, $email, $hashedPassword, $role);
-            $message = $insertStmt->execute() ? '<div class="message success">User added successfully.</div>' : '<div class="message error">Failed to add user.</div>';
+            $message = $insertStmt->execute([$name, $email, $hashedPassword, $role]) ? '<div class="message success">User added successfully.</div>' : '<div class="message error">Failed to add user.</div>';
         }
     }
 }
@@ -170,8 +156,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
         $message = '<div class="message error">You cannot delete your own account.</div>';
     } else {
         $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
-        $stmt->bind_param("i", $userIdToDelete);
-        $message = $stmt->execute() ? '<div class="message success">User deleted successfully.</div>' : '<div class="message error">Failed to delete user.</div>';
+        $message = $stmt->execute([$userIdToDelete]) ? '<div class="message success">User deleted successfully.</div>' : '<div class="message error">Failed to delete user.</div>';
     }
 }
 
@@ -198,8 +183,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action']) && iss
                 } else {
                     $placeholders = str_repeat('?,', count($user_ids) - 1) . '?';
                     $stmt = $conn->prepare("DELETE FROM users WHERE id IN ($placeholders)");
-                    $stmt->bind_param(str_repeat('i', count($user_ids)), ...$user_ids);
-                    $deleted_count = $stmt->execute() ? $stmt->affected_rows : 0;
+                    $stmt->execute($user_ids);
+                    $deleted_count = $stmt->rowCount();
                     $message = '<div class="message success">' . $deleted_count . ' user(s) deleted successfully.</div>';
                 }
                 break;
@@ -207,10 +192,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action']) && iss
             case 'change_role':
                 $new_role = $_POST['new_role'] ?? '';
                 if (in_array($new_role, ['admin', 'staff', 'user'])) {
+                    $placeholders = str_repeat('?,', count($user_ids) - 1) . '?';
                     $stmt = $conn->prepare("UPDATE users SET role = ? WHERE id IN ($placeholders)");
                     $params = array_merge([$new_role], $user_ids);
-                    $stmt->bind_param('s' . str_repeat('i', count($user_ids)), ...$params);
-                    $updated_count = $stmt->execute() ? $stmt->affected_rows : 0;
+                    $stmt->execute($params);
+                    $updated_count = $stmt->rowCount();
                     $message = '<div class="message success">' . $updated_count . ' user(s) role updated to ' . ucfirst($new_role) . '.</div>';
                 } else {
                     $message = '<div class="message error">Invalid role selected.</div>';
@@ -253,20 +239,17 @@ if (!empty($where_clauses)) { $sql_base .= " WHERE " . implode(" AND ", $where_c
 // Get total number of users for pagination
 $count_sql = "SELECT COUNT(*) " . $sql_base;
 $stmt_count = $conn->prepare($count_sql);
-if (!empty($params)) { $stmt_count->bind_param($types, ...$params); }
-$stmt_count->execute();
-$total_users = $stmt_count->get_result()->fetch_row()[0];
+$stmt_count->execute($params);
+$total_users = $stmt_count->fetchColumn();
 $total_pages = ceil($total_users / $limit);
 
 // Fetch users for the current page
 $fetch_sql = "SELECT id, name, email, role, is_approved, created_at " . $sql_base . " ORDER BY id DESC LIMIT ? OFFSET ?";
 $fetch_params = array_merge($params, [$limit, $offset]);
-$fetch_types = $types . "ii";
 
 $stmt_fetch = $conn->prepare($fetch_sql);
-$stmt_fetch->bind_param($fetch_types, ...$fetch_params);
-$stmt_fetch->execute();
-$users = $stmt_fetch->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt_fetch->execute($fetch_params);
+$users = $stmt_fetch->fetchAll(PDO::FETCH_ASSOC);
 
 // Include Sidebar
 require_once __DIR__ . '/admin_sidebar.php';

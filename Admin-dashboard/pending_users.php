@@ -23,38 +23,30 @@ if (isset($_GET['action']) && $_GET['action'] === 'link_app' && isset($_GET['use
 
     // Get app details before changing anything
     $app_details_stmt = $conn->prepare("SELECT user_id, business_name FROM applications WHERE id = ?");
-    $app_details_stmt->bind_param("i", $app_to_link_id);
-    $app_details_stmt->execute();
-    $app_details = $app_details_stmt->get_result()->fetch_assoc();
+    $app_details_stmt->execute([$app_to_link_id]);
+    $app_details = $app_details_stmt->fetch(PDO::FETCH_ASSOC);
     $original_user_id = $app_details['user_id'] ?? null;
     $business_name = $app_details['business_name'] ?? 'Unknown Application';
-    $app_details_stmt->close();
 
     // Get target user details
     $user_details_stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
-    $user_details_stmt->bind_param("i", $target_user_id);
-    $user_details_stmt->execute();
-    $target_user = $user_details_stmt->get_result()->fetch_assoc();
+    $user_details_stmt->execute([$target_user_id]);
+    $target_user = $user_details_stmt->fetch(PDO::FETCH_ASSOC);
     $target_user_name = $target_user['name'] ?? 'the new user';
     $target_user_email = $target_user['email'] ?? null;
-    $user_details_stmt->close();
 
     if ($app_details && $target_user) {
-        $conn->begin_transaction();
+        $conn->beginTransaction();
         try {
             // 1. Update the application's user_id
             $update_stmt = $conn->prepare("UPDATE applications SET user_id = ? WHERE id = ?");
-            $update_stmt->bind_param("ii", $target_user_id, $app_to_link_id);
-            $update_stmt->execute();
-            $update_stmt->close();
+            $update_stmt->execute([$target_user_id, $app_to_link_id]);
 
             // 2. Notify the new user
             $new_user_message = "An existing application for '{$business_name}' has been linked to your account by an administrator.";
             $link = "../Applicant-dashboard/view_my_application.php?id={$app_to_link_id}";
             $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
-            $notify_stmt->bind_param("iss", $target_user_id, $new_user_message, $link);
-            $notify_stmt->execute();
-            $notify_stmt->close();
+            $notify_stmt->execute([$target_user_id, $new_user_message, $link]);
 
             // 4. Email the new user (if email function exists and user has an email)
             if (function_exists('sendApplicationEmail') && $target_user_email) {
@@ -85,16 +77,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'link_app' && isset($_GET['use
             // 3. Notify the original user if there was one and it's a different user
             if ($original_user_id && $original_user_id !== $target_user_id) {
                 $original_user_stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
-                $original_user_stmt->bind_param("i", $original_user_id);
-                $original_user_stmt->execute();
-                $original_user = $original_user_stmt->get_result()->fetch_assoc();
-                $original_user_stmt->close();
+                $original_user_stmt->execute([$original_user_id]);
+                $original_user = $original_user_stmt->fetch(PDO::FETCH_ASSOC);
 
                 $original_user_message = "Your application for '{$business_name}' has been reassigned to '{$target_user_name}' by an administrator.";
                 $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message) VALUES (?, ?)");
-                $notify_stmt->bind_param("is", $original_user_id, $original_user_message);
-                $notify_stmt->execute();
-                $notify_stmt->close();
+                $notify_stmt->execute([$original_user_id, $original_user_message]);
 
                 // Email the original user
                 if ($original_user && !empty($original_user['email']) && function_exists('sendApplicationEmail')) {
@@ -121,7 +109,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'link_app' && isset($_GET['use
             $conn->commit();
             $message = '<div class="message success">Application linked successfully to ' . htmlspecialchars($target_user_name) . '. They have been notified.</div>';
         } catch (Exception $e) {
-            $conn->rollback();
+            $conn->rollBack();
             $message = '<div class="message error">Failed to link application: ' . $e->getMessage() . '</div>';
         }
     } else {
@@ -142,23 +130,19 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
     }
 
     if (isset($is_approved)) {
-        $conn->begin_transaction();
+        $conn->beginTransaction();
         try {
             // Update user approval status
             $stmt = $conn->prepare("UPDATE users SET is_approved = ? WHERE id = ? AND role = 'user'");
-            $stmt->bind_param("ii", $is_approved, $userId);
             
-            if (!$stmt->execute()) {
+            if (!$stmt->execute([$is_approved, $userId])) {
                 throw new Exception("Failed to update user status");
             }
-            $stmt->close();
             
             // Get user details for notification
             $stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
-            $stmt->bind_param("i", $userId);
-            $stmt->execute();
-            $userDetails = $stmt->get_result()->fetch_assoc();
-            $stmt->close();
+            $stmt->execute([$userId]);
+            $userDetails = $stmt->fetch(PDO::FETCH_ASSOC);
             
             // Send notification
             if ($userDetails) {
@@ -173,9 +157,7 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                     $link = null; // No link for rejection
                 }
                 $notifyStmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
-                $notifyStmt->bind_param("iss", $userId, $notificationMessage, $link);
-                $notifyStmt->execute();
-                $notifyStmt->close();
+                $notifyStmt->execute([$userId, $notificationMessage, $link]);
 
                 // 2. Send email notification
                 if (function_exists('sendApplicationEmail') && !empty($userDetails['email'])) {
@@ -201,7 +183,7 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
             $status_text = $is_approved === 1 ? 'approved' : 'rejected';
             $message = '<div class="message success">User has been ' . $status_text . '. They have been notified.</div>';
         } catch (Exception $e) {
-            $conn->rollback();
+            $conn->rollBack();
             $message = '<div class="message error">Failed to update user status: ' . $e->getMessage() . '</div>';
         }
     }
@@ -219,7 +201,7 @@ $sql = "SELECT u.id, u.name, u.email, u.phone, u.created_at,
         ORDER BY u.created_at ASC";
 $result = $conn->query($sql);
 if ($result) {
-    $pending_users = $result->fetch_all(MYSQLI_ASSOC);
+    $pending_users = $result->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // Include Sidebar
@@ -288,11 +270,8 @@ require_once __DIR__ . '/admin_sidebar.php';
                             $potential_apps_stmt = $conn->prepare($sql_potential);
 
                             if ($potential_apps_stmt) {
-                                $potential_apps_stmt->bind_param("ssi", $user['name'], $user['name'], $user['id']);
-                                $potential_apps_stmt->execute();
-                                $potential_apps_result = $potential_apps_stmt->get_result();
-                                $potential_apps = $potential_apps_result->fetch_all(MYSQLI_ASSOC);
-                                $potential_apps_stmt->close();
+                                $potential_apps_stmt->execute([$user['name'], $user['name'], $user['id']]);
+                                $potential_apps = $potential_apps_stmt->fetchAll(PDO::FETCH_ASSOC);
                             }
                             // Silently fail if JSON functions are not supported, or log the error
                         ?>
