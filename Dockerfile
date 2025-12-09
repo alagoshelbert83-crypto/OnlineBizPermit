@@ -12,6 +12,15 @@ RUN apt-get update && apt-get install -y \
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
 
+# Configure Apache to allow .htaccess overrides
+RUN echo '<Directory /var/www/html>' > /etc/apache2/conf-available/allow-htaccess.conf && \
+    echo '    Options Indexes FollowSymLinks' >> /etc/apache2/conf-available/allow-htaccess.conf && \
+    echo '    AllowOverride All' >> /etc/apache2/conf-available/allow-htaccess.conf && \
+    echo '    Require all granted' >> /etc/apache2/conf-available/allow-htaccess.conf && \
+    echo '    DirectoryIndex index.php index.html' >> /etc/apache2/conf-available/allow-htaccess.conf && \
+    echo '</Directory>' >> /etc/apache2/conf-available/allow-htaccess.conf && \
+    a2enconf allow-htaccess
+
 # Set working directory
 WORKDIR /var/www/html
 
