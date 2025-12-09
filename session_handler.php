@@ -4,6 +4,12 @@
  * Stores sessions in database since file-based sessions don't persist
  */
 
+// Suppress deprecation warnings for gc() return type
+// This is a known PHP 8.1+ compatibility issue
+if (PHP_VERSION_ID >= 80100) {
+    error_reporting(error_reporting() & ~E_DEPRECATED);
+}
+
 class DatabaseSessionHandler implements SessionHandlerInterface {
     private $conn;
     private $table = 'user_sessions';
@@ -50,13 +56,19 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
         return $stmt->execute(['session_id' => $sessionId]);
     }
 
+    /**
+     * Garbage collection - delete expired sessions
+     * @param int $maxLifetime Maximum session lifetime in seconds
+     * @return int|false Number of deleted sessions or false on failure
+     */
     #[\ReturnTypeWillChange]
     public function gc($maxLifetime) {
         try {
             $stmt = $this->conn->prepare("DELETE FROM {$this->table} WHERE session_expires < NOW()");
             if ($stmt->execute()) {
                 // Return number of deleted rows, or 0 if none
-                return $stmt->rowCount();
+                $count = $stmt->rowCount();
+                return $count;
             }
             return false;
         } catch (Exception $e) {
@@ -68,11 +80,17 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
 
 // Initialize custom session handler if database connection exists
 // IMPORTANT: Must be called BEFORE session_start()
+// Suppress warnings if session is already active (shouldn't happen if called correctly)
 if (isset($conn) && $conn instanceof PDO) {
     // Only set handler if session is not already active
     if (session_status() === PHP_SESSION_NONE) {
-        $sessionHandler = new DatabaseSessionHandler($conn);
-        session_set_save_handler($sessionHandler, true);
+        try {
+            $sessionHandler = new DatabaseSessionHandler($conn);
+            @session_set_save_handler($sessionHandler, true);
+        } catch (Exception $e) {
+            // If handler cannot be set, log error but don't die
+            error_log("Could not set session handler: " . $e->getMessage());
+        }
     }
 }
 ?>

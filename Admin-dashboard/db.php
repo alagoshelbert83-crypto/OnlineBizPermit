@@ -59,6 +59,15 @@ try {
     error_log("Database connection error: " . $e->getMessage());
     error_log("Attempted DSN: " . (isset($dsn) ? $dsn : 'DSN not set'));
     error_log("Host: $host, Port: $port, Database: $dbname, User: $user");
-    die($error_message);
+    // Don't output anything - just log and die silently to prevent header issues
+    http_response_code(500);
+    if (php_sapi_name() !== 'cli') {
+        die($error_message);
+    } else {
+        die($error_message . "\n");
+    }
 }
+
+// Include custom session handler for serverless compatibility
+require_once __DIR__ . '/../session_handler.php';
 ?>
