@@ -18,20 +18,22 @@ $message = '';
 
 // Helper function to ensure connection is clean before starting a transaction
 function ensureCleanConnection($conn) {
+    // PostgreSQL requires explicit rollback if transaction is aborted
+    // Even if inTransaction() returns false, we might be in an aborted state
     try {
-        // If we're in a transaction, rollback to clean state
-        if ($conn->inTransaction()) {
-            $conn->rollBack();
-        }
+        // Always try to rollback first - this is safe even if not in a transaction
+        $conn->exec("ROLLBACK");
     } catch (PDOException $e) {
-        // If rollback fails, the connection might be in a bad state
-        // Try to execute a simple query to reset the connection state
-        try {
-            $conn->query("SELECT 1");
-        } catch (PDOException $e2) {
-            error_log("Connection reset failed: " . $e2->getMessage());
-            // Connection might need to be recreated, but we'll let PDO handle it
-        }
+        // Ignore - might not be in a transaction
+    }
+    
+    // Now verify connection is healthy with a simple query
+    try {
+        $conn->query("SELECT 1")->fetch();
+    } catch (PDOException $e) {
+        error_log("Connection health check failed: " . $e->getMessage());
+        // If this fails, the connection is truly broken and needs to be recreated
+        throw new Exception("Database connection is in an invalid state. Please refresh the page.");
     }
 }
 
@@ -40,23 +42,41 @@ if (isset($_GET['action']) && $_GET['action'] === 'link_app' && isset($_GET['use
     $target_user_id = (int)$_GET['user_id'];
     $app_to_link_id = (int)$_GET['app_id'];
 
-    // Get app details before changing anything
-    $app_details_stmt = $conn->prepare("SELECT user_id, business_name FROM applications WHERE id = ?");
-    $app_details_stmt->execute([$app_to_link_id]);
-    $app_details = $app_details_stmt->fetch(PDO::FETCH_ASSOC);
-    $original_user_id = $app_details['user_id'] ?? null;
-    $business_name = $app_details['business_name'] ?? 'Unknown Application';
+    // Ensure connection is clean before any queries
+    try {
+        ensureCleanConnection($conn);
+    } catch (Exception $e) {
+        $message = '<div class="message error">' . htmlspecialchars($e->getMessage()) . '</div>';
+        goto skip_linking; // Skip to end of linking section
+    }
 
-    // Get target user details
-    $user_details_stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
-    $user_details_stmt->execute([$target_user_id]);
-    $target_user = $user_details_stmt->fetch(PDO::FETCH_ASSOC);
-    $target_user_name = $target_user['name'] ?? 'the new user';
-    $target_user_email = $target_user['email'] ?? null;
+    // Get app details before changing anything
+    try {
+        $app_details_stmt = $conn->prepare("SELECT user_id, business_name FROM applications WHERE id = ?");
+        $app_details_stmt->execute([$app_to_link_id]);
+        $app_details = $app_details_stmt->fetch(PDO::FETCH_ASSOC);
+        $original_user_id = $app_details['user_id'] ?? null;
+        $business_name = $app_details['business_name'] ?? 'Unknown Application';
+
+        // Get target user details
+        $user_details_stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
+        $user_details_stmt->execute([$target_user_id]);
+        $target_user = $user_details_stmt->fetch(PDO::FETCH_ASSOC);
+        $target_user_name = $target_user['name'] ?? 'the new user';
+        $target_user_email = $target_user['email'] ?? null;
+    } catch (PDOException $e) {
+        $message = '<div class="message error">Failed to fetch application or user details: ' . htmlspecialchars($e->getMessage()) . '</div>';
+        goto skip_linking;
+    }
 
     if ($app_details && $target_user) {
         // Ensure connection is clean before starting transaction
-        ensureCleanConnection($conn);
+        try {
+            ensureCleanConnection($conn);
+        } catch (Exception $e) {
+            $message = '<div class="message error">' . htmlspecialchars($e->getMessage()) . '</div>';
+            goto skip_linking;
+        }
         
         try {
             $conn->beginTransaction();
@@ -147,6 +167,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'link_app' && isset($_GET['use
     } else {
         $message = '<div class="message error">Could not find the specified user or application to link.</div>';
     }
+    skip_linking:
 }
 
 // --- Handle User Status Update ---
@@ -163,7 +184,12 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
 
     if (isset($is_approved)) {
         // Ensure connection is clean before starting transaction
-        ensureCleanConnection($conn);
+        try {
+            ensureCleanConnection($conn);
+        } catch (Exception $e) {
+            $message = '<div class="message error">' . htmlspecialchars($e->getMessage()) . '</div>';
+            goto skip_approval; // Skip to end of approval section
+        }
         
         try {
             $conn->beginTransaction();
@@ -241,6 +267,7 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
             error_log("General error: " . $e->getMessage());
             $message = '<div class="message error">Failed to update user status: ' . htmlspecialchars($e->getMessage()) . '</div>';
         }
+        skip_approval:
     }
 }
 
