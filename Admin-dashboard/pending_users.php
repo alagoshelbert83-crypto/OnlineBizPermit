@@ -152,14 +152,22 @@ if (isset($_GET['action']) && $_GET['action'] === 'link_app' && isset($_GET['use
             $conn->commit();
             $message = '<div class="message success">Application linked successfully to ' . htmlspecialchars($target_user_name) . '. They have been notified.</div>';
         } catch (PDOException $e) {
-            if ($conn->inTransaction()) {
-                $conn->rollBack();
+            // Use exec() which works even if transaction is in an aborted state
+            try {
+                $conn->exec("ROLLBACK");
+            } catch (PDOException $rollback_e) {
+                // Ignore rollback errors - transaction might already be rolled back
+                error_log("Rollback error (ignored): " . $rollback_e->getMessage());
             }
             error_log("Transaction error: " . $e->getMessage());
             $message = '<div class="message error">Failed to link application: ' . htmlspecialchars($e->getMessage()) . '</div>';
         } catch (Exception $e) {
-            if ($conn->inTransaction()) {
-                $conn->rollBack();
+            // Use exec() which works even if transaction is in an aborted state
+            try {
+                $conn->exec("ROLLBACK");
+            } catch (PDOException $rollback_e) {
+                // Ignore rollback errors - transaction might already be rolled back
+                error_log("Rollback error (ignored): " . $rollback_e->getMessage());
             }
             error_log("General error: " . $e->getMessage());
             $message = '<div class="message error">Failed to link application: ' . htmlspecialchars($e->getMessage()) . '</div>';
@@ -220,15 +228,20 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                 
                 if (!$userDetails) {
                     // No rows were updated
-                    $conn->rollBack();
+                    try {
+                        $conn->exec("ROLLBACK");
+                    } catch (PDOException $rollback_e) {
+                        // Ignore rollback errors
+                        error_log("Rollback error (ignored): " . $rollback_e->getMessage());
+                    }
                     throw new Exception("No user found with ID {$userId} or user is not a regular user");
                 }
                 
                 // Update succeeded and we have the user details
             } catch (PDOException $e) {
-                // If UPDATE fails, rollback IMMEDIATELY
+                // If UPDATE fails, rollback IMMEDIATELY using exec() which works even if transaction is aborted
                 try {
-                    $conn->rollBack();
+                    $conn->exec("ROLLBACK");
                 } catch (PDOException $rollback_e) {
                     // Log but continue - transaction might already be rolled back
                     error_log("Rollback error during UPDATE: " . $rollback_e->getMessage());
@@ -253,14 +266,12 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                 $notifyStmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
                 $notifyStmt->execute([$userId, $notificationMessage, $link]);
             } catch (PDOException $e) {
-                // If INSERT fails, rollback immediately and rethrow
-                if ($conn->inTransaction()) {
-                    try {
-                        $conn->rollBack();
-                    } catch (PDOException $rollback_e) {
-                        // Ignore rollback errors
-                        error_log("Rollback error (ignored): " . $rollback_e->getMessage());
-                    }
+                // If INSERT fails, rollback immediately using exec() which works even if transaction is aborted
+                try {
+                    $conn->exec("ROLLBACK");
+                } catch (PDOException $rollback_e) {
+                    // Ignore rollback errors - transaction might already be rolled back
+                    error_log("Rollback error during INSERT (ignored): " . $rollback_e->getMessage());
                 }
                 throw new Exception("Failed to create notification: " . $e->getMessage());
             }
@@ -295,10 +306,9 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
             $message = '<div class="message success">User has been ' . $status_text . '. They have been notified.</div>';
         } catch (Exception $e) {
             // Ensure transaction is rolled back (in case inner catch didn't handle it)
+            // Use exec() which works even if transaction is in an aborted state
             try {
-                if ($conn->inTransaction()) {
-                    $conn->rollBack();
-                }
+                $conn->exec("ROLLBACK");
             } catch (PDOException $rollback_e) {
                 // Ignore rollback errors - transaction might already be rolled back
                 error_log("Final rollback error (ignored): " . $rollback_e->getMessage());
