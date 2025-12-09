@@ -191,49 +191,56 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
             goto skip_approval; // Skip to end of approval section
         }
         
+        // Verify user exists and is a regular user BEFORE starting transaction
+        try {
+            $check_stmt = $conn->prepare("SELECT id, name, email FROM users WHERE id = ? AND role = 'user'");
+            $check_stmt->execute([$userId]);
+            $user_check = $check_stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$user_check) {
+                $message = '<div class="message error">No user found with ID ' . $userId . ' or user is not a regular user.</div>';
+                goto skip_approval;
+            }
+        } catch (PDOException $e) {
+            $message = '<div class="message error">Failed to verify user: ' . htmlspecialchars($e->getMessage()) . '</div>';
+            goto skip_approval;
+        }
+        
         try {
             $conn->beginTransaction();
             
             // Update user approval status
+            $rows_affected = 0;
             try {
                 $stmt = $conn->prepare("UPDATE users SET is_approved = ? WHERE id = ? AND role = 'user'");
-                $result = $stmt->execute([$is_approved, $userId]);
+                $stmt->execute([$is_approved, $userId]);
                 
-                // Check for errors even if no exception was thrown
-                if ($result === false) {
-                    $error_info = $stmt->errorInfo();
-                    $conn->rollBack();
-                    throw new Exception("UPDATE failed: " . ($error_info[2] ?? "Unknown error"));
-                }
-                
-                // Check if update actually affected a row
+                // Get rowCount BEFORE any other operations that might fail
                 $rows_affected = $stmt->rowCount();
-                if ($rows_affected === 0) {
-                    $conn->rollBack();
-                    throw new Exception("No user found with ID {$userId} or user is not a regular user");
-                }
             } catch (PDOException $e) {
-                // If UPDATE fails, rollback immediately and rethrow
-                if ($conn->inTransaction()) {
-                    try {
+                // If UPDATE fails, rollback IMMEDIATELY - don't do anything else first
+                try {
+                    if ($conn->inTransaction()) {
                         $conn->rollBack();
-                    } catch (PDOException $rollback_e) {
-                        // Ignore rollback errors - transaction might already be rolled back
-                        error_log("Rollback error (ignored): " . $rollback_e->getMessage());
                     }
+                } catch (PDOException $rollback_e) {
+                    // Even rollback might fail, but we log it
+                    error_log("Rollback error: " . $rollback_e->getMessage());
                 }
+                // Rethrow with clear message
                 throw new Exception("Failed to update user status: " . $e->getMessage());
-            } catch (Exception $e) {
-                // If validation fails, rollback immediately and rethrow
-                if ($conn->inTransaction()) {
-                    try {
+            }
+            
+            // Check if update actually affected a row (after we know execute succeeded)
+            if ($rows_affected === 0) {
+                try {
+                    if ($conn->inTransaction()) {
                         $conn->rollBack();
-                    } catch (PDOException $rollback_e) {
-                        // Ignore rollback errors
-                        error_log("Rollback error (ignored): " . $rollback_e->getMessage());
                     }
+                } catch (PDOException $rollback_e) {
+                    error_log("Rollback error: " . $rollback_e->getMessage());
                 }
-                throw $e;
+                throw new Exception("No user found with ID {$userId} or user is not a regular user");
             }
             
             // Get user details for notification
@@ -316,18 +323,24 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
             }
             $status_text = $is_approved === 1 ? 'approved' : 'rejected';
             $message = '<div class="message success">User has been ' . $status_text . '. They have been notified.</div>';
-        } catch (PDOException $e) {
-            if ($conn->inTransaction()) {
-                $conn->rollBack();
-            }
-            error_log("Transaction error: " . $e->getMessage());
-            $message = '<div class="message error">Failed to update user status: ' . htmlspecialchars($e->getMessage()) . '</div>';
         } catch (Exception $e) {
-            if ($conn->inTransaction()) {
-                $conn->rollBack();
+            // Ensure transaction is rolled back (in case inner catch didn't handle it)
+            try {
+                if ($conn->inTransaction()) {
+                    $conn->rollBack();
+                }
+            } catch (PDOException $rollback_e) {
+                // Ignore rollback errors - transaction might already be rolled back
+                error_log("Final rollback error (ignored): " . $rollback_e->getMessage());
             }
-            error_log("General error: " . $e->getMessage());
-            $message = '<div class="message error">Failed to update user status: ' . htmlspecialchars($e->getMessage()) . '</div>';
+            error_log("User approval error: " . $e->getMessage());
+            // Don't double-wrap the error message - use the message from the exception as-is
+            $error_msg = $e->getMessage();
+            // Remove "Failed to update user status: " prefix if it's already there to avoid duplication
+            if (strpos($error_msg, "Failed to update user status: ") === 0) {
+                $error_msg = substr($error_msg, strlen("Failed to update user status: "));
+            }
+            $message = '<div class="message error">Failed to update user status: ' . htmlspecialchars($error_msg) . '</div>';
         }
         skip_approval:
     }
