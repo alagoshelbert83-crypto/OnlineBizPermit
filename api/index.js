@@ -5,12 +5,22 @@ const admin = require('firebase-admin');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://onlinebizpermit.web.app',
+    'https://onlinebizpermit.firebaseapp.com',
+    'http://localhost:3000',
+    'http://localhost:5000',
+    process.env.FRONTEND_URL // Allow custom frontend URL
+  ].filter(Boolean),
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -34,6 +44,25 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
+
+// PostgreSQL/Neon Database Connection
+let pgPool = null;
+try {
+  const postgresUrl = process.env.DATABASE_POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  if (postgresUrl) {
+    pgPool = new Pool({
+      connectionString: postgresUrl,
+      ssl: {
+        rejectUnauthorized: false // Required for Neon
+      }
+    });
+    console.log('✅ PostgreSQL (Neon) connection pool initialized');
+  } else {
+    console.log('⚠️  No PostgreSQL connection string found');
+  }
+} catch (error) {
+  console.error('❌ Failed to initialize PostgreSQL pool:', error.message);
+}
 
 // Email configuration
 const emailTransporter = nodemailer.createTransport({
@@ -407,9 +436,123 @@ app.get('/api/users/dashboard', authenticateToken, async (req, res) => {
   }
 });
 
-// Health check
+// Health check - support both /api/health and /health
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Test Neon PostgreSQL Connection
+app.get('/api/test/db', async (req, res) => {
+  try {
+    if (!pgPool) {
+      return res.status(503).json({
+        success: false,
+        message: 'PostgreSQL connection not configured',
+        error: 'DATABASE_POSTGRES_URL or DATABASE_URL environment variable not found'
+      });
+    }
+
+    // Test connection
+    const client = await pgPool.connect();
+    
+    // Run a simple query
+    const result = await client.query('SELECT NOW() as current_time, version() as pg_version');
+    
+    // Check if users table exists
+    const tableCheck = await client.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'users'
+      );
+    `);
+
+    // Get table count if exists
+    let tableCount = null;
+    if (tableCheck.rows[0].exists) {
+      const countResult = await client.query('SELECT COUNT(*) as count FROM users');
+      tableCount = parseInt(countResult.rows[0].count);
+    }
+
+    client.release();
+
+    res.json({
+      success: true,
+      message: '✅ Database connection successful!',
+      data: {
+        connection: 'Connected to Neon PostgreSQL',
+        currentTime: result.rows[0].current_time,
+        postgresVersion: result.rows[0].pg_version.split(',')[0], // First line only
+        usersTableExists: tableCheck.rows[0].exists,
+        usersCount: tableCount,
+        environment: {
+          hasPostgresUrl: !!process.env.DATABASE_POSTGRES_URL,
+          hasDatabaseUrl: !!process.env.DATABASE_URL,
+          hasPostgresUrlAlt: !!process.env.POSTGRES_URL
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Database test error:', error);
+    res.status(500).json({
+      success: false,
+      message: '❌ Database connection failed',
+      error: error.message,
+      details: {
+        code: error.code,
+        hint: error.hint || null
+      }
+    });
+  }
+});
+
+// Test Neon PostgreSQL - List Tables
+app.get('/api/test/db/tables', async (req, res) => {
+  try {
+    if (!pgPool) {
+      return res.status(503).json({
+        success: false,
+        message: 'PostgreSQL connection not configured'
+      });
+    }
+
+    const client = await pgPool.connect();
+    
+    // Get all tables
+    const result = await client.query(`
+      SELECT table_name, 
+             (SELECT COUNT(*) FROM information_schema.columns WHERE table_name = t.table_name) as column_count
+      FROM information_schema.tables t
+      WHERE table_schema = 'public' 
+      AND table_type = 'BASE TABLE'
+      ORDER BY table_name;
+    `);
+
+    client.release();
+
+    res.json({
+      success: true,
+      message: `Found ${result.rows.length} table(s)`,
+      data: {
+        tables: result.rows,
+        count: result.rows.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Database tables error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to list tables',
+      error: error.message
+    });
+  }
 });
 
 // Error handling middleware

@@ -1,0 +1,17 @@
+node_modules
+.git
+.env.local
+*.log
+pack-*
+*.idx
+*.pack
+*.rev
+HEAD
+ORIG_HEAD
+index
+master
+description
+LICENSE
+vendor
+uploads
+

@@ -1,27 +1,64 @@
 <?php
 /**
- * Database Connection for Applicant Dashboard - PostgreSQL (Supabase)
+ * Database Connection for Applicant Dashboard - PostgreSQL (Neon)
  */
 
-// --- Database Configuration for Supabase ---
-// IMPORTANT: These values are set via environment variables in Vercel
+// --- Database Configuration for Neon ---
+// IMPORTANT: Vercel automatically provides POSTGRES_URL when Neon database is connected
+// This connection string includes all connection details
 
-$host = getenv('DB_HOST') ?: 'your-supabase-host.supabase.co';
-$user = getenv('DB_USER') ?: 'postgres';
-$pass = getenv('DB_PASS') ?: 'your-supabase-password';
-$dbname = getenv('DB_NAME') ?: 'postgres';
-$port = 5432;
+// Try Neon connection string first (provided by Vercel)
+// Neon/Vercel provides DATABASE_POSTGRES_URL or DATABASE_URL
+$postgresUrl = getenv('DATABASE_POSTGRES_URL') ?: getenv('DATABASE_URL') ?: getenv('POSTGRES_URL');
+
+$queryParams = null;
+
+if ($postgresUrl) {
+    // Parse the connection URL
+    $parsedUrl = parse_url($postgresUrl);
+    
+    // Extract connection details from URL
+    $host = $parsedUrl['host'] ?? 'localhost';
+    $port = $parsedUrl['port'] ?? 5432;
+    $dbname = ltrim($parsedUrl['path'] ?? '/postgres', '/');
+    $user = $parsedUrl['user'] ?? 'postgres';
+    $pass = $parsedUrl['pass'] ?? '';
+    
+    // For SSL connections (Neon requires SSL)
+    // Check if SSL mode is already in the query string
+    if (isset($parsedUrl['query'])) {
+        parse_str($parsedUrl['query'], $queryParams);
+    }
+} else {
+    // Fallback to individual environment variables (Neon provides these too)
+    $host = getenv('DATABASE_PGHOST') ?: getenv('DATABASE_POSTGRES_HOST') ?: getenv('DB_HOST') ?: 'localhost';
+    $user = getenv('DATABASE_PGUSER') ?: getenv('DATABASE_POSTGRES_USER') ?: getenv('DB_USER') ?: 'postgres';
+    $pass = getenv('DATABASE_PGPASSWORD') ?: getenv('DATABASE_POSTGRES_PASSWORD') ?: getenv('DB_PASS') ?: '';
+    $dbname = getenv('DATABASE_PGDATABASE') ?: getenv('DATABASE_POSTGRES_DATABASE') ?: getenv('DB_NAME') ?: 'postgres';
+    $port = getenv('DB_PORT') ?: 5432;
+}
 
 // --- Establish PostgreSQL Connection ---
 try {
-    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;user=$user;password=$pass";
-    $conn = new PDO($dsn);
-    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+    // Build DSN - SSL mode goes as a separate parameter, not in query string
+    if (isset($queryParams) && isset($queryParams['sslmode'])) {
+        $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=" . $queryParams['sslmode'];
+    } else {
+        // Always require SSL for Neon
+        $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
+    }
+    
+    $conn = new PDO($dsn, $user, $pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_TIMEOUT => 10
+    ]);
 } catch(PDOException $e) {
-    // Use a more generic error in production
+    // Use a more generic error in production, but log detailed error
     $error_message = "Database connection failed.";
     error_log("Database connection error: " . $e->getMessage());
+    error_log("Attempted DSN: " . (isset($dsn) ? $dsn : 'DSN not set'));
+    error_log("Host: $host, Port: $port, Database: $dbname, User: $user");
     die($error_message);
 }
 

@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: onlinebizpermit
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: DATABASE_POSTGRES_URL
+        sync: false
+
