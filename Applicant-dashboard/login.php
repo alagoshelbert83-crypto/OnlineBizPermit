@@ -8,7 +8,7 @@ if (session_status() === PHP_SESSION_NONE) {
 // If user is already logged in, redirect them
 if (isset($_SESSION['user_id'])) {
     if ($_SESSION['role'] === 'user') {
-        header("home.php");
+        header("Location: home.php");
     } else {
         header("Location: login.php");
     }
@@ -207,7 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
 
             <div class="auth-footer">
-                <p>Don't have an account? <a href="/signup.php">Sign Up here</a></p>
+                <p>Don't have an account? <a href="signup.php">Sign Up here</a></p>
                 <div class="divider">
 
                 </div>

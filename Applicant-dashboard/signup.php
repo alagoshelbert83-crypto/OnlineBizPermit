@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($result) {
                 // Registration successful - user is now pending approval
-                header("Location: /login.php?status=pending");
+                header("Location: login.php?status=pending");
                 exit;
             } else {
                 $error_message = "Registration failed. Please try again.";
@@ -123,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             <?php endif; ?>
 
-            <form action="/signup.php" method="POST" class="auth-form" id="registerForm">
+            <form action="signup.php" method="POST" class="auth-form" id="registerForm">
                 <div class="form-group">
                     <label for="name">
                         <i class="fas fa-user"></i>
@@ -236,7 +236,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
 
             <div class="auth-footer">
-                <p>Already have an account? <a href="/login.php">Sign in here</a></p>
+                <p>Already have an account? <a href="login.php">Sign in here</a></p>
             </div>
         </div>
 
