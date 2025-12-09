@@ -16,6 +16,25 @@ if (file_exists(__DIR__ . '/../Admin-dashboard/email_functions.php')) {
 
 $message = '';
 
+// Helper function to ensure connection is clean before starting a transaction
+function ensureCleanConnection($conn) {
+    try {
+        // If we're in a transaction, rollback to clean state
+        if ($conn->inTransaction()) {
+            $conn->rollBack();
+        }
+    } catch (PDOException $e) {
+        // If rollback fails, the connection might be in a bad state
+        // Try to execute a simple query to reset the connection state
+        try {
+            $conn->query("SELECT 1");
+        } catch (PDOException $e2) {
+            error_log("Connection reset failed: " . $e2->getMessage());
+            // Connection might need to be recreated, but we'll let PDO handle it
+        }
+    }
+}
+
 // --- Handle Linking Application ---
 if (isset($_GET['action']) && $_GET['action'] === 'link_app' && isset($_GET['user_id']) && isset($_GET['app_id'])) {
     $target_user_id = (int)$_GET['user_id'];
@@ -36,14 +55,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'link_app' && isset($_GET['use
     $target_user_email = $target_user['email'] ?? null;
 
     if ($app_details && $target_user) {
-        // Check if we're already in a transaction and rollback if needed
-        if ($conn->inTransaction()) {
-            try {
-                $conn->rollBack();
-            } catch (PDOException $e) {
-                // Ignore if already rolled back
-            }
-        }
+        // Ensure connection is clean before starting transaction
+        ensureCleanConnection($conn);
         
         try {
             $conn->beginTransaction();
@@ -149,23 +162,19 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
     }
 
     if (isset($is_approved)) {
-        // Check if we're already in a transaction and rollback if needed
-        if ($conn->inTransaction()) {
-            try {
-                $conn->rollBack();
-            } catch (PDOException $e) {
-                // Ignore if already rolled back
-            }
-        }
+        // Ensure connection is clean before starting transaction
+        ensureCleanConnection($conn);
         
         try {
             $conn->beginTransaction();
             
             // Update user approval status
             $stmt = $conn->prepare("UPDATE users SET is_approved = ? WHERE id = ? AND role = 'user'");
+            $stmt->execute([$is_approved, $userId]);
             
-            if (!$stmt->execute([$is_approved, $userId])) {
-                throw new Exception("Failed to update user status");
+            // Check if update actually affected a row
+            if ($stmt->rowCount() === 0) {
+                throw new Exception("No user found with ID {$userId} or user is not a regular user");
             }
             
             // Get user details for notification
@@ -173,23 +182,30 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
             $stmt->execute([$userId]);
             $userDetails = $stmt->fetch(PDO::FETCH_ASSOC);
             
+            if (!$userDetails) {
+                throw new Exception("User details not found after update");
+            }
+            
             // Send notification
-            if ($userDetails) {
-                $status_text = $is_approved === 1 ? 'approved' : 'rejected';
-                
-                // 1. Create in-app notification
-                if ($is_approved === 1) {
-                    $notificationMessage = "Welcome! Your account has been approved. You can now submit and manage your business permit applications.";
-                    $link = "../Applicant-dashboard/applicant_dashboard.php";
-                } else {
-                    $notificationMessage = "Your account registration has been rejected. Please contact support for more information.";
-                    $link = null; // No link for rejection
-                }
-                $notifyStmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
-                $notifyStmt->execute([$userId, $notificationMessage, $link]);
-
-                // 2. Send email notification
-                if (function_exists('sendApplicationEmail') && !empty($userDetails['email'])) {
+            $status_text = $is_approved === 1 ? 'approved' : 'rejected';
+            
+            // 1. Create in-app notification
+            if ($is_approved === 1) {
+                $notificationMessage = "Welcome! Your account has been approved. You can now submit and manage your business permit applications.";
+                $link = "../Applicant-dashboard/applicant_dashboard.php";
+            } else {
+                $notificationMessage = "Your account registration has been rejected. Please contact support for more information.";
+                $link = null; // No link for rejection
+            }
+            $notifyStmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
+            $notifyStmt->execute([$userId, $notificationMessage, $link]);
+            
+            // Commit the transaction first before sending email
+            $conn->commit();
+            
+            // Send email notification AFTER transaction is committed
+            if (function_exists('sendApplicationEmail') && !empty($userDetails['email'])) {
+                try {
                     $email_subject = "Your OnlineBizPermit Account has been " . ucfirst($status_text);
                     $email_body = "
                     <div style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
@@ -205,10 +221,11 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                         </div>
                     </div>";
                     sendApplicationEmail($userDetails['email'], $userDetails['name'], $email_subject, $email_body);
+                } catch (Exception $e) {
+                    // Log email error but don't fail the transaction
+                    error_log("Email sending failed for user {$userId}: " . $e->getMessage());
                 }
             }
-            
-            $conn->commit();
             $status_text = $is_approved === 1 ? 'approved' : 'rejected';
             $message = '<div class="message success">User has been ' . $status_text . '. They have been notified.</div>';
         } catch (PDOException $e) {
