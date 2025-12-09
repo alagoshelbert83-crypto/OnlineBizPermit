@@ -252,17 +252,19 @@ require_once __DIR__ . '/admin_sidebar.php';
                     <?php foreach ($pending_users as $user): ?>
                         <?php
                             $potential_apps = [];
-                            // This query requires MySQL 5.7+ or MariaDB 10.2+ for JSON functions
+                            // PostgreSQL JSON query - uses -> operator for JSON access
                             $sql_potential = "SELECT a.id, a.business_name, a.status, u.name as current_owner_name
                                 FROM applications a
                                 LEFT JOIN users u ON a.user_id = u.id
                                 WHERE (
-                                    JSON_UNQUOTE(JSON_EXTRACT(a.form_details, '$.owner_name')) = ?
+                                    a.form_details->>'owner_name' = ?
                                     OR
-                                    TRIM(CONCAT_WS(' ',
-                                        JSON_UNQUOTE(JSON_EXTRACT(a.form_details, '$.first_name')),
-                                        JSON_UNQUOTE(JSON_EXTRACT(a.form_details, '$.middle_name')),
-                                        JSON_UNQUOTE(JSON_EXTRACT(a.form_details, '$.last_name'))
+                                    TRIM(CONCAT(
+                                        COALESCE(a.form_details->>'first_name', ''),
+                                        ' ',
+                                        COALESCE(a.form_details->>'middle_name', ''),
+                                        ' ',
+                                        COALESCE(a.form_details->>'last_name', '')
                                     )) = ?
                                 )
                                 AND (a.user_id IS NULL OR a.user_id != ?)";

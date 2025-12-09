@@ -25,34 +25,35 @@ $id_term = (int)$term;
 
 // Search by business name, assigned applicant name, or owner name from form details.
 // Also search by ID if the term is numeric.
-// This requires MySQL 5.7+ or MariaDB 10.2+ for JSON functions.
+// PostgreSQL JSON query - uses -> operator for JSON access
 $where_clauses = [
     "a.business_name LIKE ?",
     "u.name LIKE ?",
-    "JSON_UNQUOTE(JSON_EXTRACT(a.form_details, '$.owner_name')) LIKE ?", // For seeded data
-    "TRIM(CONCAT_WS(' ',
-        JSON_UNQUOTE(JSON_EXTRACT(a.form_details, '$.first_name')),
-        JSON_UNQUOTE(JSON_EXTRACT(a.form_details, '$.middle_name')),
-        JSON_UNQUOTE(JSON_EXTRACT(a.form_details, '$.last_name'))
+    "a.form_details->>'owner_name' LIKE ?", // For seeded data
+    "TRIM(CONCAT(
+        COALESCE(a.form_details->>'first_name', ''),
+        ' ',
+        COALESCE(a.form_details->>'middle_name', ''),
+        ' ',
+        COALESCE(a.form_details->>'last_name', '')
     )) LIKE ?" // For real form submissions
 ];
 $params = [$like_term, $like_term, $like_term, $like_term];
-$types = "ssss";
 
 if ($id_term > 0) {
     $where_clauses[] = "a.id = ?";
     $params[] = $id_term;
-    $types .= "i";
 }
 // Use COALESCE to intelligently select the best available name for display.
 // This makes the search results more informative, especially for unassigned applications.
 $sql = "SELECT a.id, a.business_name, a.status,
                COALESCE(
                    u.name, 
-                   JSON_UNQUOTE(JSON_EXTRACT(a.form_details, '$.owner_name')),
-                   TRIM(CONCAT_WS(' ',
-                       JSON_UNQUOTE(JSON_EXTRACT(a.form_details, '$.first_name')),
-                       JSON_UNQUOTE(JSON_EXTRACT(a.form_details, '$.last_name'))
+                   a.form_details->>'owner_name',
+                   TRIM(CONCAT(
+                       COALESCE(a.form_details->>'first_name', ''),
+                       ' ',
+                       COALESCE(a.form_details->>'last_name', '')
                    ))
                ) as current_owner_name
         FROM applications a

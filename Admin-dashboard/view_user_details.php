@@ -14,22 +14,14 @@ if (isset($_GET['id'])) {
     
     // Fetch user details
     $stmt = $conn->prepare("SELECT * FROM users WHERE id = ? AND role = 'user'");
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($result->num_rows > 0) {
-        $user = $result->fetch_assoc();
-    }
-    $stmt->close();
+    $stmt->execute([$userId]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
     
     // Fetch user's application history
     if ($user) {
         $stmt = $conn->prepare("SELECT * FROM applications WHERE user_id = ? ORDER BY submitted_at DESC");
-        $stmt->bind_param("i", $userId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $applications = $result->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
+        $stmt->execute([$userId]);
+        $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
 

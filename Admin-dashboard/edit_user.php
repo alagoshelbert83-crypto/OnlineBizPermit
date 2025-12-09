@@ -26,16 +26,13 @@ if ($user_id <= 0) {
 
 // Fetch user details
 $stmt = $conn->prepare("SELECT id, name, email, role, created_at FROM users WHERE id = ?");
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$result = $stmt->get_result();
+$stmt->execute([$user_id]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if ($result->num_rows === 0) {
+if (!$user) {
     header('Location: user_management.php');
     exit;
 }
-
-$user = $result->fetch_assoc();
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
@@ -49,10 +46,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
     } else {
         // Check if email is already taken by another user
         $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
-        $stmt->bind_param("si", $email, $user_id);
-        $stmt->execute();
+        $stmt->execute([$email, $user_id]);
         
-        if ($stmt->get_result()->num_rows > 0) {
+        if ($stmt->fetch()) {
             $message = '<div class="message error">An account with this email already exists.</div>';
         } else {
             // Update user with or without password
@@ -62,21 +58,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
                 } else {
                     $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
                     $updateStmt = $conn->prepare("UPDATE users SET name = ?, email = ?, role = ?, password = ? WHERE id = ?");
-                    $updateStmt->bind_param("ssssi", $name, $email, $role, $hashedPassword, $user_id);
-                    $message = $updateStmt->execute() ? '<div class="message success">User updated successfully.</div>' : '<div class="message error">Failed to update user.</div>';
+                    $message = $updateStmt->execute([$name, $email, $role, $hashedPassword, $user_id]) ? '<div class="message success">User updated successfully.</div>' : '<div class="message error">Failed to update user.</div>';
                 }
             } else {
                 $updateStmt = $conn->prepare("UPDATE users SET name = ?, email = ?, role = ? WHERE id = ?");
-                $updateStmt->bind_param("sssi", $name, $email, $role, $user_id);
-                $message = $updateStmt->execute() ? '<div class="message success">User updated successfully.</div>' : '<div class="message error">Failed to update user.</div>';
+                $message = $updateStmt->execute([$name, $email, $role, $user_id]) ? '<div class="message success">User updated successfully.</div>' : '<div class="message error">Failed to update user.</div>';
             }
             
             // Refresh user data after update
             if (strpos($message, 'success') !== false) {
                 $stmt = $conn->prepare("SELECT id, name, email, role, created_at FROM users WHERE id = ?");
-                $stmt->bind_param("i", $user_id);
-                $stmt->execute();
-                $user = $stmt->get_result()->fetch_assoc();
+                $stmt->execute([$user_id]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
             }
         }
     }
