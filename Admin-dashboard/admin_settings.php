@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
         } else {
             $profile_message = '<div class="message error">Failed to update profile.</div>';
         }
-        header("Location: settings.php"); exit; // Refresh to show updated info and clear POST
+        header("Location: admin_settings.php"); exit; // Refresh to show updated info and clear POST
     }
 }
 

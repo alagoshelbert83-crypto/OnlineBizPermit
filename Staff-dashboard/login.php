@@ -34,7 +34,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 // Redirect based on role
                 if ($user['role'] === 'admin') {
                     // Redirect admin to their own dashboard
-                    header("Location: ../Admin-dashboard/dashboard.php");
+                    header("Location: ../Admin-dashboard/admin_dashboard.php");
                 } else {
                     // Staff and other roles go to the dashboard in the current directory
                     header("Location: dashboard.php");

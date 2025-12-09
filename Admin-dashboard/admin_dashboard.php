@@ -113,8 +113,8 @@ require_once __DIR__ . '/admin_sidebar.php';
             </div>
             <span><?= htmlspecialchars($current_user_name) ?></span>
             <div class="dropdown-menu">
-              <a href="settings.php"><i class="fas fa-cog"></i> Profile</a>
-              <a href="logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> Logout</a>
+              <a href="admin_settings.php"><i class="fas fa-cog"></i> Profile</a>
+              <a href="admin_logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> Logout</a>
             </div>
           </div>
         </div>
