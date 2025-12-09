@@ -218,37 +218,31 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
             $conn->beginTransaction();
             
             // Update user approval status using RETURNING to verify it worked
-            // This avoids needing to call rowCount() which might fail if transaction is aborted
-            try {
-                $stmt = $conn->prepare("UPDATE users SET is_approved = ? WHERE id = ? AND role = 'user' RETURNING id, name, email");
-                $stmt->execute([$is_approved, $userId]);
-                
-                // Fetch the updated row - if no row returned, update didn't match anything
-                $userDetails = $stmt->fetch(PDO::FETCH_ASSOC);
-                
-                if (!$userDetails) {
-                    // No rows were updated
-                    try {
-                        $conn->exec("ROLLBACK");
-                    } catch (PDOException $rollback_e) {
-                        // Ignore rollback errors
-                        error_log("Rollback error (ignored): " . $rollback_e->getMessage());
-                    }
-                    throw new Exception("No user found with ID {$userId} or user is not a regular user");
-                }
-                
-                // Update succeeded and we have the user details
-            } catch (PDOException $e) {
-                // If UPDATE fails, rollback IMMEDIATELY using exec() which works even if transaction is aborted
+            $stmt = $conn->prepare("UPDATE users SET is_approved = ? WHERE id = ? AND role = 'user' RETURNING id, name, email");
+            $stmt->execute([$is_approved, $userId]);
+            
+            // Check transaction state immediately after execute
+            // If transaction was aborted, rollback before trying to fetch
+            if (!$conn->inTransaction()) {
+                // Transaction was aborted - try to rollback and throw error
                 try {
                     $conn->exec("ROLLBACK");
                 } catch (PDOException $rollback_e) {
-                    // Log but continue - transaction might already be rolled back
-                    error_log("Rollback error during UPDATE: " . $rollback_e->getMessage());
+                    // Ignore rollback errors
                 }
-                // Rethrow with clear message
-                throw new Exception("Failed to update user status: " . $e->getMessage());
+                throw new Exception("Transaction was aborted during UPDATE. The user may not exist or there was a constraint violation.");
             }
+            
+            // Transaction is still active, safe to fetch
+            $userDetails = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$userDetails) {
+                // No rows were updated
+                $conn->rollBack();
+                throw new Exception("No user found with ID {$userId} or user is not a regular user");
+            }
+            
+            // Update succeeded and we have the user details
             
             // Send notification
             $status_text = $is_approved === 1 ? 'approved' : 'rejected';
