@@ -50,15 +50,29 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
         return $stmt->execute(['session_id' => $sessionId]);
     }
 
-    public function gc($maxLifetime): bool {
-        $stmt = $this->conn->prepare("DELETE FROM {$this->table} WHERE session_expires < NOW()");
-        return $stmt->execute();
+    #[\ReturnTypeWillChange]
+    public function gc($maxLifetime) {
+        try {
+            $stmt = $this->conn->prepare("DELETE FROM {$this->table} WHERE session_expires < NOW()");
+            if ($stmt->execute()) {
+                // Return number of deleted rows, or 0 if none
+                return $stmt->rowCount();
+            }
+            return false;
+        } catch (Exception $e) {
+            error_log("Session GC error: " . $e->getMessage());
+            return false;
+        }
     }
 }
 
 // Initialize custom session handler if database connection exists
+// IMPORTANT: Must be called BEFORE session_start()
 if (isset($conn) && $conn instanceof PDO) {
-    $sessionHandler = new DatabaseSessionHandler($conn);
-    session_set_save_handler($sessionHandler, true);
+    // Only set handler if session is not already active
+    if (session_status() === PHP_SESSION_NONE) {
+        $sessionHandler = new DatabaseSessionHandler($conn);
+        session_set_save_handler($sessionHandler, true);
+    }
 }
 ?>

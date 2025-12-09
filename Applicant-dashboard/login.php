@@ -1,6 +1,9 @@
 <?php
-session_start();
 require_once 'db.php';
+// Start session AFTER db.php includes session_handler.php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // If user is already logged in, redirect them
 if (isset($_SESSION['user_id'])) {

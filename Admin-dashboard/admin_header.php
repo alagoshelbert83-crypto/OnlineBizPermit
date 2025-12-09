@@ -1,6 +1,10 @@
 <?php
-session_start();
+// db.php must be included first to set up session handler
 require_once __DIR__ . '/db.php';
+// Start session AFTER db.php includes session_handler.php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Authentication Check (allows both admin and staff)
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'staff'])) {
@@ -13,20 +17,16 @@ $current_user_role = $_SESSION['role'];
 
 // Fetch Current User Info
 $stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
-$stmt->bind_param("i", $current_user_id);
-$stmt->execute();
-$user_info = $stmt->get_result()->fetch_assoc();
+$stmt->execute([$current_user_id]);
+$user_info = $stmt->fetch(PDO::FETCH_ASSOC);
 $current_user_name = $user_info['name'] ?? 'User';
-$stmt->close();
 
 // --- Fetch unread notification count for admin ---
 $unread_notifications_count = 0;
 $count_stmt = $conn->prepare("SELECT COUNT(*) as unread_count FROM notifications WHERE user_id = ? AND is_read = 0");
-$count_stmt->bind_param("i", $current_user_id);
-$count_stmt->execute();
-$count_result = $count_stmt->get_result()->fetch_assoc();
+$count_stmt->execute([$current_user_id]);
+$count_result = $count_stmt->fetch(PDO::FETCH_ASSOC);
 $unread_notifications_count = $count_result['unread_count'] ?? 0;
-$count_stmt->close();
 
 
 ?>

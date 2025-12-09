@@ -1,6 +1,9 @@
 <?php
-session_start();
 require './db.php';
+// Start session AFTER db.php includes session_handler.php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 $error = '';
 $success = '';

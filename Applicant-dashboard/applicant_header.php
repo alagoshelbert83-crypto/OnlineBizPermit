@@ -1,5 +1,10 @@
 <?php
-session_start();
+// db.php must be included first to set up session handler
+require_once __DIR__ . '/db.php';
+// Start session AFTER db.php includes session_handler.php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . '/db.php';
 
 // Authentication Check: Only allow users with the 'user' role

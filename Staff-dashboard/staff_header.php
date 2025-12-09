@@ -1,11 +1,15 @@
 <?php
-session_start();
-
 // Set a default timezone to prevent potential date/time warnings
 date_default_timezone_set('Asia/Manila');
 
-// Include the database connection. The path is relative to this header file.
+// Include the database connection FIRST - it sets up the session handler
+// The path is relative to this header file.
 require_once __DIR__ . '/db.php';
+
+// Start session AFTER db.php includes session_handler.php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Security check: Ensure only logged-in staff or admins can access staff pages.
 // The staff login form allows both roles, so we should check for both here.
