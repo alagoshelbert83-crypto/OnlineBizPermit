@@ -209,62 +209,32 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
         try {
             $conn->beginTransaction();
             
-            // Update user approval status
-            $rows_affected = 0;
+            // Update user approval status using RETURNING to verify it worked
+            // This avoids needing to call rowCount() which might fail if transaction is aborted
             try {
-                $stmt = $conn->prepare("UPDATE users SET is_approved = ? WHERE id = ? AND role = 'user'");
+                $stmt = $conn->prepare("UPDATE users SET is_approved = ? WHERE id = ? AND role = 'user' RETURNING id, name, email");
                 $stmt->execute([$is_approved, $userId]);
                 
-                // Get rowCount BEFORE any other operations that might fail
-                $rows_affected = $stmt->rowCount();
-            } catch (PDOException $e) {
-                // If UPDATE fails, rollback IMMEDIATELY - don't do anything else first
-                try {
-                    if ($conn->inTransaction()) {
-                        $conn->rollBack();
-                    }
-                } catch (PDOException $rollback_e) {
-                    // Even rollback might fail, but we log it
-                    error_log("Rollback error: " . $rollback_e->getMessage());
-                }
-                // Rethrow with clear message
-                throw new Exception("Failed to update user status: " . $e->getMessage());
-            }
-            
-            // Check if update actually affected a row (after we know execute succeeded)
-            if ($rows_affected === 0) {
-                try {
-                    if ($conn->inTransaction()) {
-                        $conn->rollBack();
-                    }
-                } catch (PDOException $rollback_e) {
-                    error_log("Rollback error: " . $rollback_e->getMessage());
-                }
-                throw new Exception("No user found with ID {$userId} or user is not a regular user");
-            }
-            
-            // Get user details for notification
-            $userDetails = null;
-            try {
-                $stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
-                $stmt->execute([$userId]);
+                // Fetch the updated row - if no row returned, update didn't match anything
                 $userDetails = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if (!$userDetails) {
+                    // No rows were updated
                     $conn->rollBack();
-                    throw new Exception("User details not found after update");
+                    throw new Exception("No user found with ID {$userId} or user is not a regular user");
                 }
+                
+                // Update succeeded and we have the user details
             } catch (PDOException $e) {
-                // If SELECT fails, rollback immediately and rethrow
-                if ($conn->inTransaction()) {
-                    try {
-                        $conn->rollBack();
-                    } catch (PDOException $rollback_e) {
-                        // Ignore rollback errors
-                        error_log("Rollback error (ignored): " . $rollback_e->getMessage());
-                    }
+                // If UPDATE fails, rollback IMMEDIATELY
+                try {
+                    $conn->rollBack();
+                } catch (PDOException $rollback_e) {
+                    // Log but continue - transaction might already be rolled back
+                    error_log("Rollback error during UPDATE: " . $rollback_e->getMessage());
                 }
-                throw new Exception("Failed to fetch user details: " . $e->getMessage());
+                // Rethrow with clear message
+                throw new Exception("Failed to update user status: " . $e->getMessage());
             }
             
             // Send notification
