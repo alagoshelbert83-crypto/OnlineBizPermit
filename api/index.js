@@ -1,68 +1,188 @@
-require('dotenv').config();
+// Only load dotenv in local development (Vercel provides env vars automatically)
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  try {
+    require('dotenv').config();
+  } catch (e) {
+    // dotenv not available, continue without it
+  }
+}
 const express = require('express');
 const cors = require('cors');
-const admin = require('firebase-admin');
+const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
-const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors({
-  origin: [
-    'https://onlinebizpermit.web.app',
-    'https://onlinebizpermit.firebaseapp.com',
-    'http://localhost:3000',
-    'http://localhost:5000',
-    process.env.FRONTEND_URL // Allow custom frontend URL
-  ].filter(Boolean),
-  credentials: true
-}));
+// CORS configuration
+const allowedOrigins = [
+  // Default Firebase domains
+  'https://onlinebizpermit.web.app',
+  'https://onlinebizpermit.firebaseapp.com',
+  // Firebase dashboard domains
+  'https://admin-dashboardbiz.web.app',
+  'https://applicant-dashboardbiz.web.app',
+  'https://staff-dashboardbiz.web.app',
+  // Vercel deployment domains (will be set via environment)
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+  process.env.VERCEL_BRANCH_URL ? `https://${process.env.VERCEL_BRANCH_URL}` : null,
+  // Local development
+  'http://localhost:5000',
+  'http://localhost:3000',
+  'http://127.0.0.1:5500' // For local testing with Live Server
+].filter(Boolean); // Remove null values
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Log all CORS requests for debugging
+    console.log('[CORS CHECK] Origin:', origin);
+    console.log('[CORS CHECK] Allowed origins:', allowedOrigins);
+    
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      console.log('[CORS CHECK] No origin, allowing');
+      return callback(null, true);
+    }
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      console.log('[CORS CHECK] Origin allowed:', origin);
+      callback(null, true);
+    } else {
+      // Log for debugging
+      console.log('[CORS CHECK] Blocked origin:', origin);
+      console.log('[CORS CHECK] Allowed origins:', allowedOrigins);
+      // Temporarily allow all to debug - change back after testing
+      console.log('[CORS CHECK] Temporarily allowing for debugging');
+      callback(null, true);
+      // callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['Content-Length', 'Content-Type'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
+
+// CRITICAL: Handle OPTIONS requests FIRST, before ANY other middleware
+// This ensures preflight requests get CORS headers immediately
+// Must be at the very top to catch all OPTIONS requests
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  console.log('[OPTIONS HANDLER] Preflight request from:', origin);
+  console.log('[OPTIONS HANDLER] Request URL:', req.url);
+  console.log('[OPTIONS HANDLER] Allowed origins:', allowedOrigins);
+  
+  // Check if origin is allowed
+  if (!origin || allowedOrigins.includes(origin)) {
+    // Send CORS headers for allowed origin
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    console.log('[OPTIONS HANDLER] Allowed, sending CORS headers, status 204');
+    return res.status(204).end();
+  } else {
+    console.log('[OPTIONS HANDLER] Blocked origin:', origin);
+    return res.status(403).end();
+  }
+});
+
+// Also handle OPTIONS in middleware for any edge cases
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    const origin = req.headers.origin;
+    console.log('[OPTIONS MIDDLEWARE] Preflight request from:', origin);
+    
+    if (!origin || allowedOrigins.includes(origin)) {
+      if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+      } else {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+      }
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Max-Age', '86400');
+      console.log('[OPTIONS MIDDLEWARE] Allowed, sending CORS headers, status 204');
+      return res.status(204).end();
+    } else {
+      console.log('[OPTIONS MIDDLEWARE] Blocked origin:', origin);
+      return res.status(403).end();
+    }
+  }
+  next();
+});
+
+// Apply CORS middleware for all other requests
+// The cors package automatically handles OPTIONS preflight requests
+// But we've already handled OPTIONS above, so this is for actual requests
+app.use(cors(corsOptions));
+
+// Ensure CORS headers are added to ALL responses (backup)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  next();
+});
+
+// --- START DEBUGGING MIDDLEWARE ---
+// This will log every request that hits the Express app
+app.use((req, res, next) => {
+  console.log(`[INCOMING REQUEST] ${new Date().toISOString()}`);
+  console.log(`  METHOD: ${req.method}`);
+  console.log(`  URL: ${req.url}`);
+  console.log(`  ORIGINAL_URL: ${req.originalUrl}`);
+  console.log(`  HEADERS: ${JSON.stringify(req.headers, null, 2)}`);
+  // Note: req.body is only populated after the express.json() middleware runs.
+  // We will log it inside the 404 handler for a complete picture if a route is not found.
+  next();
+});
+// --- END DEBUGGING MIDDLEWARE ---
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Initialize Firebase Admin
-const serviceAccount = {
-  type: "service_account",
-  project_id: "onlinebizpermit",
-  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-  private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  client_email: process.env.FIREBASE_CLIENT_EMAIL,
-  client_id: process.env.FIREBASE_CLIENT_ID,
-  auth_uri: "https://accounts.google.com/o/oauth2/auth",
-  token_uri: "https://oauth2.googleapis.com/token",
-  auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-  client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL
-};
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: `https://onlinebizpermit.firebaseio.com`
+// Strip /api prefix if present (Vercel should do this, but just in case)
+// This MUST happen before routes are checked
+app.use((req, res, next) => {
+  const originalUrl = req.url;
+  if (req.url.startsWith('/api')) {
+    req.url = req.url.replace(/^\/api/, '') || '/';
+    req.originalUrl = req.originalUrl.replace(/^\/api/, '') || '/';
+    console.log(`[PATH STRIPPED] ${originalUrl} -> ${req.url}`);
+  }
+  console.log(`[BEFORE ROUTES] Method: ${req.method}, URL: ${req.url}, Original: ${req.originalUrl}`);
+  next();
 });
 
-const db = admin.firestore();
+// Initialize PostgreSQL connection (Neon)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL?.includes('sslmode=require') ? { rejectUnauthorized: false } : false
+});
 
-// PostgreSQL/Neon Database Connection
-let pgPool = null;
-try {
-  const postgresUrl = process.env.DATABASE_POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL;
-  if (postgresUrl) {
-    pgPool = new Pool({
-      connectionString: postgresUrl,
-      ssl: {
-        rejectUnauthorized: false // Required for Neon
-      }
-    });
-    console.log('✅ PostgreSQL (Neon) connection pool initialized');
-  } else {
-    console.log('⚠️  No PostgreSQL connection string found');
-  }
-} catch (error) {
-  console.error('❌ Failed to initialize PostgreSQL pool:', error.message);
-}
+// Test database connection
+pool.on('connect', () => {
+  console.log('Connected to PostgreSQL database');
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
+  process.exit(-1);
+});
 
 // Email configuration
 const emailTransporter = nodemailer.createTransport({
@@ -89,93 +209,14 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Routes
-
-// Root route - serve landing page
-app.get('/', (req, res) => {
-  const landingPageHTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Online Business Permit System</title>
-    <style>
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .container {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            padding: 40px;
-            text-align: center;
-            max-width: 500px;
-            width: 90%;
-        }
-        .logo { font-size: 3rem; color: #667eea; margin-bottom: 20px; }
-        h1 { color: #333; margin-bottom: 10px; font-size: 2rem; }
-        p { color: #666; margin-bottom: 30px; font-size: 1.1rem; }
-        .dashboard-grid { display: grid; gap: 20px; margin-top: 30px; }
-        .dashboard-card {
-            background: #f8f9fa;
-            border: 2px solid #e9ecef;
-            border-radius: 12px;
-            padding: 20px;
-            text-decoration: none;
-            color: #333;
-            transition: all 0.3s ease;
-            display: block;
-        }
-        .dashboard-card:hover {
-            background: #667eea;
-            color: white;
-            border-color: #667eea;
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
-        }
-        .dashboard-card h3 { margin: 0 0 8px 0; font-size: 1.3rem; }
-        .dashboard-card p { margin: 0; font-size: 0.95rem; opacity: 0.8; }
-        .dashboard-card:hover p { opacity: 1; }
-        .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e9ecef; color: #666; font-size: 0.9rem; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="logo">🏢</div>
-        <h1>Online Business Permit System</h1>
-        <p>Select your dashboard to get started</p>
-        <div class="dashboard-grid">
-            <a href="/Applicant-dashboard/index.php" class="dashboard-card">
-                <h3>👤 Applicant Portal</h3>
-                <p>Apply for business permits, track applications, and manage your submissions</p>
-            </a>
-            <a href="/Staff-dashboard/index.php" class="dashboard-card">
-                <h3>👨‍💼 Staff Dashboard</h3>
-                <p>Review applications, process permits, and manage workflow</p>
-            </a>
-            <a href="/Admin-dashboard/index.php" class="dashboard-card">
-                <h3>⚡ Admin Panel</h3>
-                <p>System administration, user management, and analytics</p>
-            </a>
-        </div>
-        <div class="footer">
-            <p>Powered by Firebase & Vercel</p>
-        </div>
-    </div>
-</body>
-</html>`;
-  res.send(landingPageHTML);
-});
+// Create a new router for our API
+const apiRouter = express.Router();
 
 // Applicant Login endpoint
-app.post('/api/auth/login', async (req, res) => {
+apiRouter.post('/auth/login', async (req, res) => {
+  console.log('✅ Applicant login route MATCHED!');
+  console.log('  URL:', req.url);
+  console.log('  Method:', req.method);
   try {
     const { email, password } = req.body;
 
@@ -186,24 +227,24 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // Query Firestore for user by email
-    const usersRef = db.collection('users');
-    const querySnapshot = await usersRef.where('email', '==', email).limit(1).get();
+    // Query PostgreSQL for user by email
+    const result = await pool.query(
+      'SELECT id, name, email, password, role, is_approved FROM users WHERE email = $1 LIMIT 1',
+      [email]
+    );
 
-    if (querySnapshot.empty) {
+    if (result.rows.length === 0) {
+      // Timing attack protection - hash dummy password
+      await bcrypt.hash('dummy', 10);
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
       });
     }
 
-    const userDoc = querySnapshot.docs[0];
-    const user = { id: userDoc.id, ...userDoc.data() };
+    const user = result.rows[0];
 
-    // Timing attack protection
-    const passwordHash = user ? user.password : await bcrypt.hash('dummy', 10);
-
-    if (!(await bcrypt.compare(password, passwordHash))) {
+    if (!(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
@@ -261,7 +302,8 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // Staff/Admin Login endpoint
-app.post('/api/auth/staff-login', async (req, res) => {
+apiRouter.post('/auth/staff-login', async (req, res) => {
+  console.log('Staff login route hit:', req.url, req.method, req.body);
   try {
     const { email, password } = req.body;
 
@@ -272,19 +314,20 @@ app.post('/api/auth/staff-login', async (req, res) => {
       });
     }
 
-    // Query Firestore for staff/admin user by email
-    const usersRef = db.collection('users');
-    const querySnapshot = await usersRef.where('email', '==', email).where('role', 'in', ['staff', 'admin']).limit(1).get();
+    // Query PostgreSQL for staff/admin user by email
+    const result = await pool.query(
+      'SELECT id, name, email, password, role FROM users WHERE email = $1 AND role IN ($2, $3) LIMIT 1',
+      [email, 'staff', 'admin']
+    );
 
-    if (querySnapshot.empty) {
+    if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
       });
     }
 
-    const userDoc = querySnapshot.docs[0];
-    const user = { id: userDoc.id, ...userDoc.data() };
+    const user = result.rows[0];
 
     if (!(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({
@@ -324,7 +367,7 @@ app.post('/api/auth/staff-login', async (req, res) => {
 });
 
 // Signup endpoint
-app.post('/api/auth/signup', async (req, res) => {
+apiRouter.post('/auth/signup', async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
@@ -336,10 +379,12 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 
     // Check if user already exists
-    const usersRef = db.collection('users');
-    const existingQuery = await usersRef.where('email', '==', email).limit(1).get();
+    const existingUser = await pool.query(
+      'SELECT id FROM users WHERE email = $1',
+      [email]
+    );
 
-    if (!existingQuery.empty) {
+    if (existingUser.rows.length > 0) {
       return res.status(409).json({
         success: false,
         message: 'User already exists with this email'
@@ -349,22 +394,16 @@ app.post('/api/auth/signup', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user document
-    const newUser = {
-      name,
-      email,
-      password: hashedPassword,
-      role: 'user',
-      is_approved: 0,
-      created_at: admin.firestore.FieldValue.serverTimestamp()
-    };
-
-    const docRef = await usersRef.add(newUser);
+    // Create new user
+    const result = await pool.query(
+      'INSERT INTO users (name, email, password, role, is_approved) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+      [name, email, hashedPassword, 'user', 0]
+    );
 
     res.status(201).json({
       success: true,
       message: 'Registration successful! Please wait for admin approval.',
-      data: { userId: docRef.id }
+      data: { userId: result.rows[0].id }
     });
 
   } catch (error) {
@@ -377,42 +416,39 @@ app.post('/api/auth/signup', async (req, res) => {
 });
 
 // Dashboard endpoint
-app.get('/api/users/dashboard', authenticateToken, async (req, res) => {
+apiRouter.get('/users/dashboard', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    // Get user info from Firestore
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) {
+    // Get user info from PostgreSQL
+    const userResult = await pool.query(
+      'SELECT id, name, email FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
-    const user = { id: userDoc.id, ...userDoc.data() };
+    const user = userResult.rows[0];
 
-    // Get user applications from Firestore
-    const applicationsSnapshot = await db.collection('applications')
-      .where('user_id', '==', userId)
-      .orderBy('submitted_at', 'desc')
-      .get();
+    // Get user applications from PostgreSQL
+    const applicationsResult = await pool.query(
+      'SELECT * FROM applications WHERE user_id = $1 ORDER BY submitted_at DESC',
+      [userId]
+    );
 
-    const applications = applicationsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    const applications = applicationsResult.rows;
 
-    // Get user notifications from Firestore
-    const notificationsSnapshot = await db.collection('notifications')
-      .where('user_id', '==', userId)
-      .orderBy('created_at', 'desc')
-      .limit(5)
-      .get();
+    // Get user notifications from PostgreSQL
+    const notificationsResult = await pool.query(
+      'SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 5',
+      [userId]
+    );
 
-    const notifications = notificationsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    const notifications = notificationsResult.rows;
 
     res.json({
       success: true,
@@ -436,124 +472,34 @@ app.get('/api/users/dashboard', authenticateToken, async (req, res) => {
   }
 });
 
-// Health check - support both /api/health and /health
-app.get('/api/health', (req, res) => {
+// Health check
+apiRouter.get('/health', (req, res) => {
+  console.log('Health check hit:', req.url, req.method);
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+// Root route for testing
+apiRouter.get('/', (req, res) => {
+  console.log('Root route hit:', req.url, req.method);
+  res.json({ 
+    message: 'API is working!',
+    routes: ['/auth/login', '/auth/staff-login', '/auth/signup', '/health']
+  });
 });
 
-// Test Neon PostgreSQL Connection
-app.get('/api/test/db', async (req, res) => {
-  try {
-    if (!pgPool) {
-      return res.status(503).json({
-        success: false,
-        message: 'PostgreSQL connection not configured',
-        error: 'DATABASE_POSTGRES_URL or DATABASE_URL environment variable not found'
-      });
-    }
+// Mount the API router. Since Vercel routes /api/* to this file,
+// we mount the router at the root '/'.
+// Vercel strips the /api prefix, so /api/auth/login becomes /auth/login
+app.use('/', apiRouter);
 
-    // Test connection
-    const client = await pgPool.connect();
-    
-    // Run a simple query
-    const result = await client.query('SELECT NOW() as current_time, version() as pg_version');
-    
-    // Check if users table exists
-    const tableCheck = await client.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'users'
-      );
-    `);
-
-    // Get table count if exists
-    let tableCount = null;
-    if (tableCheck.rows[0].exists) {
-      const countResult = await client.query('SELECT COUNT(*) as count FROM users');
-      tableCount = parseInt(countResult.rows[0].count);
-    }
-
-    client.release();
-
-    res.json({
-      success: true,
-      message: '✅ Database connection successful!',
-      data: {
-        connection: 'Connected to Neon PostgreSQL',
-        currentTime: result.rows[0].current_time,
-        postgresVersion: result.rows[0].pg_version.split(',')[0], // First line only
-        usersTableExists: tableCheck.rows[0].exists,
-        usersCount: tableCount,
-        environment: {
-          hasPostgresUrl: !!process.env.DATABASE_POSTGRES_URL,
-          hasDatabaseUrl: !!process.env.DATABASE_URL,
-          hasPostgresUrlAlt: !!process.env.POSTGRES_URL
-        }
-      },
-      timestamp: new Date().toISOString()
-    });
-
-  } catch (error) {
-    console.error('Database test error:', error);
-    res.status(500).json({
-      success: false,
-      message: '❌ Database connection failed',
-      error: error.message,
-      details: {
-        code: error.code,
-        hint: error.hint || null
-      }
-    });
+// Debug: Log all registered routes
+console.log('=== REGISTERED ROUTES ===');
+apiRouter.stack.forEach((r) => {
+  if (r.route) {
+    console.log(`${Object.keys(r.route.methods).join(', ').toUpperCase()} ${r.route.path}`);
   }
 });
-
-// Test Neon PostgreSQL - List Tables
-app.get('/api/test/db/tables', async (req, res) => {
-  try {
-    if (!pgPool) {
-      return res.status(503).json({
-        success: false,
-        message: 'PostgreSQL connection not configured'
-      });
-    }
-
-    const client = await pgPool.connect();
-    
-    // Get all tables
-    const result = await client.query(`
-      SELECT table_name, 
-             (SELECT COUNT(*) FROM information_schema.columns WHERE table_name = t.table_name) as column_count
-      FROM information_schema.tables t
-      WHERE table_schema = 'public' 
-      AND table_type = 'BASE TABLE'
-      ORDER BY table_name;
-    `);
-
-    client.release();
-
-    res.json({
-      success: true,
-      message: `Found ${result.rows.length} table(s)`,
-      data: {
-        tables: result.rows,
-        count: result.rows.length
-      }
-    });
-
-  } catch (error) {
-    console.error('Database tables error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to list tables',
-      error: error.message
-    });
-  }
-});
+console.log('========================');
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -564,16 +510,30 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
+// 404 handler - log all unmatched routes for debugging
 app.use('*', (req, res) => {
+  console.error('--- 404: ROUTE NOT FOUND ---');
+  console.error(`  Timestamp: ${new Date().toISOString()}`);
+  console.error(`  Method: ${req.method}`);
+  console.error(`  URL (as seen by Express): ${req.url}`);
+  console.error(`  Original URL: ${req.originalUrl}`);
+  if (req.body && Object.keys(req.body).length > 0) {
+    console.error(`  Request Body: ${JSON.stringify(req.body, null, 2)}`);
+  }
   res.status(404).json({
     success: false,
-    message: 'Endpoint not found'
+    message: 'Endpoint not found',
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// For local development, start the server
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
 
+// Export for Vercel serverless functions
+// Vercel automatically detects api/index.js and mounts it at /api
+// Routes should be relative (e.g., '/auth/login' not '/api/auth/login')
 module.exports = app;

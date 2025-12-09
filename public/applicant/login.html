@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Applicant Login - OnlineBizPermit</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/auth_style.css">
+    <script src="/config.js"></script>
+    <style>
+        .error, .success {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.5rem;
+            font-size: 14px;
+            text-align: center;
+            display: none;
+        }
+        .error.show, .success.show {
+            display: block;
+        }
+        .error {
+            color: #842029;
+            background-color: #f8d7da;
+            border: 1px solid #f5c2c7;
+        }
+        .success {
+            color: #0f5132;
+            background-color: #d1e7dd;
+            border: 1px solid #badbcc;
+        }
+        button[type="submit"]:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div id="successMessage" class="success"></div>
+    <div id="errorMessage" class="error"></div>
+    
+    <!-- Your existing login form HTML here -->
+    <!-- I'll use a simplified version since the full CSS is in auth_style.css -->
+    <div class="login-container">
+        <form id="loginForm" novalidate>
+            <h2>Applicant Login</h2>
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password" required>
+            </div>
+            <button type="submit" id="submitBtn">Log In</button>
+            <div class="links">
+                <a href="signup.html">Don't have an account? Sign up</a>
+                <a href="forgot-password.html">Forgot Password?</a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // Check for success messages from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const status = urlParams.get('status');
+        if (status === 'registered') {
+            showMessage('Registration successful! Please log in with your credentials.', 'success');
+        } else if (status === 'pending') {
+            showMessage('Registration successful! Your account is pending admin approval. You will be notified once approved.', 'success');
+        } else if (status === 'reset_success') {
+            showMessage('Password reset successful! Please log in with your new password.', 'success');
+        } else if (status === 'logout') {
+            showMessage('You have been logged out successfully.', 'success');
+        }
+
+        // Handle form submission
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const submitBtn = document.getElementById('submitBtn');
+            hideMessages();
+            
+            if (!email || !password) {
+                showMessage('Please enter both email and password.', 'error');
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Logging in...';
+            
+            try {
+                const API_BASE_URL = window.CONFIG?.API_BASE_URL || 'https://online-biz-permit.vercel.app/api';
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    localStorage.setItem('token', data.data.token);
+                    localStorage.setItem('user', JSON.stringify(data.data.user));
+                    window.location.href = 'home.html';
+                } else {
+                    showMessage(data.message || 'Invalid email or password.', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Log In';
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showMessage('Network error. Please check your connection and try again.', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Log In';
+            }
+        });
+        
+        function showMessage(message, type) {
+            const messageEl = type === 'error' ? document.getElementById('errorMessage') : document.getElementById('successMessage');
+            messageEl.textContent = message;
+            messageEl.classList.add('show');
+            setTimeout(() => messageEl.classList.remove('show'), 5000);
+        }
+        
+        function hideMessages() {
+            document.getElementById('errorMessage').classList.remove('show');
+            document.getElementById('successMessage').classList.remove('show');
+        }
+        
+        // Check if already logged in
+        const token = localStorage.getItem('token');
+        if (token) {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (user.role === 'user') {
+                window.location.href = 'home.html';
+            }
+        }
+    </script>
+</body>
+</html>
+

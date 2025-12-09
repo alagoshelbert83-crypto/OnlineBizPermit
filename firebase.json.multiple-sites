@@ -1,7 +1,7 @@
 {
   "hosting": [
     {
-      "target": "admin-dashboardbiz",
+      "target": "admin-dashboard",
       "public": "public/admin",
       "ignore": [
         "firebase.json",
@@ -43,7 +43,7 @@
       ]
     },
     {
-      "target": "applicant-dashboardbiz",
+      "target": "applicant-dashboard",
       "public": "public/applicant",
       "ignore": [
         "firebase.json",
@@ -85,7 +85,7 @@
       ]
     },
     {
-      "target": "staff-dashboardbiz",
+      "target": "staff-dashboard",
       "public": "public/staff",
       "ignore": [
         "firebase.json",
@@ -128,3 +128,4 @@
     }
   ]
 }
+
