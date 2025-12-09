@@ -32,15 +32,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_staff'])) {
         $message = '<div class="message error">Password must be at least 8 characters long.</div>';
     } else {
         $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
-        $stmt->bind_param("s", $email);
-        $stmt->execute();
-        if ($stmt->get_result()->num_rows > 0) {
+        $stmt->execute([$email]);
+        if ($stmt->fetch()) {
             $message = '<div class="message error">An account with this email already exists.</div>';
         } else {
             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
             $insertStmt = $conn->prepare("INSERT INTO users (name, email, password, role, is_approved) VALUES (?, ?, ?, 'staff', 1)");
-            $insertStmt->bind_param("sss", $name, $email, $hashedPassword);
-            if ($insertStmt->execute()) {
+            if ($insertStmt->execute([$name, $email, $hashedPassword])) {
                 $message = '<div class="message success">Staff member added successfully.</div>';
             } else {
                 $message = '<div class="message error">Failed to add staff member.</div>';
@@ -55,17 +53,16 @@ $recent_users_sql = "SELECT id, name, email, role, created_at
                     ORDER BY created_at DESC
                     LIMIT 7";
 $recent_users_result = $conn->query($recent_users_sql);
-$recent_users = $recent_users_result ? $recent_users_result->fetch_all(MYSQLI_ASSOC) : [];
+$recent_users = $recent_users_result ? $recent_users_result->fetchAll(PDO::FETCH_ASSOC) : [];
 
 // --- Fetch All Dashboard Stats in a Single, Optimized Query ---
 $user_kpi_sql = "SELECT
     (SELECT COUNT(*) FROM users) as total_users,
     (SELECT COUNT(*) FROM users WHERE role = 'staff') as staff_count,
     (SELECT COUNT(*) FROM users WHERE role = 'user' AND is_approved = 0) as pending_users,
-    (SELECT COUNT(*) FROM users WHERE created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')) as new_users_this_month
-    FROM DUAL";
+    (SELECT COUNT(*) FROM users WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)) as new_users_this_month";
 $user_kpi_result = $conn->query($user_kpi_sql);
-$user_kpis = $user_kpi_result ? $user_kpi_result->fetch_assoc() : [];
+$user_kpis = $user_kpi_result ? $user_kpi_result->fetch(PDO::FETCH_ASSOC) : [];
 
 // --- Monthly User Registrations for Bar Chart ---
 // Initialize an array for the last 12 months with 0 counts to ensure a complete dataset for the chart.
@@ -79,14 +76,14 @@ for ($i = 11; $i >= 0; $i--) {
 $twelveMonthsAgo = new DateTime('-11 months');
 $startDate = $twelveMonthsAgo->format('Y-m-01 00:00:00');
 
-$res = $conn->query("SELECT DATE_FORMAT(created_at, '%b %Y') AS month, COUNT(*) AS total
+$res = $conn->query("SELECT TO_CHAR(created_at, 'Mon YYYY') AS month, COUNT(*) AS total
                      FROM users
                      WHERE created_at >= '{$startDate}'
-                     GROUP BY DATE_FORMAT(created_at, '%Y-%m')
-                     ORDER BY created_at ASC");
+                     GROUP BY TO_CHAR(created_at, 'YYYY-MM'), TO_CHAR(created_at, 'Mon YYYY')
+                     ORDER BY TO_CHAR(created_at, 'YYYY-MM') ASC");
 
 if ($res) {
-    while ($row = $res->fetch_assoc()) {
+    while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
         if (isset($monthlyData[$row['month']])) {
             $monthlyData[$row['month']] = (int)$row['total'];
         }

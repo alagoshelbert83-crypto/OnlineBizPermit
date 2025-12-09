@@ -18,10 +18,9 @@ $user_kpi_sql = "SELECT
     (SELECT COUNT(*) FROM users) as total_users,
     (SELECT COUNT(*) FROM users WHERE role = 'staff') as staff_count,
     (SELECT COUNT(*) FROM users WHERE role = 'user' AND is_approved = 0) as pending_users,
-    (SELECT COUNT(*) FROM users WHERE created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')) as new_users_this_month
-    FROM DUAL";
+    (SELECT COUNT(*) FROM users WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)) as new_users_this_month";
 $user_kpi_result = $conn->query($user_kpi_sql);
-$user_kpis = $user_kpi_result ? $user_kpi_result->fetch_assoc() : [];
+$user_kpis = $user_kpi_result ? $user_kpi_result->fetch(PDO::FETCH_ASSOC) : [];
 
 // --- Data for Monthly Trend Chart (Last 12 Months) ---
 $monthly_labels = [];
@@ -33,14 +32,14 @@ for ($i = 11; $i >= 0; $i--) {
     $counts_by_month[$month_key] = 0;
 }
 
-$monthly_sql = "SELECT DATE_FORMAT(created_at, '%Y-%m') AS month, COUNT(id) AS count
+$monthly_sql = "SELECT TO_CHAR(created_at, 'YYYY-MM') AS month, COUNT(id) AS count
                 FROM users
-                WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
-                GROUP BY month
+                WHERE created_at >= CURRENT_DATE - INTERVAL '12 months'
+                GROUP BY TO_CHAR(created_at, 'YYYY-MM')
                 ORDER BY month ASC";
 $monthly_result = $conn->query($monthly_sql);
 if ($monthly_result) {
-    while ($row = $monthly_result->fetch_assoc()) {
+    while ($row = $monthly_result->fetch(PDO::FETCH_ASSOC)) {
         if (isset($counts_by_month[$row['month']])) {
             $counts_by_month[$row['month']] = (int)$row['count'];
         }
@@ -61,7 +60,7 @@ $role_colors = [
 ];
 $doughnut_bg_colors = [];
 if ($role_result) {
-    while ($row = $role_result->fetch_assoc()) {
+    while ($row = $role_result->fetch(PDO::FETCH_ASSOC)) {
         $role_labels[] = ($row['role'] === 'user') ? 'Applicants' : ucfirst($row['role']);
         $role_counts[] = $row['count'];
         $doughnut_bg_colors[] = $role_colors[strtolower($row['role'])] ?? $role_colors['default'];
@@ -74,7 +73,7 @@ $recent_users_sql = "SELECT id, name, email, role, created_at
                     ORDER BY created_at DESC
                     LIMIT 7";
 $recent_users_result = $conn->query($recent_users_sql);
-$recent_users = $recent_users_result ? $recent_users_result->fetch_all(MYSQLI_ASSOC) : [];
+$recent_users = $recent_users_result ? $recent_users_result->fetchAll(PDO::FETCH_ASSOC) : [];
 
 // Include Sidebar
 require_once __DIR__ . '/admin_sidebar.php';

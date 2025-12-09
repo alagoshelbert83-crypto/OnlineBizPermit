@@ -9,7 +9,8 @@ $pending_users_count = 0;
 if (isset($conn)) {
     $count_result = $conn->query("SELECT COUNT(*) as count FROM users WHERE role = 'user' AND is_approved = 0");
     if ($count_result) {
-        $pending_users_count = $count_result->fetch_assoc()['count'] ?? 0;
+        $row = $count_result->fetch(PDO::FETCH_ASSOC);
+        $pending_users_count = $row['count'] ?? 0;
     }
 }
 ?>

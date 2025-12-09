@@ -28,19 +28,19 @@ function time_ago(string $datetime): string {
 /**
  * Retrieves a setting value from the database.
  *
- * @param mysqli $conn The database connection.
+ * @param PDO $conn The database connection.
  * @param string $key The key of the setting to retrieve.
  * @param mixed $default The default value to return if the key is not found.
  * @return mixed The value of the setting or the default value.
  */
-function get_setting(mysqli $conn, string $key, $default = '') {
+function get_setting(PDO $conn, string $key, $default = '') {
     // This function can be optimized by caching settings in a static variable.
     static $settings = null;
     if ($settings === null) {
         $settings = [];
         $result = $conn->query("SELECT setting_key, setting_value FROM settings");
         if ($result) {
-            while ($row = $result->fetch_assoc()) {
+            while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
                 $settings[$row['setting_key']] = $row['setting_value'];
             }
         }
@@ -51,16 +51,14 @@ function get_setting(mysqli $conn, string $key, $default = '') {
 /**
  * Updates or creates a setting in the database.
  *
- * @param mysqli $conn The database connection.
+ * @param PDO $conn The database connection.
  * @param string $key The key of the setting.
  * @param string $value The new value for the setting.
  * @return bool True on success, false on failure.
  */
-function update_setting(mysqli $conn, string $key, string $value): bool {
-    $stmt = $conn->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?");
+function update_setting(PDO $conn, string $key, string $value): bool {
+    // PostgreSQL uses ON CONFLICT instead of ON DUPLICATE KEY UPDATE
+    $stmt = $conn->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT (setting_key) DO UPDATE SET setting_value = ?");
     if (!$stmt) return false;
-    $stmt->bind_param("sss", $key, $value, $value);
-    $success = $stmt->execute();
-    $stmt->close();
-    return $success;
+    return $stmt->execute([$key, $value, $value]);
 }

@@ -21,22 +21,18 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
     }
 
     if (!empty($new_status)) {
-        $conn->begin_transaction();
+        $conn->beginTransaction();
         try {
             // Update status
             $stmt = $conn->prepare("UPDATE applications SET status = ? WHERE id = ?");
-            $stmt->bind_param("si", $new_status, $applicationId);
-            if (!$stmt->execute()) {
+            if (!$stmt->execute([$new_status, $applicationId])) {
                 throw new Exception("Failed to update application status.");
             }
-            $stmt->close();
 
             // Get user details for notification
             $userStmt = $conn->prepare("SELECT a.user_id, a.business_name, u.name as applicant_name, u.email as applicant_email FROM applications a JOIN users u ON a.user_id = u.id WHERE a.id = ?");
-            $userStmt->bind_param("i", $applicationId);
-            $userStmt->execute();
-            $appData = $userStmt->get_result()->fetch_assoc();
-            $userStmt->close();
+            $userStmt->execute([$applicationId]);
+            $appData = $userStmt->fetch(PDO::FETCH_ASSOC);
 
             if ($appData) {
                 $status_text = ($new_status === 'approved') ? 'approved' : 'rejected';
@@ -44,16 +40,14 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                 $link = "../Applicant-dashboard/view_my_application.php?id={$applicationId}";
                 
                 $notifyStmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
-                $notifyStmt->bind_param("iss", $appData['user_id'], $notificationMessage, $link);
-                $notifyStmt->execute();
-                $notifyStmt->close();
+                $notifyStmt->execute([$appData['user_id'], $notificationMessage, $link]);
             }
             
             $conn->commit();
             $message = '<div class="message success">Application status updated successfully. Applicant has been notified.</div>';
 
         } catch (Exception $e) {
-            $conn->rollback();
+            $conn->rollBack();
             $message = '<div class="message error">Failed to update application status: ' . $e->getMessage() . '</div>';
         }
     }
@@ -70,7 +64,7 @@ $counts_sql = "SELECT
     SUM(CASE WHEN renewal_status = 'expiring_soon' THEN 1 ELSE 0 END) as expiring,
     SUM(CASE WHEN renewal_status = 'expired' THEN 1 ELSE 0 END) as expired
     FROM applications";
-$counts_result = $conn->query($counts_sql)->fetch_assoc();
+$counts_result = $conn->query($counts_sql)->fetch(PDO::FETCH_ASSOC);
 
 $where_clauses = [];
 $params = [];
@@ -125,15 +119,8 @@ $sql = "SELECT a.id, a.business_name, a.business_address, a.submitted_at, a.stat
         ORDER BY a.submitted_at DESC";
 
 $stmt = $conn->prepare($sql);
-if (!empty($params)) {
-    $stmt->bind_param($types, ...$params);
-}
-$stmt->execute();
-$result = $stmt->get_result();
-if ($result) {
-    $applications = $result->fetch_all(MYSQLI_ASSOC);
-}
-$stmt->close();
+$stmt->execute($params);
+$applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Include Sidebar
 require_once __DIR__ . '/admin_sidebar.php';

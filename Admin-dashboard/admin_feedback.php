@@ -13,8 +13,7 @@ $message = '';
 if ($current_user_role === 'admin' && isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
     $feedbackIdToDelete = (int)$_GET['id'];
     $stmt = $conn->prepare("DELETE FROM feedback WHERE id = ?");
-    $stmt->bind_param("i", $feedbackIdToDelete);
-    if ($stmt->execute()) {
+    if ($stmt->execute([$feedbackIdToDelete])) {
         $message = '<div class="message success">Feedback deleted successfully.</div>';
     } else {
         $message = '<div class="message error">Failed to delete feedback.</div>';
@@ -49,9 +48,8 @@ $sql .= " ORDER BY " . $sort_col . " " . $sort_order;
 
 // Prepare and execute the statement
 $stmt = $conn->prepare($sql);
-if (!empty($params)) { $stmt->bind_param($types, ...$params); }
-$stmt->execute();
-$feedback_items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->execute($params);
+$feedback_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Include Sidebar
 require_once __DIR__ . '/admin_sidebar.php';

@@ -66,10 +66,7 @@ if (!$stmt) {
     echo json_encode(['error' => 'Database query failed to prepare.']);
     exit;
 }
-$stmt->bind_param($types, ...$params);
-$stmt->execute();
-$result = $stmt->get_result();
-$applications = $result->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
+$stmt->execute($params);
+$applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 echo json_encode($applications);

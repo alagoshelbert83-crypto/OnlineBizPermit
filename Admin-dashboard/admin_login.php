@@ -43,7 +43,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $error_message = "Invalid email or password.";
         }
-        $stmt->close();
     }
 } else {
     if (isset($_GET['status']) && $_GET['status'] === 'logout') {

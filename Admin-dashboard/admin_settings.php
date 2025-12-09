@@ -18,8 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
         $profile_message = '<div class="message error">Name cannot be empty.</div>';
     } else {
         $stmt = $conn->prepare("UPDATE users SET name = ? WHERE id = ?");
-        $stmt->bind_param("si", $name, $current_user_id);
-        if ($stmt->execute()) {
+        if ($stmt->execute([$name, $current_user_id])) {
             $profile_message = '<div class="message success">Profile updated successfully.</div>';
             // Update session/page variables to reflect the change immediately
             $_SESSION['name'] = $name;
@@ -27,7 +26,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
         } else {
             $profile_message = '<div class="message error">Failed to update profile.</div>';
         }
-        $stmt->close();
         header("Location: settings.php"); exit; // Refresh to show updated info and clear POST
     }
 }
@@ -46,21 +44,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
         $password_message = '<div class="message error">Password must be at least 8 characters long.</div>';
     } else {
         $stmt = $conn->prepare("SELECT password FROM users WHERE id = ?");
-        $stmt->bind_param("i", $current_user_id);
-        $stmt->execute();
-        $user = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
+        $stmt->execute([$current_user_id]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user && password_verify($current_password, $user['password'])) {
             $hashedPassword = password_hash($new_password, PASSWORD_DEFAULT);
             $update_stmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
-            $update_stmt->bind_param("si", $hashedPassword, $current_user_id);
-            if ($update_stmt->execute()) {
+            if ($update_stmt->execute([$hashedPassword, $current_user_id])) {
                 $password_message = '<div class="message success">Password changed successfully.</div>';
             } else {
                 $password_message = '<div class="message error">Could not change password.</div>';
             }
-            $update_stmt->close();
         } else {
             $password_message = '<div class="message error">Incorrect current password.</div>';
         }
@@ -98,9 +92,8 @@ if ($current_user_role === 'admin') {
 
 // Fetch current user's info for the form fields
 $stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
-$stmt->bind_param("i", $current_user_id);
-$stmt->execute();
-$user_info = $stmt->get_result()->fetch_assoc();
+$stmt->execute([$current_user_id]);
+$user_info = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // Include Sidebar
 require_once __DIR__ . '/admin_sidebar.php';
