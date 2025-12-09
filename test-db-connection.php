@@ -47,16 +47,31 @@ if ($postgresUrl) {
     echo "4. Connection String (DSN):\n";
     echo "   $dsn\n\n";
     
-    // Test 4: Try to connect
+    // Test 4: Try to connect with SSL
     echo "5. Testing Connection:\n";
+    
+    // Check if SSL mode is in query string
+    $queryParams = [];
+    if (isset($parsedUrl['query'])) {
+        parse_str($parsedUrl['query'], $queryParams);
+    }
+    
+    // Build DSN with SSL mode
+    if (isset($queryParams['sslmode'])) {
+        $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=" . $queryParams['sslmode'];
+    } else {
+        // Default to require SSL for Neon
+        $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
+    }
+    
+    echo "   DSN: $dsn\n";
+    
     try {
         $conn = new PDO($dsn, $user, $pass, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_SSL_MODE => PDO::SQLSRV_SSL_MODE_STRICT
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_TIMEOUT => 30
         ]);
-        
-        // Try setting SSL mode via attribute
-        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         
         echo "   ✅ Connection successful!\n";
         echo "   PostgreSQL Version: " . $conn->query('SELECT version()')->fetchColumn() . "\n";
@@ -66,22 +81,15 @@ if ($postgresUrl) {
         $tableCount = $stmt->fetchColumn();
         echo "   Tables in database: $tableCount\n";
         
+        // Test if users table exists
+        $stmt = $conn->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'");
+        $usersTableExists = $stmt->fetchColumn();
+        echo "   Users table exists: " . ($usersTableExists > 0 ? 'YES' : 'NO') . "\n";
+        
     } catch(PDOException $e) {
         echo "   ❌ Connection failed!\n";
         echo "   Error: " . $e->getMessage() . "\n";
         echo "   Code: " . $e->getCode() . "\n";
-        
-        // Try with SSL mode in DSN
-        echo "\n6. Retrying with SSL mode in DSN:\n";
-        try {
-            $dsnWithSSL = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
-            echo "   DSN: $dsnWithSSL\n";
-            $conn2 = new PDO($dsnWithSSL, $user, $pass);
-            $conn2->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            echo "   ✅ Connection successful with SSL!\n";
-        } catch(PDOException $e2) {
-            echo "   ❌ Still failed: " . $e2->getMessage() . "\n";
-        }
     }
 } else {
     // Fallback to individual variables

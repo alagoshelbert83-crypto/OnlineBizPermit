@@ -16,17 +16,27 @@ $current_user_id = $_SESSION['user_id'];
 $current_user_role = $_SESSION['role'];
 
 // Fetch Current User Info
-$stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
-$stmt->execute([$current_user_id]);
-$user_info = $stmt->fetch(PDO::FETCH_ASSOC);
-$current_user_name = $user_info['name'] ?? 'User';
+try {
+    $stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
+    $stmt->execute([$current_user_id]);
+    $user_info = $stmt->fetch(PDO::FETCH_ASSOC);
+    $current_user_name = $user_info['name'] ?? 'User';
+} catch(PDOException $e) {
+    error_log("Error fetching user info: " . $e->getMessage());
+    $current_user_name = 'User';
+}
 
 // --- Fetch unread notification count for admin ---
 $unread_notifications_count = 0;
-$count_stmt = $conn->prepare("SELECT COUNT(*) as unread_count FROM notifications WHERE user_id = ? AND is_read = 0");
-$count_stmt->execute([$current_user_id]);
-$count_result = $count_stmt->fetch(PDO::FETCH_ASSOC);
-$unread_notifications_count = $count_result['unread_count'] ?? 0;
+try {
+    $count_stmt = $conn->prepare("SELECT COUNT(*) as unread_count FROM notifications WHERE user_id = ? AND is_read = 0");
+    $count_stmt->execute([$current_user_id]);
+    $count_result = $count_stmt->fetch(PDO::FETCH_ASSOC);
+    $unread_notifications_count = $count_result['unread_count'] ?? 0;
+} catch(PDOException $e) {
+    error_log("Error fetching notification count: " . $e->getMessage());
+    $unread_notifications_count = 0;
+}
 
 
 ?>
