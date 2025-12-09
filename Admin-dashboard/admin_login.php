@@ -1,15 +1,21 @@
 <?php
-session_start();
+// db.php must be included first to set up session handler
 require_once 'db.php';
+// Start session AFTER db.php includes session_handler.php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // If user is already logged in, redirect them
 if (isset($_SESSION['user_id'])) {
     if (in_array($_SESSION['role'], ['admin', 'staff'])) {
         header("Location: ./admin_dashboard.php");
+        exit;
     } else {
-        header("Location: ./admin_login.php");
+        // User is logged in but not admin/staff - clear session and show login
+        session_unset();
+        session_destroy();
     }
-    exit;
 }
 
 $error_message = '';
@@ -30,8 +36,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (password_verify($password, $user['password'])) {
                 // Check if the user is an admin or staff
                 if (in_array($user['role'], ['admin', 'staff'])) {
+                    // Regenerate session ID to prevent session fixation attacks
+                    session_regenerate_id(true);
                     $_SESSION['user_id'] = $user['id'];
                     $_SESSION['role'] = $user['role'];
+                    $_SESSION['name'] = $user['name'] ?? 'User';
                     header("Location: ./admin_dashboard.php");
                     exit;
                 } else {
