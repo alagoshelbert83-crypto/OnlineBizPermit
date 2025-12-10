@@ -20,7 +20,7 @@ if (!isset($_GET['id'])) {
 $application_id = (int)$_GET['id'];
 
 // Use a transaction to ensure all operations succeed or fail together
-$conn->begin_transaction();
+$conn->beginTransaction();
 
 try {
     // 1. Fetch application and user details
@@ -28,12 +28,10 @@ try {
         "SELECT a.user_id, a.business_name, u.name as applicant_name, u.email as applicant_email 
          FROM applications a 
          JOIN users u ON a.user_id = u.id 
-         WHERE a.id = ?"
+         WHERE a.id = :id"
     );
-    $stmt->bind_param("i", $application_id);
-    $stmt->execute();
-    $app_data = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
+    $stmt->execute([':id' => $application_id]);
+    $app_data = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$app_data) {
         throw new Exception("Application not found.");
@@ -41,21 +39,17 @@ try {
 
     // 2. Update the application status to 'complete' and mark as released
     $update_stmt = $conn->prepare(
-        "UPDATE applications SET status = 'complete', permit_released_at = NOW(), updated_at = NOW() WHERE id = ?"
+        "UPDATE applications SET status = 'complete', permit_released_at = NOW(), updated_at = NOW() WHERE id = :id"
     );
-    $update_stmt->bind_param("i", $application_id);
-    $update_stmt->execute();
-    $update_stmt->close();
+    $update_stmt->execute([':id' => $application_id]);
 
     // 3. Create a notification for the applicant
     $business_name_safe = htmlspecialchars($app_data['business_name']);
     $notification_message = "Congratulations! Your business permit for '{$business_name_safe}' has been released. You can now view and download it from your dashboard.";
     $link = "../Applicant-dashboard/view_my_application.php?id={$application_id}";
 
-    $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
-    $notify_stmt->bind_param("iss", $app_data['user_id'], $notification_message, $link);
-    $notify_stmt->execute();
-    $notify_stmt->close();
+    $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (:user_id, :message, :link)");
+    $notify_stmt->execute([':user_id' => $app_data['user_id'], ':message' => $notification_message, ':link' => $link]);
 
     // 4. Send an email notification
     try {
@@ -99,7 +93,7 @@ try {
         'text' => "Permit for application #{$application_id} has been released and the applicant has been notified."
     ];
 } catch (Exception $e) {
-    $conn->rollback();
+    if ($conn->inTransaction()) { $conn->rollBack(); }
     $_SESSION['flash_message'] = ['type' => 'error', 'text' => "Failed to release permit: " . $e->getMessage()];
     error_log("Failed to release permit for application ID {$application_id}: " . $e->getMessage());
 }

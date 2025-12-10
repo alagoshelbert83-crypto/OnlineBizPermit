@@ -1,4 +1,4 @@
-<?php
+ <?php
 /**
  * Database Connection for Admin Dashboard - PostgreSQL (Neon)
  */

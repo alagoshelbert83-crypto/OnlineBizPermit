@@ -14,14 +14,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (empty($name) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $profile_message = '<div class="message error">Please provide a valid name and email.</div>';
         } else {
-            $stmt = $conn->prepare("UPDATE users SET name = ?, email = ? WHERE id = ?");
-            $stmt->bind_param("ssi", $name, $email, $userId);
-            if ($stmt->execute()) {
-                $profile_message = '<div class="message success">Profile updated successfully.</div>';
-            } else {
-                $profile_message = '<div class="message error">Could not update profile.</div>';
-            }
-            $stmt->close();
+        $stmt = $conn->prepare("UPDATE users SET name = :name, email = :email WHERE id = :id");
+        if ($stmt->execute([':name' => $name, ':email' => $email, ':id' => $userId])) {
+          $profile_message = '<div class="message success">Profile updated successfully.</div>';
+        } else {
+          $profile_message = '<div class="message error">Could not update profile.</div>';
+        }
+      }
         }
     } elseif (isset($_POST['change_password'])) {
         $current_password = $_POST['current_password'];
@@ -35,22 +34,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($new_password !== $confirm_password) {
             $password_message = '<div class="message error">New passwords do not match.</div>';
         } else {
-            $stmt = $conn->prepare("SELECT password FROM users WHERE id = ?");
-            $stmt->bind_param("i", $userId);
-            $stmt->execute();
-            $user = $stmt->get_result()->fetch_assoc();
-            $stmt->close();
+            $stmt = $conn->prepare("SELECT password FROM users WHERE id = :id");
+            $stmt->execute([':id' => $userId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($user && password_verify($current_password, $user['password'])) {
                 $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-                $update_stmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
-                $update_stmt->bind_param("si", $hashed_password, $userId);
-                if ($update_stmt->execute()) {
-                    $password_message = '<div class="message success">Password changed successfully.</div>';
+                $update_stmt = $conn->prepare("UPDATE users SET password = :password WHERE id = :id");
+                if ($update_stmt->execute([':password' => $hashed_password, ':id' => $userId])) {
+                  $password_message = '<div class="message success">Password changed successfully.</div>';
                 } else {
-                    $password_message = '<div class="message error">Could not change password.</div>';
+                  $password_message = '<div class="message error">Could not change password.</div>';
                 }
-                $update_stmt->close();
             } else {
                 $password_message = '<div class="message error">Incorrect current password.</div>';
             }
@@ -58,10 +53,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
-$stmt->bind_param("i", $userId);
-$stmt->execute();
-$user = $stmt->get_result()->fetch_assoc();
+        $stmt = $conn->prepare("SELECT name, email FROM users WHERE id = :id");
+        $stmt->execute([':id' => $userId]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 require_once './staff_sidebar.php';
 ?>

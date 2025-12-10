@@ -28,11 +28,9 @@ if (isset($_GET['application_id'])) {
 }
 
 if ($application_id) {
-    $stmt = $conn->prepare("SELECT a.user_id, a.business_name, u.name as applicant_name, u.email as applicant_email FROM applications a JOIN users u ON a.user_id = u.id WHERE a.id = ?");
-    $stmt->bind_param("i", $application_id);
-    $stmt->execute();
-    $app_data = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
+  $stmt = $conn->prepare("SELECT a.user_id, a.business_name, u.name as applicant_name, u.email as applicant_email FROM applications a JOIN users u ON a.user_id = u.id WHERE a.id = :id");
+  $stmt->execute([':id' => $application_id]);
+  $app_data = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
 if (!$app_data) {
@@ -49,16 +47,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_notification']))
     if (empty($subject) || empty($message_body)) {
         $flash_message = '<div class="message error">Subject and message cannot be empty.</div>';
     } else {
-        $conn->begin_transaction();
+        $conn->beginTransaction();
         try {
             // 1. Create an in-app notification
             $link = "../Applicant-dashboard/view_my_application.php?id={$application_id}";
             $notification_message = "You have a new message from staff regarding your application for '" . htmlspecialchars($app_data['business_name']) . "'.";
             
-            $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
-            $notify_stmt->bind_param("iss", $app_data['user_id'], $notification_message, $link);
-            $notify_stmt->execute();
-            $notify_stmt->close();
+            $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (:user_id, :message, :link)");
+            $notify_stmt->execute([':user_id' => $app_data['user_id'], ':message' => $notification_message, ':link' => $link]);
 
             // 2. Send an email notification
             $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https" : "http";
@@ -95,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_notification']))
             exit;
 
         } catch (Exception $e) {
-            $conn->rollback();
+          if ($conn->inTransaction()) { $conn->rollBack(); }
             error_log("Notification sending failed for application ID {$application_id}: " . $e->getMessage());
             $flash_message = '<div class="message error">Failed to send notification. Please try again. Error: ' . $e->getMessage() . '</div>';
         }
@@ -105,12 +101,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_notification']))
 // --- Fetch unread notification count for sidebar ---
 $unread_notifications_count = 0;
 if (isset($_SESSION['user_id'])) {
-    $count_stmt = $conn->prepare("SELECT COUNT(*) as unread_count FROM notifications WHERE user_id = ? AND is_read = 0");
-    $count_stmt->bind_param("i", $_SESSION['user_id']);
-    $count_stmt->execute();
-    $count_result = $count_stmt->get_result()->fetch_assoc();
-    $unread_notifications_count = $count_result['unread_count'] ?? 0;
-    $count_stmt->close();
+  $count_stmt = $conn->prepare("SELECT COUNT(*) as unread_count FROM notifications WHERE user_id = :user_id AND is_read = 0");
+  $count_stmt->execute([':user_id' => $_SESSION['user_id']]);
+  $count_result = $count_stmt->fetch(PDO::FETCH_ASSOC);
+  $unread_notifications_count = $count_result['unread_count'] ?? 0;
 }
 
 ?>
