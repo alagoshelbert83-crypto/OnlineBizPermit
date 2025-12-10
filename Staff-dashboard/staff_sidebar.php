@@ -31,6 +31,7 @@ if (isset($conn) && $conn instanceof PDO) {
         <hr class="sidebar-divider">
         <a href="reports.php" class="btn-nav <?= ($current_page === 'reports') ? 'active' : '' ?>"><i class="fas fa-chart-bar"></i><span>Reports</span></a>
         <a href="feedback.php" class="btn-nav <?= ($current_page === 'feedback') ? 'active' : '' ?>"><i class="fas fa-comment-dots"></i><span>Feedback</span></a>
+        <a href="staff_audit_logs.php" class="btn-nav <?= ($current_page === 'audit_logs') ? 'active' : '' ?>"><i class="fas fa-history"></i><span>My Activity</span></a>
     </div>
     <div>
         <a href="settings.php" class="btn-nav <?= ($current_page === 'settings') ? 'active' : '' ?>"><i class="fas fa-cog"></i><span>Settings</span></a>

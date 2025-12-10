@@ -74,18 +74,22 @@ $secureFlag = ( (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
     || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
     || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
 );
-// Use empty domain (null) so browser uses current domain automatically - works better on Render
-if (PHP_VERSION_ID >= 70300) {
-    session_set_cookie_params([
-        'lifetime' => 0,
-        'path' => '/',
-        'domain' => '', // Empty domain works better on Render/proxy environments
-        'secure' => $secureFlag,
-        'httponly' => true,
-        'samesite' => 'Lax'
-    ]);
-} else {
-    session_set_cookie_params(0, '/', '', $secureFlag, true);
+
+// Only set cookie params if session is not already active
+if (session_status() === PHP_SESSION_NONE) {
+    // Use empty domain (null) so browser uses current domain automatically - works better on Render
+    if (PHP_VERSION_ID >= 70300) {
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path' => '/',
+            'domain' => '', // Empty domain works better on Render/proxy environments
+            'secure' => $secureFlag,
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+    } else {
+        session_set_cookie_params(0, '/', '', $secureFlag, true);
+    }
 }
 
 // Include custom session handler for serverless compatibility

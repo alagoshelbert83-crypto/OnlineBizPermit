@@ -32,6 +32,7 @@ if (isset($conn) && isset($_SESSION['user_id'])) {
         <i class="fas fa-bell"></i><span>Notifications <?php if ($unread_notifications_count > 0): ?><span class="notification-count"><?= $unread_notifications_count ?></span><?php endif; ?></span>
     </a>
     <a href="applicant_reports.php" class="btn-nav <?= ($current_page === 'reports') ? 'active' : '' ?>"><i class="fas fa-chart-pie"></i><span>My Reports</span></a>
+    <a href="applicant_audit_logs.php" class="btn-nav <?= ($current_page === 'audit_logs') ? 'active' : '' ?>"><i class="fas fa-history"></i><span>My Activity</span></a>
     <hr class="sidebar-divider">
     <a href="applicant_faq.php?action=start_chat" id="startLiveChatBtn" class="btn-nav <?= ($current_page === 'live_chat') ? 'active' : '' ?>"><i class="fas fa-headset"></i><span>Live Chat</span></a>
     <a href="about.php" class="btn-nav <?= ($current_page === 'about') ? 'active' : '' ?>"><i class="fas fa-info-circle"></i><span>About Us</span></a>
