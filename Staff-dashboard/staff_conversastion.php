@@ -140,6 +140,46 @@ require_once './staff_sidebar.php';
         50% { border-left-color: #ffeaa7; }
         100% { border-left-color: #ffc107; }
     }
+
+    /* Responsive Design */
+    @media (max-width: 1200px) {
+        .chat-cards-grid { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem; }
+    }
+
+    @media (max-width: 768px) {
+        .main { padding: 15px; }
+        .header { margin-bottom: 20px; }
+        .header h1 { font-size: 24px; }
+        .header p { font-size: 14px; }
+        .chat-cards-grid { grid-template-columns: 1fr; gap: 1rem; }
+        .chat-card { margin-bottom: 1rem; }
+        .card-header { padding: 1rem; flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+        .applicant-info { width: 100%; justify-content: space-between; }
+        .status-badge { align-self: flex-end; }
+        .card-body { padding: 1rem; }
+        .chat-meta div { font-size: 0.85rem; }
+        .card-footer { padding: 0.75rem 1rem; }
+        .btn-open-chat { width: 100%; justify-content: center; }
+        .empty-state { padding: 3rem 1rem; }
+        .empty-state i { font-size: 2.5rem; }
+    }
+
+    @media (max-width: 480px) {
+        .main { padding: 10px; }
+        .header h1 { font-size: 20px; }
+        .header p { font-size: 13px; }
+        .chat-card { border-left-width: 3px; }
+        .card-header { padding: 0.75rem; }
+        .applicant-info { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+        .user-avatar { width: 35px; height: 35px; }
+        .applicant-info strong { font-size: 0.9rem; }
+        .applicant-info small { font-size: 0.8rem; }
+        .status-badge { font-size: 0.7rem; padding: 0.2rem 0.6rem; }
+        .card-body { padding: 0.75rem; }
+        .chat-meta { gap: 0.5rem; }
+        .card-footer { padding: 0.5rem 0.75rem; }
+        .btn-open-chat { padding: 0.5rem 1rem; font-size: 0.9rem; }
+    }
 </style>
 
 <?php require_once './staff_footer.php'; ?>

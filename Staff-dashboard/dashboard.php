@@ -114,7 +114,39 @@ $monthly_counts = array_values($counts_by_month);
     .status-pending { background: rgba(255, 193, 7, 0.1); color: #d9a400; }
     .status-rejected { background: rgba(220, 53, 69, 0.1); color: #dc3545; }
 
-    @media (max-width: 1200px) { .dashboard-grid { grid-template-columns: 1fr; } }
+    /* Responsive Design */
+    @media (max-width: 1200px) {
+        .dashboard-grid { grid-template-columns: 1fr; }
+        .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+    }
+
+    @media (max-width: 768px) {
+        .main { padding: 15px; }
+        .main-header { flex-direction: column; align-items: flex-start; gap: 15px; }
+        .main-header h1 { font-size: 24px; }
+        .kpi-grid { grid-template-columns: 1fr; gap: 15px; }
+        .kpi-card { padding: 20px; }
+        .kpi-card .icon { font-size: 2rem; }
+        .kpi-card .details h3 { font-size: 1.8rem; }
+        .dashboard-grid { gap: 15px; }
+        .main-chart-container, .recent-activity-container { padding: 15px; height: 350px; }
+        .activity-list .activity-item { padding: 10px 0; gap: 10px; }
+        .activity-item .activity-icon { font-size: 1.2rem; }
+        .activity-item .activity-details p { font-size: 0.9rem; }
+        .activity-item .activity-details span { font-size: 0.8rem; }
+    }
+
+    @media (max-width: 480px) {
+        .main { padding: 10px; }
+        .main-header h1 { font-size: 20px; }
+        .kpi-card { padding: 15px; }
+        .kpi-card .icon { font-size: 1.8rem; padding: 12px; }
+        .kpi-card .details h3 { font-size: 1.6rem; }
+        .main-chart-container, .recent-activity-container { height: 300px; padding: 12px; }
+        .activity-list .activity-item { flex-direction: column; align-items: flex-start; gap: 8px; }
+        .activity-item .activity-details { width: 100%; }
+        .activity-item .activity-details p { margin-bottom: 4px; }
+    }
   </style>
 
 <?php
