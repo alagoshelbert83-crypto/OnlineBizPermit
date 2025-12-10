@@ -9,12 +9,14 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
     $action = $_GET['action'];
     $notification_id = (int)$_GET['id'];
     if ($action === 'toggle_read') {
-        $stmt = $conn->prepare("UPDATE notifications SET is_read = !is_read WHERE id = ? AND (user_id = ? OR user_id IS NULL)");
-        $stmt->bind_param("ii", $notification_id, $staff_id);
-        $stmt->execute();
-        $stmt->close();
-        header("Location: notifications.php");
-        exit;
+      try {
+        $stmt = $conn->prepare("UPDATE notifications SET is_read = NOT is_read WHERE id = ? AND (user_id = ? OR user_id IS NULL)");
+        $stmt->execute([$notification_id, $staff_id]);
+      } catch (PDOException $e) {
+        error_log("Failed to toggle notification read state: " . $e->getMessage());
+      }
+      header("Location: notifications.php");
+      exit;
     }
 }
 
@@ -24,13 +26,13 @@ $sql = "SELECT id, message, link, created_at, is_read
         WHERE user_id = ? OR user_id IS NULL
         ORDER BY created_at DESC";
 $stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $staff_id);
-$stmt->execute();
-$result = $stmt->get_result();
-if ($result) {
-    $notifications = $result->fetch_all(MYSQLI_ASSOC);
+try {
+  $stmt->execute([$staff_id]);
+  $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+  error_log("Failed to fetch notifications: " . $e->getMessage());
+  $notifications = [];
 }
-$stmt->close();
 
 require_once './staff_sidebar.php';
 ?>

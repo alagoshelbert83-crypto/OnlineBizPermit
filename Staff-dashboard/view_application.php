@@ -14,47 +14,39 @@ $lgu_message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_application'])) {
     $applicationId = (int)$_POST['application_id'];
     
-    $conn->begin_transaction();
     try {
-        // The staff should only update the LGU form data, not the applicant's data.
-        // We also need to update the `updated_at` timestamp on the main application to track activity.
+        $conn->beginTransaction();
+
+        // Update timestamp
         $updateTimestampStmt = $conn->prepare("UPDATE applications SET updated_at = NOW() WHERE id = ?");
-        $updateTimestampStmt->bind_param("i", $applicationId);
-        $updateTimestampStmt->execute();
-        $updateTimestampStmt->close();
+        $updateTimestampStmt->execute([$applicationId]);
 
-            // Now, handle the LGU Section data
-            $lgu_form_data = [
-                'verification' => $_POST['verification'] ?? [],
-                'fees' => $_POST['fees'] ?? []
-            ];
-            $lgu_form_data_json = json_encode($lgu_form_data);
+        // Now, handle the LGU Section data
+        $lgu_form_data = [
+            'verification' => $_POST['verification'] ?? [],
+            'fees' => $_POST['fees'] ?? []
+        ];
+        $lgu_form_data_json = json_encode($lgu_form_data);
 
-            $lgu_stmt = $conn->prepare("REPLACE INTO staff_form_data (application_id, form_data) VALUES (?, ?)");
-            $lgu_stmt->bind_param("is", $applicationId, $lgu_form_data_json);
-            $lgu_stmt->execute();
-            $lgu_stmt->close();
+        // Use Postgres upsert (ON CONFLICT) instead of MySQL REPLACE
+        $lgu_stmt = $conn->prepare("INSERT INTO staff_form_data (application_id, form_data) VALUES (?, ?) ON CONFLICT (application_id) DO UPDATE SET form_data = EXCLUDED.form_data");
+        $lgu_stmt->execute([$applicationId, $lgu_form_data_json]);
 
-            $conn->commit();
-            $message = '<div class="message success">LGU data updated successfully!</div>';
-        } catch (Exception $e) {
-            $conn->rollback();
-            $message = '<div class="message error">Failed to update data: ' . $e->getMessage() . '</div>';
-        }
-
-        header("Location: view_application.php?id=" . $applicationId . "&status=updated");
-        exit;
+        $conn->commit();
+        $message = '<div class="message success">LGU data updated successfully!</div>';
+    } catch (PDOException $e) {
+        try { $conn->rollBack(); } catch (Exception $_) {}
+        $message = '<div class="message error">Failed to update data: ' . htmlspecialchars($e->getMessage()) . '</div>';
     }
+
+    header("Location: view_application.php?id=" . $applicationId . "&status=updated");
+    exit;
+}
 
 if ($applicationId > 0) {
     $stmt = $conn->prepare("SELECT a.*, u.name as applicant_name, u.email as applicant_email FROM applications a LEFT JOIN users u ON a.user_id = u.id WHERE a.id = ?");
-    $stmt->bind_param("i", $applicationId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($result->num_rows > 0) {
-        $application = $result->fetch_assoc();
-    }
-    $stmt->close();
+    $stmt->execute([$applicationId]);
+    $application = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 
 if (!$application) {
@@ -68,14 +60,16 @@ $form_details = json_decode($application['form_details'], true) ?? [];
 // Fetch LGU/staff form data
 $staff_form_data = [];
 $stmt = $conn->prepare("SELECT form_data FROM staff_form_data WHERE application_id = ?");
-$stmt->bind_param("i", $applicationId);
-$stmt->execute();
-$result = $stmt->get_result();
-if ($result->num_rows > 0) {
-    $row = $result->fetch_assoc();
-    $staff_form_data = json_decode($row['form_data'], true) ?? [];
+try {
+    $stmt->execute([$applicationId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($row) {
+        $staff_form_data = json_decode($row['form_data'], true) ?? [];
+    }
+} catch (PDOException $e) {
+    error_log("Failed to fetch staff_form_data: " . $e->getMessage());
+    $staff_form_data = [];
 }
-$stmt->close();
 
 // Display a success message if the URL contains the status parameter
 if (isset($_GET['status']) && $_GET['status'] === 'updated') {

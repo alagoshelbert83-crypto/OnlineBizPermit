@@ -14,24 +14,19 @@ $application_id = (int)($_GET['application_id'] ?? 0);
 $app = null; $user = null; $docs = [];
 if ($application_id > 0) {
     $stmt = $conn->prepare("SELECT a.*, u.name as applicant_name, u.email as applicant_email
-                             FROM applications a 
-                             JOIN users u ON a.user_id = u.id 
-                             WHERE a.id = ?");
-    $stmt->bind_param("i", $application_id);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    $app = $res->fetch_assoc();
-    $stmt->close();
+                 FROM applications a 
+                 JOIN users u ON a.user_id = u.id 
+                 WHERE a.id = ?");
+    $stmt->execute([$application_id]);
+    $app = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // ✅ Fixed query: match your actual columns
     $d = $conn->prepare("SELECT document_name AS file_name, file_path, upload_date AS uploaded_at 
-                         FROM documents 
-                         WHERE application_id=? 
-                         ORDER BY id DESC");
-    $d->bind_param("i", $application_id);
-    $d->execute();
-    $docs = $d->get_result()->fetch_all(MYSQLI_ASSOC);
-    $d->close();
+               FROM documents 
+               WHERE application_id=? 
+               ORDER BY id DESC");
+    $d->execute([$application_id]);
+    $docs = $d->fetchAll(PDO::FETCH_ASSOC);
 }
 
 if (!$app) {

@@ -14,16 +14,14 @@ $report_data = [
     'rejected' => 0,
 ];
 
-$stmt = $conn->prepare("SELECT status, COUNT(id) as count FROM applications WHERE user_id = ? GROUP BY status");
-$stmt->bind_param("i", $current_user_id);
-$stmt->execute();
-$result = $stmt->get_result();
-
-if ($result) {
-    while ($row = $result->fetch_assoc()) {
+try {
+    $stmt = $conn->prepare("SELECT status, COUNT(id) as count FROM applications WHERE user_id = ? GROUP BY status");
+    $stmt->execute([$current_user_id]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as $row) {
         $status = strtolower($row['status']);
         $count = (int)$row['count'];
-        
+
         if (in_array($status, ['approved', 'complete'])) {
             $report_data['complete'] += $count;
         } elseif (in_array($status, ['review', 'for review'])) {
@@ -34,8 +32,9 @@ if ($result) {
             $report_data['rejected'] += $count;
         }
     }
+} catch (PDOException $e) {
+    error_log("Failed to fetch applicant report data: " . $e->getMessage());
 }
-$stmt->close();
 
 
 // Include Sidebar

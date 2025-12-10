@@ -21,18 +21,19 @@ if ($chat_id > 0) {
          JOIN users u ON lc.user_id = u.id
          WHERE lc.id = ? AND lc.user_id = ?"
     );
-    $stmt->bind_param("ii", $chat_id, $current_user_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($result->num_rows > 0) {
-        $chat_session = $result->fetch_assoc();
-
-        // If chat is 'Pending', we just display it. Only staff can change the status.
-        if ($chat_session['status'] === 'Pending') {
-            // No action needed from applicant side
+    try {
+        $stmt->execute([$chat_id, $current_user_id]);
+        $chat_session = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($chat_session) {
+            // If chat is 'Pending', we just display it. Only staff can change the status.
+            if ($chat_session['status'] === 'Pending') {
+                // No action needed from applicant side
+            }
         }
+    } catch (PDOException $e) {
+        error_log("Failed to fetch chat session: " . $e->getMessage());
+        $chat_session = null;
     }
-    $stmt->close();
 }
 
 if (!$chat_session) {
@@ -49,10 +50,13 @@ if ($chat_id > 0) {
          JOIN users u ON cm.sender_id = u.id
          WHERE cm.chat_id = ? ORDER BY cm.id ASC"
     );
-    $msg_stmt->bind_param("i", $chat_id);
-    $msg_stmt->execute();
-    $existing_messages = $msg_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $msg_stmt->close();
+    try {
+        $msg_stmt->execute([$chat_id]);
+        $existing_messages = $msg_stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Failed to fetch chat messages: " . $e->getMessage());
+        $existing_messages = [];
+    }
 }
 ?>
 <!DOCTYPE html>

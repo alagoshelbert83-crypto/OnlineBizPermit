@@ -14,11 +14,14 @@ $delete_message = '';
 
 // --- Fetch fresh user data ---
 // Note: This assumes you have added `email_notifications_enabled` to your `users` table.
-$stmt = $conn->prepare("SELECT name, email, phone, email_notifications_enabled, profile_picture_path FROM users WHERE id = ?");
-$stmt->bind_param("i", $current_user_id);
-$stmt->execute();
-$user_info = $stmt->get_result()->fetch_assoc();
-$stmt->close();
+try {
+    $stmt = $conn->prepare("SELECT name, email, phone, email_notifications_enabled, profile_picture_path FROM users WHERE id = ?");
+    $stmt->execute([$current_user_id]);
+    $user_info = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+} catch (PDOException $e) {
+    error_log("Failed to fetch user info for settings: " . $e->getMessage());
+    $user_info = [];
+}
 
 // Set defaults if not present
 $current_user_name = $user_info['name'] ?? 'Applicant';
@@ -48,15 +51,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_picture'])) {
             if (move_uploaded_file($file['tmp_name'], $upload_dir . $new_filename)) {
                 if ($profile_picture_path && file_exists($upload_dir . $profile_picture_path)) { @unlink($upload_dir . $profile_picture_path); }
                 $stmt = $conn->prepare("UPDATE users SET profile_picture_path = ? WHERE id = ?");
-                $stmt->bind_param("si", $new_filename, $current_user_id);
-                if ($stmt->execute()) {
+                if ($stmt->execute([$new_filename, $current_user_id])) {
                     $picture_message = '<div class="message success">Profile picture updated successfully.</div>';
                     $profile_picture_path = $new_filename;
                 } else {
                     $picture_message = '<div class="message error">Failed to update database.</div>';
                     @unlink($upload_dir . $new_filename);
                 }
-                $stmt->close();
+                // no explicit close for PDO
             } else {
                 $picture_message = '<div class="message error">Failed to upload file.</div>';
             }
@@ -76,8 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
         $profile_message = '<div class="message error">Name cannot be empty.</div>';
     } else {
         $stmt = $conn->prepare("UPDATE users SET name = ?, phone = ? WHERE id = ?");
-        $stmt->bind_param("ssi", $name, $phone, $current_user_id);
-        if ($stmt->execute()) {
+        if ($stmt->execute([$name, $phone, $current_user_id])) {
             $profile_message = '<div class="message success">Profile updated successfully.</div>';
             // Update session/page variables to reflect the change immediately
             $_SESSION['user_name'] = $name;
@@ -86,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
         } else {
             $profile_message = '<div class="message error">Failed to update profile.</div>';
         }
-        $stmt->close();
+        // PDO doesn't require explicit statement close
     }
 }
 
@@ -97,11 +98,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
     $confirm_password = $_POST['confirm_password'];
 
     // Fetch current password hash
-    $stmt = $conn->prepare("SELECT password FROM users WHERE id = ?");
-    $stmt->bind_param("i", $current_user_id);
-    $stmt->execute();
-    $user_password_hash = $stmt->get_result()->fetch_assoc()['password'];
-    $stmt->close();
+    try {
+        $stmt = $conn->prepare("SELECT password FROM users WHERE id = ?");
+        $stmt->execute([$current_user_id]);
+        $user_password_hash = $stmt->fetch(PDO::FETCH_ASSOC)['password'] ?? '';
+    } catch (PDOException $e) {
+        error_log("Failed to fetch user password hash: " . $e->getMessage());
+        $user_password_hash = '';
+    }
 
     if (empty($current_password) || empty($new_password) || empty($confirm_password)) {
         $password_message = '<div class="message error">All password fields are required.</div>';
@@ -114,13 +118,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
     } else {
         $hashedPassword = password_hash($new_password, PASSWORD_DEFAULT);
         $stmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
-        $stmt->bind_param("si", $hashedPassword, $current_user_id);
-        if ($stmt->execute()) {
+        if ($stmt->execute([$hashedPassword, $current_user_id])) {
             $password_message = '<div class="message success">Password updated successfully.</div>';
         } else {
             $password_message = '<div class="message error">Failed to update password.</div>';
         }
-        $stmt->close();
+        // PDO statement closed automatically
     }
 }
 
@@ -129,8 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_notifications'
     $email_notifications = isset($_POST['email_notifications']) ? 1 : 0;
 
     $stmt = $conn->prepare("UPDATE users SET email_notifications_enabled = ? WHERE id = ?");
-    $stmt->bind_param("ii", $email_notifications, $current_user_id);
-    if ($stmt->execute()) {
+    if ($stmt->execute([$email_notifications, $current_user_id])) {
         $notifications_message = '<div class="message success">Notification settings updated.</div>';
         $email_notifications_enabled = (bool)$email_notifications;
     } else {

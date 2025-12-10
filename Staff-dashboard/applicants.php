@@ -24,26 +24,21 @@ if (isset($_POST['update_status'])) {
     $id = $_POST['id'];
     $status = $_POST['status'];
 
-    $conn->begin_transaction();
     try {
+        $conn->beginTransaction();
         $stmt = $conn->prepare("UPDATE applications SET status=?, updated_at=NOW() WHERE id=?");
-        $stmt->bind_param("si", $status, $id);
-        $stmt->execute();
-        $stmt->close();
-        error_log("Status updated for application ID: {$id} to status: {$status}"); // Add log
-        
+        $stmt->execute([$status, $id]);
+        error_log("Status updated for application ID: {$id} to status: {$status}");
+
         $conn->commit();
-        
+
         // Fetch application and user details for notification (if user is assigned)
         $stmt = $conn->prepare("SELECT a.business_name, u.name, u.email 
                                      FROM applications a
                                      LEFT JOIN users u ON a.user_id = u.id
                                      WHERE a.id = ?");
-        $stmt->bind_param('i', $id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $application_data = $result->fetch_assoc();
-        $stmt->close();
+        $stmt->execute([$id]);
+        $application_data = $stmt->fetch(PDO::FETCH_ASSOC);
 
         // Only send notification if a user is linked to the application
         if ($application_data && !empty($application_data['email'])) {
@@ -69,8 +64,8 @@ if (isset($_POST['update_status'])) {
             }
         }
 
-    } catch (Exception $e) {
-        $conn->rollback();
+    } catch (PDOException $e) {
+        try { $conn->rollBack(); } catch (Exception $_) {}
         $_SESSION['flash_message'] = ['type' => 'danger', 'text' => 'Failed to update status. Please try again.'];
         error_log("Failed to update status for application ID {$id}: " . $e->getMessage());
     }
@@ -110,14 +105,15 @@ $offset = ($page - 1) * $limit;
 
 // Get total number of applications for pagination
 $count_sql = "SELECT COUNT(a.id) FROM applications a LEFT JOIN users u ON a.user_id = u.id" . $where_sql;
-$stmt_count = $conn->prepare($count_sql);
-if (!empty($params)) {
-    $stmt_count->bind_param($types, ...$params);
+try {
+    $stmt_count = $conn->prepare($count_sql);
+    $stmt_count->execute($params);
+    $total_applications = (int)$stmt_count->fetchColumn();
+} catch (PDOException $e) {
+    error_log("Failed to count applications: " . $e->getMessage());
+    $total_applications = 0;
 }
-$stmt_count->execute();
-$total_applications = $stmt_count->get_result()->fetch_row()[0];
 $total_pages = ceil($total_applications / $limit);
-$stmt_count->close();
 
 $sql = "SELECT a.id, a.business_name, a.status, a.renewal_date, a.renewal_status, a.permit_released_at, u.name, u.email, a.submitted_at
         FROM applications a 
@@ -125,13 +121,17 @@ $sql = "SELECT a.id, a.business_name, a.status, a.renewal_date, a.renewal_status
        . $where_sql . "
         ORDER BY a.submitted_at DESC
         LIMIT ? OFFSET ?";
-$params[] = $limit; $params[] = $offset; $types .= "ii";
+// Prepare and execute main query
+$params_for_query = $params; // copy
+$params_for_query[] = $limit; $params_for_query[] = $offset;
 $stmt = $conn->prepare($sql);
-if (!empty($params)) {
-    $stmt->bind_param($types, ...$params);
+try {
+    $stmt->execute($params_for_query);
+    $resultRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log("Failed to fetch applications: " . $e->getMessage());
+    $resultRows = [];
 }
-$stmt->execute();
-$result = $stmt->get_result();
 require_once './staff_sidebar.php';
 ?>
 <style>
@@ -224,10 +224,10 @@ require_once './staff_sidebar.php';
             <tr><th>Applicant</th><th>Business Name</th><th>Renewal Info</th><th>Status</th><th>Update Status</th><th>Actions</th></tr>
           </thead>
           <tbody>
-            <?php if ($result->num_rows === 0): ?>
-              <tr><td colspan="6" style="text-align:center; padding: 40px;">No applications found.</td></tr>
-            <?php else: ?>
-              <?php while ($row = $result->fetch_assoc()): ?>
+                        <?php if (empty($resultRows)): ?>
+                            <tr><td colspan="6" style="text-align:center; padding: 40px;">No applications found.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($resultRows as $row): ?>
                 <tr>
                   <td data-label="Applicant">
                     <div class="user-cell">
@@ -283,7 +283,7 @@ require_once './staff_sidebar.php';
 
                   </td>
                 </tr>
-              <?php endwhile; ?>
+                            <?php endforeach; ?>
             <?php endif; ?>
           </tbody>
         </table>

@@ -8,24 +8,26 @@ require_once __DIR__ . '/applicant_header.php';
 
 // --- Fetch notifications for the logged-in user ---
 $notifications = [];
-$stmt = $conn->prepare("SELECT id, message, link, created_at, is_read 
+try {
+    $stmt = $conn->prepare("SELECT id, message, link, created_at, is_read 
                          FROM notifications 
                          WHERE user_id = ? 
                          ORDER BY created_at DESC");
-$stmt->bind_param("i", $current_user_id);
-$stmt->execute();
-$result = $stmt->get_result();
-if ($result) {
-    $notifications = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->execute([$current_user_id]);
+    $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log("Failed to fetch applicant notifications: " . $e->getMessage());
+    $notifications = [];
 }
-$stmt->close();
 
 // --- Mark all notifications as read for this user ---
 // When the user visits this page, all their notifications are marked as read.
 $update_stmt = $conn->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0");
-$update_stmt->bind_param("i", $current_user_id);
-$update_stmt->execute();
-$update_stmt->close();
+try {
+    $update_stmt->execute([$current_user_id]);
+} catch (PDOException $e) {
+    error_log("Failed to mark notifications as read for user {$current_user_id}: " . $e->getMessage());
+}
 
 
 // Include Sidebar
