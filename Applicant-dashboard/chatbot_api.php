@@ -140,10 +140,15 @@ if ($is_live_chat_action) {
             }
         }
 
-        $stmt = $conn->prepare("INSERT INTO chat_messages (chat_id, sender_id, sender_role, message, created_at) VALUES (:chat_id, :sender_id, :sender_role, :message, NOW())");
-        $stmt->execute([':chat_id' => $chat_id, ':sender_id' => $sender_id, ':sender_role' => $sender_role, ':message' => $final_message]);
-
-        echo json_encode(['success' => true]);
+        try {
+            $stmt = $conn->prepare("INSERT INTO chat_messages (chat_id, sender_id, sender_role, message, created_at) VALUES (:chat_id, :sender_id, :sender_role, :message, NOW())");
+            $stmt->execute([':chat_id' => $chat_id, ':sender_id' => $sender_id, ':sender_role' => $sender_role, ':message' => $final_message]);
+            echo json_encode(['success' => true]);
+        } catch (PDOException $e) {
+            error_log('send_message error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to send message. Please try again.']);
+        }
         exit;
     }
 
@@ -151,32 +156,38 @@ if ($is_live_chat_action) {
         $chat_id = (int)$_GET['chat_id'];
         $last_id = (int)$_GET['last_id'];
 
-        // Fetch new messages with sender's name
-        $stmt = $conn->prepare(
-            "SELECT 
-                cm.id, 
-                cm.message, 
-                cm.sender_role, 
-                cm.created_at, 
-                u.name as sender_name 
-             FROM chat_messages cm
-             LEFT JOIN users u ON cm.sender_id = u.id
-             WHERE cm.chat_id = :chat_id AND cm.id > :last_id
-             ORDER BY cm.id ASC"
-        );
-        $stmt->execute([':chat_id' => $chat_id, ':last_id' => $last_id]);
-        $messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        try {
+            // Fetch new messages with sender's name
+            $stmt = $conn->prepare(
+                "SELECT 
+                    cm.id, 
+                    cm.message, 
+                    cm.sender_role, 
+                    cm.created_at, 
+                    u.name as sender_name 
+                 FROM chat_messages cm
+                 LEFT JOIN users u ON cm.sender_id = u.id
+                 WHERE cm.chat_id = :chat_id AND cm.id > :last_id
+                 ORDER BY cm.id ASC"
+            );
+            $stmt->execute([':chat_id' => $chat_id, ':last_id' => $last_id]);
+            $messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Fetch current chat status
-        $status_stmt = $conn->prepare("SELECT status, user_is_typing, staff_is_typing FROM live_chats WHERE id = :chat_id");
-        $status_stmt->execute([':chat_id' => $chat_id]);
-        $status_result = $status_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            // Fetch current chat status
+            $status_stmt = $conn->prepare("SELECT status, user_is_typing, staff_is_typing FROM live_chats WHERE id = :chat_id");
+            $status_stmt->execute([':chat_id' => $chat_id]);
+            $status_result = $status_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-        $status_result['status'] = ucfirst($status_result['status'] ?? 'Unknown');
-        $status_result['user_is_typing'] = (bool)($status_result['user_is_typing'] ?? false);
-        $status_result['staff_is_typing'] = (bool)($status_result['staff_is_typing'] ?? false);
+            $status_result['status'] = ucfirst($status_result['status'] ?? 'Unknown');
+            $status_result['user_is_typing'] = (bool)($status_result['user_is_typing'] ?? false);
+            $status_result['staff_is_typing'] = (bool)($status_result['staff_is_typing'] ?? false);
 
-        echo json_encode(['messages' => $messages, 'status' => $status_result]);
+            echo json_encode(['messages' => $messages, 'status' => $status_result]);
+        } catch (PDOException $e) {
+            error_log('get_messages error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['messages' => [], 'status' => ['error' => 'Failed to fetch messages']]);
+        }
         exit;
     }
 
@@ -217,17 +228,23 @@ if ($is_live_chat_action) {
         $is_typing = $_POST['is_typing'] === 'true' ? 1 : 0;
         $sender_role = $_POST['sender_role'] ?? '';
 
-        if ($sender_role === 'user') {
-            $stmt = $conn->prepare("UPDATE live_chats SET user_is_typing = :is_typing WHERE id = :chat_id");
-        } elseif ($sender_role === 'staff') {
-            $stmt = $conn->prepare("UPDATE live_chats SET staff_is_typing = :is_typing WHERE id = :chat_id");
-        } else {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'Invalid sender role.']);
-            exit;
+        try {
+            if ($sender_role === 'user') {
+                $stmt = $conn->prepare("UPDATE live_chats SET user_is_typing = :is_typing WHERE id = :chat_id");
+            } elseif ($sender_role === 'staff') {
+                $stmt = $conn->prepare("UPDATE live_chats SET staff_is_typing = :is_typing WHERE id = :chat_id");
+            } else {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Invalid sender role.']);
+                exit;
+            }
+            $stmt->execute([':is_typing' => $is_typing, ':chat_id' => $chat_id]);
+            echo json_encode(['success' => true]);
+        } catch (PDOException $e) {
+            error_log('update_typing error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to update typing status.']);
         }
-        $stmt->execute([':is_typing' => $is_typing, ':chat_id' => $chat_id]);
-        echo json_encode(['success' => true]);
         exit;
     }
 
