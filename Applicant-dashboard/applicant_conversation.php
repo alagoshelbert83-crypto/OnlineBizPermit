@@ -620,7 +620,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const chatForm = document.getElementById('chatForm'), userInput = document.getElementById('userInput');
     const chatId = document.getElementById('chatId').value, chatStatusSpan = document.getElementById('chatStatus');
     const fileInput = document.getElementById('fileInput'), filePreview = document.getElementById('filePreview');
-    let lastMessageId = <?= $last_message_id ?>; // Start polling from the last message loaded by PHP
+    let lastMessageId = <?= (int)$last_message_id ?>; // Start polling from the last message loaded by PHP
     let typingTimeout;
     let isSending = false; // Prevent multiple simultaneous sends
     let lastSendTime = 0; // Track last send time to prevent spam
@@ -758,7 +758,7 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('chat_id', chatId);
         formData.append('message', message);
         formData.append('sender_role', 'user');
-        formData.append('sender_id', '<?= $current_user_id ?>'); // Add sender_id for the API
+        formData.append('sender_id', '<?= $current_user_id ?? '' ?>'); // Add sender_id for the API
         if (fileInput.files[0]) {
             formData.append('chat_file', fileInput.files[0]);
         }
