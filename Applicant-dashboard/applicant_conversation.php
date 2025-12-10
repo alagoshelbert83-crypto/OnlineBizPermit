@@ -652,7 +652,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const timeSpan = document.createElement('div');
             timeSpan.className = 'timestamp';
-            timeSpan.textContent = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+            timeSpan.textContent = 'now';
 
             msgContent.append(nameSpan, bubble, timeSpan);
             wrapper.append(avatar, msgContent);
