@@ -158,7 +158,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
         }
 
-        // Create Staff Notification
+        $conn->commit();
+
+        // Create Staff Notification (outside transaction as it's best-effort)
         $notification_message = "New comprehensive application (#{$app_id}) for '{$business_name}' has been submitted.";
         $notification_link = "view_application.php?id={$app_id}";
         try {
@@ -180,7 +182,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https" : "http";
                     $host = $_SERVER['HTTP_HOST'];
                     $absolute_link = "{$protocol}://{$host}/onlinebizpermit/Applicant-dashboard/view_my_application.php?id={$app_id}";
-                    
+
                     $email_subject = "Application Received: '" . htmlspecialchars($business_name) . "'";
                     $email_body = "
                     <div style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
@@ -199,8 +201,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 }
             }
         }
-        
-        $conn->commit();
         
         echo "<h2>✅ Success!</h2>";
         echo "<p>Your comprehensive business permit application has been successfully submitted.</p>";

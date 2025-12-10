@@ -99,6 +99,11 @@ if (PHP_VERSION_ID >= 70300) {
 
 require_once __DIR__ . '/../session_handler.php';
 
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 // Include file upload helper for cloud storage
 require_once __DIR__ . '/../file_upload_helper.php';
 ?>

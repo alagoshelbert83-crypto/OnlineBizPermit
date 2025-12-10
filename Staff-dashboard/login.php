@@ -283,12 +283,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       <form method="POST" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" novalidate>
         <div class="input-group">
           <label for="email">Email Address</label>
-          <input type="email" id="email" name="email" placeholder="you@example.com" required value="<?php echo htmlspecialchars($email); ?>">
+          <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="username" required value="<?php echo htmlspecialchars($email); ?>">
         </div>
         <div class="input-group">
           <label for="password">Password</label>
           <div class="password-wrapper">
-              <input type="password" name="password" id="password" placeholder="Enter your password" required>
+              <input type="password" name="password" id="password" placeholder="Enter your password" autocomplete="current-password" required>
               <button type="button" class="toggle-password" aria-label="Show password">
                   <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                       <path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/>
