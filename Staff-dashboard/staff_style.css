@@ -288,7 +288,7 @@ body {
 .stat-icon {
     width: 56px;
     height: 56px;
-    border-radius: var(--border-radius);
+    border-radius: 50%;
     background: linear-gradient(135deg, var(--accent-color), var(--primary-light));
     display: flex;
     align-items: center;

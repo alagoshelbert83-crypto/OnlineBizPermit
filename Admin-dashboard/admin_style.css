@@ -236,6 +236,21 @@ body {
     background: var(--primary-light);
 }
 
+/* --- KPI Cards & Stats --- */
+.stat-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    margin-bottom: var(--spacing-lg);
+    box-shadow: 0 4px 12px rgba(74, 105, 189, 0.3);
+}
+
 /* --- Cards --- */
 .cards {
     display: grid;
