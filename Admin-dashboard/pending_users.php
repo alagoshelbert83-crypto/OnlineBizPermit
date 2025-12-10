@@ -98,7 +98,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'link_app' && isset($_GET['use
             $new_user_message = "An existing application for '{$business_name}' has been linked to your account by an administrator.";
             $link = "../Applicant-dashboard/view_my_application.php?id={$app_to_link_id}";
             $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
-            $notify_stmt->execute([$target_user_id, $new_user_message, $link]);
+            try {
+                $notify_stmt->execute([$target_user_id, $new_user_message, $link]);
+            } catch (PDOException $notify_e) {
+                // Log notification error but continue - the app linking was successful
+                error_log("Failed to create notification for user {$target_user_id}: " . $notify_e->getMessage());
+            }
 
             // 4. Email the new user (if email function exists and user has an email)
             if (function_exists('sendApplicationEmail') && $target_user_email) {
@@ -134,7 +139,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'link_app' && isset($_GET['use
 
                 $original_user_message = "Your application for '{$business_name}' has been reassigned to '{$target_user_name}' by an administrator.";
                 $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message) VALUES (?, ?)");
-                $notify_stmt->execute([$original_user_id, $original_user_message]);
+                try {
+                    $notify_stmt->execute([$original_user_id, $original_user_message]);
+                } catch (PDOException $notify_e) {
+                    // Log notification error but continue
+                    error_log("Failed to create notification for original user {$original_user_id}: " . $notify_e->getMessage());
+                }
 
                 // Email the original user
                 if ($original_user && !empty($original_user['email']) && function_exists('sendApplicationEmail')) {
@@ -315,8 +325,16 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                 $link = null; // No link for rejection
             }
             
-            $notifyStmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
-            $notifyStmt->execute([$userId, $notificationMessage, $link]);
+            // Wrap notification insert in try-catch to handle potential constraint violations
+            try {
+                $notifyStmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
+                $notifyStmt->execute([$userId, $notificationMessage, $link]);
+            } catch (PDOException $notify_e) {
+                // Log the notification error but don't fail the entire transaction
+                // The user approval is still valid, just the notification failed
+                error_log("Failed to create notification for user {$userId}: " . $notify_e->getMessage());
+                // Continue with commit - the approval was already successful
+            }
             
             // Commit the transaction
             $conn->commit();
