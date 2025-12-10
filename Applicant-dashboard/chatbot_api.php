@@ -26,8 +26,17 @@ require_once $db_path;
         exit;
     }
 
-    // Include audit logger
-    require_once __DIR__ . '/../audit_logger.php';
+    // Include audit logger (with error handling to prevent HTML output)
+    $audit_logger_available = false;
+    try {
+        if (file_exists(__DIR__ . '/../audit_logger.php')) {
+            require_once __DIR__ . '/../audit_logger.php';
+            $audit_logger_available = true;
+        }
+    } catch (Exception $e) {
+        error_log('Failed to load audit logger: ' . $e->getMessage());
+        $audit_logger_available = false;
+    }
 
     // Start session AFTER database connection is established (required for custom session handler)
     if (session_status() == PHP_SESSION_NONE) {
@@ -147,10 +156,17 @@ require_once $db_path;
             $stmt = $conn->prepare("INSERT INTO chat_messages (chat_id, sender_id, sender_role, message, created_at) VALUES (:chat_id, :sender_id, :sender_role, :message, NOW())");
             $stmt->execute([':chat_id' => $chat_id, ':sender_id' => $sender_id, ':sender_role' => $sender_role, ':message' => $final_message]);
 
-            // Log the chat message
-            $logger = AuditLogger::getInstance();
-            $has_file = isset($_FILES['chat_file']) && $_FILES['chat_file']['error'] === UPLOAD_ERR_OK;
-            $logger->logChatMessage($chat_id, strlen($message), $sender_id, $sender_role, $has_file);
+            // Log the chat message (only if audit logger is available)
+            if ($audit_logger_available) {
+                try {
+                    $logger = AuditLogger::getInstance();
+                    $has_file = isset($_FILES['chat_file']) && $_FILES['chat_file']['error'] === UPLOAD_ERR_OK;
+                    $logger->logChatMessage($chat_id, strlen($message), $sender_id, $sender_role, $has_file);
+                } catch (Exception $e) {
+                    error_log('Failed to log chat message: ' . $e->getMessage());
+                    // Continue without logging - don't break the chat functionality
+                }
+            }
 
             echo json_encode(['success' => true]);
         } catch (PDOException $e) {
