@@ -21,6 +21,17 @@ try {
     $my_apps = [];
 }
 
+// --- Fetch active live chats for the user ---
+$active_chats = [];
+try {
+    $stmt = $conn->prepare("SELECT id, status, created_at FROM live_chats WHERE user_id = ? AND status IN ('Pending', 'Open') ORDER BY created_at DESC LIMIT 5");
+    $stmt->execute([$current_user_id]);
+    $active_chats = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch(PDOException $e) {
+    error_log("Error fetching active chats: " . $e->getMessage());
+    $active_chats = [];
+}
+
 // --- Fetch application statistics (Optimized) ---
 $app_stats = [
     'total' => 0,
@@ -149,6 +160,38 @@ require_once __DIR__ . '/applicant_sidebar.php';
 
     <?php if (isset($_GET['status']) && $_GET['status'] === 'success'): ?>
         <div class="message success">Your application has been submitted successfully!</div>
+    <?php endif; ?>
+
+    <!-- Active Live Chats -->
+    <?php if (!empty($active_chats)): ?>
+    <div class="chat-section">
+        <div class="section-header">
+            <h3><i class="fas fa-comments"></i> Active Live Chats</h3>
+            <p>Your ongoing conversations with support staff</p>
+        </div>
+        <div class="chat-list">
+            <?php foreach ($active_chats as $chat): ?>
+                <div class="chat-item">
+                    <div class="chat-info">
+                        <div class="chat-status">
+                            <span class="status-badge status-<?= strtolower($chat['status']) ?>">
+                                <i class="fas fa-<?= $chat['status'] === 'Open' ? 'check-circle' : 'clock' ?>"></i>
+                                <?= htmlspecialchars($chat['status']) ?>
+                            </span>
+                        </div>
+                        <div class="chat-date">
+                            Started: <?= date('M d, Y H:i', strtotime($chat['created_at'])) ?>
+                        </div>
+                    </div>
+                    <div class="chat-actions">
+                        <a href="applicant_conversation.php?id=<?= $chat['id'] ?>" class="btn btn-primary">
+                            <i class="fas fa-comments"></i> Continue Chat
+                        </a>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
     <?php endif; ?>
 
     <div class="table-container">

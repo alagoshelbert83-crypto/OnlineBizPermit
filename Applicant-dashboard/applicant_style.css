@@ -332,6 +332,67 @@ tr:last-child td { border-bottom: none; }
 .renewal-status.active { background: rgba(46, 204, 113, 0.2); color: var(--success); }
 .no-renewal { color: var(--text-muted); font-style: italic; }
 
+/* Chat Section */
+.chat-section {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    margin: 30px 0;
+}
+.section-header {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+.section-header h3 {
+    margin: 0 0 5px 0;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.section-header p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 14px;
+}
+.chat-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+.chat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: var(--bg-dark);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+}
+.chat-item:hover {
+    border-color: var(--primary);
+    transform: translateY(-1px);
+}
+.chat-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.chat-status .status-badge {
+    font-size: 11px;
+    padding: 4px 8px;
+}
+.chat-date {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.chat-actions .btn {
+    padding: 8px 16px;
+    font-size: 14px;
+}
 
 /* Responsive */
 #hamburger { display: none; background: none; border: none; color: var(--text-light); font-size: 24px; cursor: pointer; }
