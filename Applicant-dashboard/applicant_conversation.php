@@ -9,6 +9,23 @@ $error_message = '';
 $is_authenticated = isset($_SESSION['user_id']);
 $current_user_id = $_SESSION['user_id'] ?? null;
 
+// If authenticated user doesn't have chat_id in URL, try to find their active chat
+if ($is_authenticated && $chat_id === 0) {
+    try {
+        $stmt = $conn->prepare("SELECT id FROM live_chats WHERE user_id = ? AND status IN ('Active', 'Pending') ORDER BY created_at DESC LIMIT 1");
+        $stmt->execute([$current_user_id]);
+        $active_chat = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($active_chat) {
+            $chat_id = (int)$active_chat['id'];
+            // Redirect to the chat with proper ID
+            header("Location: applicant_conversation.php?id=" . $chat_id);
+            exit;
+        }
+    } catch (PDOException $e) {
+        error_log("Error finding active chat: " . $e->getMessage());
+    }
+}
+
 // If not authenticated and no guest session, redirect to login
 if (!$is_authenticated && (!isset($_SESSION['guest_chat_id']) || (int)$_SESSION['guest_chat_id'] !== $chat_id)) {
     header("Location: ../login.php");

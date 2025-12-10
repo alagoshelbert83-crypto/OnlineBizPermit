@@ -134,7 +134,6 @@ require_once './staff_sidebar.php';
         border-radius: var(--staff-chat-radius);
         box-shadow: var(--staff-chat-shadow);
         border: 1px solid rgba(255, 255, 255, 0.2);
-        display: flex;
         flex-direction: column;
         height: calc(100vh - 140px);
         min-height: 650px;

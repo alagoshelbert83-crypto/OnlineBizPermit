@@ -1,5 +1,6 @@
 <?php
 require_once 'db.php';
+require_once '../audit_logger.php';
 // Start session AFTER db.php includes session_handler.php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -55,6 +56,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $_SESSION['user_name'] = $user['name'];
                             $_SESSION['role'] = $user['role'];
 
+                            // Log successful login
+                            $logger = AuditLogger::getInstance();
+                            $logger->logLogin($user['id'], $user['role']);
+
                             header("Location: home.php");
                             exit;
                         } else {
@@ -65,9 +70,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 } else {
                     $error_message = "Invalid email or password.";
+                    // Log failed login attempt
+                    $logger = AuditLogger::getInstance();
+                    $logger->logFailedLogin($email, 'invalid_password');
                 }
             } else {
                 $error_message = "Invalid email or password.";
+                // Log failed login attempt
+                $logger = AuditLogger::getInstance();
+                $logger->logFailedLogin($email, 'user_not_found');
             }
         } catch(PDOException $e) {
             $error_message = "Database error occurred. Please try again.";

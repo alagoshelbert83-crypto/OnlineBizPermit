@@ -26,6 +26,7 @@ if (isset($conn)) {
         <hr class="sidebar-divider">
         <a href="admin_feedback.php" class="btn-nav <?= ($current_page === 'feedback') ? 'active' : '' ?>"><i class="fas fa-comment-dots"></i><span>Feedback</span></a>
         <a href="admin_reports.php" class="btn-nav <?= ($current_page === 'reports') ? 'active' : '' ?>"><i class="fas fa-chart-bar"></i><span>Reports</span></a>
+        <a href="audit_logs.php" class="btn-nav <?= ($current_page === 'audit_logs') ? 'active' : '' ?>"><i class="fas fa-history"></i><span>Audit Logs</span></a>
     </div>
     <div>
         <a href="admin_settings.php" class="btn-nav <?= ($current_page === 'settings') ? 'active' : '' ?>"><i class="fas fa-cog"></i><span>Settings</span></a>

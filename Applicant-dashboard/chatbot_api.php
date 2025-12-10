@@ -19,12 +19,15 @@ if ($is_live_chat_action) {
     // Connect to DB ONLY for live chat actions to improve resilience.
     $db_path = __DIR__ . '/db.php';
     if (file_exists($db_path)) {
-        require_once $db_path;
+require_once $db_path;
     } else {
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Database configuration is missing.']);
         exit;
     }
+
+    // Include audit logger
+    require_once __DIR__ . '/../audit_logger.php';
 
     // Start session AFTER database connection is established (required for custom session handler)
     if (session_status() == PHP_SESSION_NONE) {
@@ -143,6 +146,12 @@ if ($is_live_chat_action) {
         try {
             $stmt = $conn->prepare("INSERT INTO chat_messages (chat_id, sender_id, sender_role, message, created_at) VALUES (:chat_id, :sender_id, :sender_role, :message, NOW())");
             $stmt->execute([':chat_id' => $chat_id, ':sender_id' => $sender_id, ':sender_role' => $sender_role, ':message' => $final_message]);
+
+            // Log the chat message
+            $logger = AuditLogger::getInstance();
+            $has_file = isset($_FILES['chat_file']) && $_FILES['chat_file']['error'] === UPLOAD_ERR_OK;
+            $logger->logChatMessage($chat_id, strlen($message), $sender_id, $sender_role, $has_file);
+
             echo json_encode(['success' => true]);
         } catch (PDOException $e) {
             error_log('send_message error: ' . $e->getMessage());
