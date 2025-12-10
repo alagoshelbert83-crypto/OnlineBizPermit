@@ -55,17 +55,10 @@ if (isset($_SESSION['user_id'])) {
 <head>
   <meta charset="UTF-8">
   <title><?= isset($page_title) ? htmlspecialchars($page_title) : 'Staff Dashboard' ?> - OnlineBizPermit</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    :root {
-        --primary-color: #4a69bd; --secondary-color: #3c4b64; --bg-color: #f0f2f5; --card-bg: #ffffff; --text-primary: #343a40; --text-secondary: #6c757d; --border-color: #dee2e6; --shadow-sm: 0 1px 3px rgba(0,0,0,0.05); --border-radius: 8px;
-    }
-    * { margin:0; padding:0; box-sizing:border-box; font-family:'Poppins',sans-serif; }
-    body { background-color: var(--bg-color); color: var(--text-primary); }
-    .wrapper { display: flex; min-height: 100vh; }
-  </style>
+  <link rel="stylesheet" href="staff_style.css">
 </head>
 <body>
   <div class="wrapper">
