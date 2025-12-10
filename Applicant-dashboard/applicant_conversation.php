@@ -745,51 +745,51 @@ document.addEventListener('DOMContentLoaded', function() {
             isSending = true;
             lastSendTime = now;
 
-        // Disable form to prevent spam
-        const submitBtn = chatForm.querySelector('button[type="submit"]');
-        const originalBtnText = submitBtn.innerHTML;
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
-        userInput.disabled = true;
+            // Disable form to prevent spam
+            const submitBtn = chatForm.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+            userInput.disabled = true;
 
-        const formData = new FormData();
+            const formData = new FormData();
 
-        clearTimeout(typingTimeout);
-        updateTypingStatus(false);
+            clearTimeout(typingTimeout);
+            updateTypingStatus(false);
 
-        formData.append('action', 'send_message');
-        formData.append('chat_id', chatId);
-        formData.append('message', message);
-        formData.append('sender_role', 'user');
-        formData.append('sender_id', '<?= $current_user_id ?? '' ?>'); // Add sender_id for the API
-        if (fileInput.files[0]) {
-            formData.append('chat_file', fileInput.files[0]);
-        }
-
-        try {
-            const response = await fetch('./chatbot_api.php', { method: 'POST', body: formData });
-            const data = await response.json();
-            if (data.success) {
-                // The message will be added via the fetchMessages poll
-                userInput.value = '';
-                fileInput.value = ''; // Clear file input
-                filePreview.style.display = 'none';
-                filePreview.innerHTML = '';
-            } else {
-                addMessage('bot', 'Error: ' + (data.error || 'Could not send message.'));
+            formData.append('action', 'send_message');
+            formData.append('chat_id', chatId);
+            formData.append('message', message);
+            formData.append('sender_role', 'user');
+            formData.append('sender_id', '<?= $current_user_id ?? '' ?>'); // Add sender_id for the API
+            if (fileInput.files[0]) {
+                formData.append('chat_file', fileInput.files[0]);
             }
-        } catch (error) {
-            console.error('Error sending message:', error);
-            addMessage('bot', 'Error: Could not send message.');
-        } finally {
-            // Re-enable form and reset sending flag
-            isSending = false;
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalBtnText;
-            userInput.disabled = false;
-            userInput.focus();
-        }
-    };
+
+            try {
+                const response = await fetch('./chatbot_api.php', { method: 'POST', body: formData });
+                const data = await response.json();
+                if (data.success) {
+                    // The message will be added via the fetchMessages poll
+                    userInput.value = '';
+                    fileInput.value = ''; // Clear file input
+                    filePreview.style.display = 'none';
+                    filePreview.innerHTML = '';
+                } else {
+                    addMessage('bot', 'Error: ' + (data.error || 'Could not send message.'));
+                }
+            } catch (error) {
+                console.error('Error sending message:', error);
+                addMessage('bot', 'Error: Could not send message.');
+            } finally {
+                // Re-enable form and reset sending flag
+                isSending = false;
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+                userInput.disabled = false;
+                userInput.focus();
+            }
+        };
 
     // Set up the initial submit handler
     setupSubmitHandler();
