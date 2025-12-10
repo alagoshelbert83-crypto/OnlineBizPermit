@@ -42,37 +42,28 @@ if ($is_live_chat_action) {
     // All live chat action handlers go inside this block
     if ($action === 'create_live_chat') {
         try {
-            $conn->begin_transaction();
+            $conn->beginTransaction();
 
-            // Insert new chat session
-            $stmt = $conn->prepare("INSERT INTO live_chats (user_id, status, created_at) VALUES (?, 'Pending', NOW())");
-            $stmt->bind_param("i", $current_user_id);
-            $stmt->execute();
-            $chat_id = $stmt->insert_id;
-            $stmt->close();
-            
+            // Insert new chat session and return the id (Postgres RETURNING)
+            $stmt = $conn->prepare("INSERT INTO live_chats (user_id, status, created_at) VALUES (:user_id, 'Pending', NOW()) RETURNING id");
+            $stmt->execute([':user_id' => $current_user_id]);
+            $chat_id = $stmt->fetchColumn();
+
             // Notify all staff members about the new chat request.
             $notification_message = "New chat request from {$current_user_name}.";
             $notification_link = "../Staff-dashboard/conversation.php?id={$chat_id}"; // Direct link to the new chat
-            
-            // This query inserts a notification for every user with the 'staff' role.
-            // It's more reliable than assuming user_id can be NULL.
-            $notify_staff_sql = "
-                INSERT INTO notifications (user_id, message, link, is_read)
-                SELECT id, ?, ?, 0 FROM users WHERE role = 'staff'
-            ";
+
+            // Insert notifications for every user with the 'staff' role
+            $notify_staff_sql = "INSERT INTO notifications (user_id, message, link, is_read) SELECT id, :message, :link, 0 FROM users WHERE role = 'staff'";
             $notify_stmt = $conn->prepare($notify_staff_sql);
-            if ($notify_stmt) {
-                $notify_stmt->bind_param("ss", $notification_message, $notification_link);
-                $notify_stmt->execute();
-                $notify_stmt->close();
-            }
+            $notify_stmt->execute([':message' => $notification_message, ':link' => $notification_link]);
 
             $conn->commit();
-            echo json_encode(['success' => true, 'chat_id' => $chat_id]);
+            echo json_encode(['success' => true, 'chat_id' => (int)$chat_id]);
         } catch (Exception $e) {
-            $conn->rollback();
+            if ($conn->inTransaction()) { $conn->rollBack(); }
             http_response_code(500);
+            error_log('chat create error: ' . $e->getMessage());
             echo json_encode(['success' => false, 'error' => 'Failed to create chat session.']);
         }
         exit;
@@ -122,10 +113,8 @@ if ($is_live_chat_action) {
             }
         }
 
-        $stmt = $conn->prepare("INSERT INTO chat_messages (chat_id, sender_id, sender_role, message) VALUES (?, ?, ?, ?)");
-        $stmt->bind_param("iiss", $chat_id, $sender_id, $sender_role, $final_message);
-        $stmt->execute();
-        $stmt->close();
+        $stmt = $conn->prepare("INSERT INTO chat_messages (chat_id, sender_id, sender_role, message, created_at) VALUES (:chat_id, :sender_id, :sender_role, :message, NOW())");
+        $stmt->execute([':chat_id' => $chat_id, ':sender_id' => $sender_id, ':sender_role' => $sender_role, ':message' => $final_message]);
 
         echo json_encode(['success' => true]);
         exit;
@@ -144,21 +133,17 @@ if ($is_live_chat_action) {
                 cm.created_at, 
                 u.name as sender_name 
              FROM chat_messages cm
-             JOIN users u ON cm.sender_id = u.id
-             WHERE cm.chat_id = ? AND cm.id > ? 
+             LEFT JOIN users u ON cm.sender_id = u.id
+             WHERE cm.chat_id = :chat_id AND cm.id > :last_id
              ORDER BY cm.id ASC"
         );
-        $stmt->bind_param("ii", $chat_id, $last_id);
-        $stmt->execute();
-        $messages = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-        
+        $stmt->execute([':chat_id' => $chat_id, ':last_id' => $last_id]);
+        $messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
         // Fetch current chat status
-        $status_stmt = $conn->prepare("SELECT status, user_is_typing, staff_is_typing FROM live_chats WHERE id = ?");
-        $status_stmt->bind_param("i", $chat_id);
-        $status_stmt->execute();
-        $status_result = $status_stmt->get_result()->fetch_assoc();
-        $status_stmt->close();
+        $status_stmt = $conn->prepare("SELECT status, user_is_typing, staff_is_typing FROM live_chats WHERE id = :chat_id");
+        $status_stmt->execute([':chat_id' => $chat_id]);
+        $status_result = $status_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
         $status_result['status'] = ucfirst($status_result['status'] ?? 'Unknown');
         $status_result['user_is_typing'] = (bool)($status_result['user_is_typing'] ?? false);
@@ -179,26 +164,23 @@ if ($is_live_chat_action) {
         }
 
         try {
-            $conn->begin_transaction();
-            $stmt = $conn->prepare("UPDATE live_chats SET status = 'Closed', closed_at = NOW() WHERE id = ?");
-            $stmt->bind_param("i", $chat_id);
-            $stmt->execute();
-            $stmt->close();
+            $conn->beginTransaction();
+            $stmt = $conn->prepare("UPDATE live_chats SET status = 'Closed', closed_at = NOW() WHERE id = :chat_id");
+            $stmt->execute([':chat_id' => $chat_id]);
 
             // Notify the applicant that the chat has been closed by staff
             $notification_message = "Your live chat session (#{$chat_id}) has been closed by a staff member.";
             $notification_link = "applicant_conversation.php?id={$chat_id}";
-            $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message, link, is_read) SELECT user_id, ?, ?, 0 FROM live_chats WHERE id = ?");
-            $notify_stmt->bind_param("ssi", $notification_message, $notification_link, $chat_id);
-            $notify_stmt->execute();
-            $notify_stmt->close();
+            $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message, link, is_read) SELECT user_id, :message, :link, 0 FROM live_chats WHERE id = :chat_id");
+            $notify_stmt->execute([':message' => $notification_message, ':link' => $notification_link, ':chat_id' => $chat_id]);
 
             $conn->commit();
             echo json_encode(['success' => true]);
         } catch (Exception $e) {
-            $conn->rollback();
+            if ($conn->inTransaction()) { $conn->rollBack(); }
             http_response_code(500);
-            echo json_encode(['success' => false, 'error' => 'Failed to close chat: ' . $e->getMessage()]);
+            error_log('chat close error: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => 'Failed to close chat.']);
         }
         exit;
     }
@@ -209,17 +191,15 @@ if ($is_live_chat_action) {
         $sender_role = $_POST['sender_role'] ?? '';
 
         if ($sender_role === 'user') {
-            $stmt = $conn->prepare("UPDATE live_chats SET user_is_typing = ? WHERE id = ?");
+            $stmt = $conn->prepare("UPDATE live_chats SET user_is_typing = :is_typing WHERE id = :chat_id");
         } elseif ($sender_role === 'staff') {
-            $stmt = $conn->prepare("UPDATE live_chats SET staff_is_typing = ? WHERE id = ?");
+            $stmt = $conn->prepare("UPDATE live_chats SET staff_is_typing = :is_typing WHERE id = :chat_id");
         } else {
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Invalid sender role.']);
             exit;
         }
-        $stmt->bind_param("ii", $is_typing, $chat_id);
-        $stmt->execute();
-        $stmt->close();
+        $stmt->execute([':is_typing' => $is_typing, ':chat_id' => $chat_id]);
         echo json_encode(['success' => true]);
         exit;
     }
@@ -236,35 +216,30 @@ if ($is_live_chat_action) {
         }
 
         try {
-            $conn->begin_transaction();
+            $conn->beginTransaction();
 
             // Get names for notification message
             $current_staff_name = $_SESSION['name'] ?? 'A staff member';
-            $new_staff_stmt = $conn->prepare("SELECT name FROM users WHERE id = ?");
-            $new_staff_stmt->bind_param("i", $new_staff_id);
-            $new_staff_stmt->execute();
-            $new_staff_name = $new_staff_stmt->get_result()->fetch_assoc()['name'] ?? 'another staff member';
-            $new_staff_stmt->close();
+            $new_staff_stmt = $conn->prepare("SELECT name FROM users WHERE id = :id");
+            $new_staff_stmt->execute([':id' => $new_staff_id]);
+            $new_staff_name = $new_staff_stmt->fetchColumn() ?: 'another staff member';
 
             // Update the chat's assigned staff_id
-            $update_stmt = $conn->prepare("UPDATE live_chats SET staff_id = ? WHERE id = ?");
-            $update_stmt->bind_param("ii", $new_staff_id, $chat_id);
-            $update_stmt->execute();
-            $update_stmt->close();
+            $update_stmt = $conn->prepare("UPDATE live_chats SET staff_id = :new_staff_id WHERE id = :chat_id");
+            $update_stmt->execute([':new_staff_id' => $new_staff_id, ':chat_id' => $chat_id]);
 
             // Add a system message to the chat log
             $transfer_message = "Chat transferred from {$current_staff_name} to {$new_staff_name}.";
-            $msg_stmt = $conn->prepare("INSERT INTO chat_messages (chat_id, sender_role, message) VALUES (?, 'bot', ?)");
-            $msg_stmt->bind_param("is", $chat_id, $transfer_message);
-            $msg_stmt->execute();
-            $msg_stmt->close();
+            $msg_stmt = $conn->prepare("INSERT INTO chat_messages (chat_id, sender_role, message, created_at) VALUES (:chat_id, 'bot', :message, NOW())");
+            $msg_stmt->execute([':chat_id' => $chat_id, ':message' => $transfer_message]);
 
             $conn->commit();
             echo json_encode(['success' => true, 'message' => 'Chat transferred successfully.']);
         } catch (Exception $e) {
-            $conn->rollback();
+            if ($conn->inTransaction()) { $conn->rollBack(); }
             http_response_code(500);
-            echo json_encode(['success' => false, 'error' => 'Failed to transfer chat: ' . $e->getMessage()]);
+            error_log('chat transfer error: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => 'Failed to transfer chat.']);
         }
         exit;
     }
