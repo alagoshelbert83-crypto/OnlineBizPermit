@@ -2,11 +2,6 @@
 
 header('Content-Type: application/json');
 
-// Start session only if not already started
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
-}
-
 // Basic security check
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' && $_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(400);
@@ -29,6 +24,11 @@ if ($is_live_chat_action) {
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Database configuration is missing.']);
         exit;
+    }
+
+    // Start session AFTER database connection is established (required for custom session handler)
+    if (session_status() == PHP_SESSION_NONE) {
+        session_start();
     }
     // Determine authentication state: allow guest creation of chats if a guest name is provided.
     $is_authenticated = isset($_SESSION['user_id']);
