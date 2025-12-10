@@ -3,13 +3,34 @@ $current_page = 'feedback';
 require_once './staff_header.php'; // Handles session, DB, and auth
 
 $feedbacks = [];
-$sql = "SELECT f.id, u.name, u.email, f.message, f.created_at, f.rating 
+// Try to select with rating column; if it doesn't exist, fall back to query without it
+try {
+  $sql = "SELECT f.id, u.name, u.email, f.message, f.created_at, f.rating 
+      FROM feedback f 
+      JOIN users u ON f.user_id = u.id 
+      ORDER BY f.created_at DESC";
+  $stmt = $conn->prepare($sql);
+  $stmt->execute();
+  $feedbacks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+  error_log('feedback.php query with rating failed: ' . $e->getMessage());
+  try {
+    $sql = "SELECT f.id, u.name, u.email, f.message, f.created_at 
         FROM feedback f 
         JOIN users u ON f.user_id = u.id 
         ORDER BY f.created_at DESC";
-$result = $conn->query($sql);
-if ($result) {
-    $feedbacks = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt = $conn->prepare($sql);
+    $stmt->execute();
+    $feedbacks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Ensure rating key exists with null for compatibility
+    foreach ($feedbacks as &$fb) {
+      if (!array_key_exists('rating', $fb)) { $fb['rating'] = null; }
+    }
+    unset($fb);
+  } catch (PDOException $e2) {
+    error_log('feedback.php fallback query failed: ' . $e2->getMessage());
+    $feedbacks = [];
+  }
 }
 
 require_once './staff_sidebar.php';

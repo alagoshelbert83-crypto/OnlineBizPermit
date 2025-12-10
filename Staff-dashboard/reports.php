@@ -13,8 +13,15 @@ $kpi_sql = "SELECT
                 SUM(CASE WHEN status IN ('pending', 'for review', 'review') THEN 1 ELSE 0 END) as pending_count,
                 SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected_count
             FROM applications";
-$kpi_result = $conn->query($kpi_sql);
-$kpis = $kpi_result ? $kpi_result->fetch_assoc() : [];
+$kpis = [];
+try {
+  $kpi_stmt = $conn->prepare($kpi_sql);
+  $kpi_stmt->execute();
+  $kpis = $kpi_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+} catch (PDOException $e) {
+  error_log('reports.php kpi query error: ' . $e->getMessage());
+  $kpis = [];
+}
 
 // --- Data for Monthly Trend Chart (Last 12 Months) ---
 $monthly_labels = [];
@@ -26,24 +33,36 @@ for ($i = 11; $i >= 0; $i--) {
     $counts_by_month[$month_key] = 0;
 }
 
-$monthly_sql = "SELECT DATE_FORMAT(submitted_at, '%Y-%m') AS month, COUNT(id) AS count
-                FROM applications
-                WHERE submitted_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
-                GROUP BY month
-                ORDER BY month ASC";
-$monthly_result = $conn->query($monthly_sql);
-if ($monthly_result) {
-    while ($row = $monthly_result->fetch_assoc()) {
-        if (isset($counts_by_month[$row['month']])) {
-            $counts_by_month[$row['month']] = (int)$row['count'];
-        }
+$monthly_sql = "SELECT to_char(submitted_at, 'YYYY-MM') AS month, COUNT(id) AS count
+        FROM applications
+        WHERE submitted_at >= (CURRENT_DATE - INTERVAL '12 months')
+        GROUP BY month
+        ORDER BY month ASC";
+try {
+  $monthly_stmt = $conn->prepare($monthly_sql);
+  $monthly_stmt->execute();
+  $monthly_rows = $monthly_stmt->fetchAll(PDO::FETCH_ASSOC);
+  foreach ($monthly_rows as $row) {
+    if (isset($counts_by_month[$row['month']])) {
+      $counts_by_month[$row['month']] = (int)$row['count'];
     }
+  }
+} catch (PDOException $e) {
+  error_log('reports.php monthly query error: ' . $e->getMessage());
 }
 $monthly_counts = array_values($counts_by_month);
 
 // --- Data for Application Status Doughnut Chart ---
 $status_distribution_sql = "SELECT status, COUNT(*) as count FROM applications GROUP BY status";
-$status_result = $conn->query($status_distribution_sql);
+try {
+  $status_stmt = $conn->prepare($status_distribution_sql);
+  $status_stmt->execute();
+  $status_rows = $status_stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+  error_log('reports.php status distribution error: ' . $e->getMessage());
+  $status_rows = [];
+}
+
 $status_labels = [];
 $status_counts = [];
 $status_colors = [
@@ -56,12 +75,12 @@ $status_colors = [
     'default' => '#6c757d'
 ];
 $doughnut_bg_colors = [];
-if ($status_result) {
-    while ($row = $status_result->fetch_assoc()) {
-        $status_labels[] = ucfirst($row['status']);
-        $status_counts[] = $row['count'];
-        $doughnut_bg_colors[] = $status_colors[strtolower($row['status'])] ?? $status_colors['default'];
-    }
+if (!empty($status_rows)) {
+  foreach ($status_rows as $row) {
+    $status_labels[] = ucfirst($row['status']);
+    $status_counts[] = $row['count'];
+    $doughnut_bg_colors[] = $status_colors[strtolower($row['status'])] ?? $status_colors['default'];
+  }
 }
 
 // --- Fetch Recent Applications for Table ---
@@ -70,8 +89,15 @@ $recent_apps_sql = "SELECT a.id, a.business_name, u.name as applicant_name, a.st
                     JOIN users u ON a.user_id = u.id
                     ORDER BY a.submitted_at DESC
                     LIMIT 7";
-$recent_apps_result = $conn->query($recent_apps_sql);
-$recent_applications = $recent_apps_result ? $recent_apps_result->fetch_all(MYSQLI_ASSOC) : [];
+$recent_applications = [];
+try {
+  $recent_stmt = $conn->prepare($recent_apps_sql);
+  $recent_stmt->execute();
+  $recent_applications = $recent_stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+  error_log('reports.php recent apps error: ' . $e->getMessage());
+  $recent_applications = [];
+}
 require_once './staff_sidebar.php';
 ?>
 

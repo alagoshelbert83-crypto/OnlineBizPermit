@@ -8,49 +8,58 @@ $profile_message = '';
 $password_message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['update_profile'])) {
-        $name = trim($_POST['name']);
-        $email = trim($_POST['email']);
-        if (empty($name) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $profile_message = '<div class="message error">Please provide a valid name and email.</div>';
-        } else {
+  if (isset($_POST['update_profile'])) {
+    $name = trim($_POST['name']);
+    $email = trim($_POST['email']);
+    if (empty($name) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+      $profile_message = '<div class="message error">Please provide a valid name and email.</div>';
+    } else {
+      try {
         $stmt = $conn->prepare("UPDATE users SET name = :name, email = :email WHERE id = :id");
         if ($stmt->execute([':name' => $name, ':email' => $email, ':id' => $userId])) {
           $profile_message = '<div class="message success">Profile updated successfully.</div>';
         } else {
           $profile_message = '<div class="message error">Could not update profile.</div>';
         }
+      } catch (PDOException $e) {
+        error_log('settings.php update_profile error: ' . $e->getMessage());
+        $profile_message = '<div class="message error">An error occurred while updating profile.</div>';
       }
-        }
-    } elseif (isset($_POST['change_password'])) {
-        $current_password = $_POST['current_password'];
-        $new_password = $_POST['new_password'];
-        $confirm_password = $_POST['confirm_password'];
-
-        if (empty($current_password) || empty($new_password) || empty($confirm_password)) {
-            $password_message = '<div class="message error">All password fields are required.</div>';
-        } elseif (strlen($new_password) < 8) {
-            $password_message = '<div class="message error">New password must be at least 8 characters long.</div>';
-        } elseif ($new_password !== $confirm_password) {
-            $password_message = '<div class="message error">New passwords do not match.</div>';
-        } else {
-            $stmt = $conn->prepare("SELECT password FROM users WHERE id = :id");
-            $stmt->execute([':id' => $userId]);
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($user && password_verify($current_password, $user['password'])) {
-                $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-                $update_stmt = $conn->prepare("UPDATE users SET password = :password WHERE id = :id");
-                if ($update_stmt->execute([':password' => $hashed_password, ':id' => $userId])) {
-                  $password_message = '<div class="message success">Password changed successfully.</div>';
-                } else {
-                  $password_message = '<div class="message error">Could not change password.</div>';
-                }
-            } else {
-                $password_message = '<div class="message error">Incorrect current password.</div>';
-            }
-        }
     }
+  } elseif (isset($_POST['change_password'])) {
+    $current_password = $_POST['current_password'] ?? '';
+    $new_password = $_POST['new_password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
+
+    if (empty($current_password) || empty($new_password) || empty($confirm_password)) {
+      $password_message = '<div class="message error">All password fields are required.</div>';
+    } elseif (strlen($new_password) < 8) {
+      $password_message = '<div class="message error">New password must be at least 8 characters long.</div>';
+    } elseif ($new_password !== $confirm_password) {
+      $password_message = '<div class="message error">New passwords do not match.</div>';
+    } else {
+      try {
+        $stmt = $conn->prepare("SELECT password FROM users WHERE id = :id");
+        $stmt->execute([':id' => $userId]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($user && password_verify($current_password, $user['password'])) {
+          $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+          $update_stmt = $conn->prepare("UPDATE users SET password = :password WHERE id = :id");
+          if ($update_stmt->execute([':password' => $hashed_password, ':id' => $userId])) {
+            $password_message = '<div class="message success">Password changed successfully.</div>';
+          } else {
+            $password_message = '<div class="message error">Could not change password.</div>';
+          }
+        } else {
+          $password_message = '<div class="message error">Incorrect current password.</div>';
+        }
+      } catch (PDOException $e) {
+        error_log('settings.php change_password error: ' . $e->getMessage());
+        $password_message = '<div class="message error">An error occurred while changing password.</div>';
+      }
+    }
+  }
 }
 
         $stmt = $conn->prepare("SELECT name, email FROM users WHERE id = :id");
