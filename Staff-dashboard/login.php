@@ -309,24 +309,43 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     </div>
   </div>
   <script>
-    document.querySelectorAll('.toggle-password').forEach(toggle => {
-      toggle.addEventListener('click', () => {
-        const passwordInput = toggle.closest('.password-wrapper').querySelector('input');
-        const isPassword = passwordInput.type === 'password';
-        
-        passwordInput.type = isPassword ? 'text' : 'password';
+    // Defensive toggle-password handler: guard against missing DOM elements
+    (function () {
+      try {
+        const toggles = document.querySelectorAll('.toggle-password');
+        if (!toggles || toggles.length === 0) return;
 
-        const eyeIcon = toggle.querySelector('.icon-eye');
-        const eyeSlashIcon = toggle.querySelector('.icon-eye-slash');
+        toggles.forEach(toggle => {
+          toggle.addEventListener('click', () => {
+            try {
+              // Prefer locating the input by id if available, otherwise search nearby
+              let passwordInput = document.getElementById('password');
+              if (!passwordInput) {
+                const wrapper = toggle.closest('.password-wrapper');
+                passwordInput = wrapper ? wrapper.querySelector('input[type="password"], input[type="text"]') : null;
+              }
+              if (!passwordInput) return;
 
-        if (eyeIcon && eyeSlashIcon) {
-            eyeIcon.style.display = isPassword ? 'none' : 'block';
-            eyeSlashIcon.style.display = isPassword ? 'block' : 'none';
-        }
-        
-        toggle.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
-      });
-    });
+              const isPassword = passwordInput.type === 'password';
+              passwordInput.type = isPassword ? 'text' : 'password';
+
+              const eyeIcon = toggle.querySelector('.icon-eye');
+              const eyeSlashIcon = toggle.querySelector('.icon-eye-slash');
+              if (eyeIcon && eyeSlashIcon) {
+                eyeIcon.style.display = isPassword ? 'none' : 'block';
+                eyeSlashIcon.style.display = isPassword ? 'block' : 'none';
+              }
+
+              toggle.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+            } catch (innerErr) {
+              console.warn('Toggle password handler error:', innerErr);
+            }
+          });
+        });
+      } catch (err) {
+        console.warn('Init toggle-password failed:', err);
+      }
+    })();
   </script>
 </body>
 </html>

@@ -223,25 +223,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         </div>
     </div>
-    <script>
-        document.querySelectorAll('.toggle-password').forEach(toggle => {
-            toggle.addEventListener('click', () => {
-                const passwordInput = toggle.closest('.password-wrapper').querySelector('input');
-                const isPassword = passwordInput.type === 'password';
-                
-                passwordInput.type = isPassword ? 'text' : 'password';
+        <script>
+        // Defensive toggle-password handler for admin login
+        (function () {
+            try {
+                const toggles = document.querySelectorAll('.toggle-password');
+                if (!toggles || toggles.length === 0) return;
 
-                const eyeIcon = toggle.querySelector('.icon-eye');
-                const eyeSlashIcon = toggle.querySelector('.icon-eye-slash');
+                toggles.forEach(toggle => {
+                    toggle.addEventListener('click', () => {
+                        try {
+                            let passwordInput = document.getElementById('password');
+                            if (!passwordInput) {
+                                const wrapper = toggle.closest('.password-wrapper');
+                                passwordInput = wrapper ? wrapper.querySelector('input[type="password"], input[type="text"]') : null;
+                            }
+                            if (!passwordInput) return;
 
-                if (eyeIcon && eyeSlashIcon) {
-                    eyeIcon.style.display = isPassword ? 'none' : 'block';
-                    eyeSlashIcon.style.display = isPassword ? 'block' : 'none';
-                }
-                
-                toggle.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
-            });
-        });
-    </script>
+                            const isPassword = passwordInput.type === 'password';
+                            passwordInput.type = isPassword ? 'text' : 'password';
+
+                            const eyeIcon = toggle.querySelector('.icon-eye');
+                            const eyeSlashIcon = toggle.querySelector('.icon-eye-slash');
+                            if (eyeIcon && eyeSlashIcon) {
+                                eyeIcon.style.display = isPassword ? 'none' : 'block';
+                                eyeSlashIcon.style.display = isPassword ? 'block' : 'none';
+                            }
+
+                            toggle.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+                        } catch (innerErr) {
+                            console.warn('Admin toggle handler inner error:', innerErr);
+                        }
+                    });
+                });
+            } catch (err) {
+                console.warn('Init admin toggle-password failed:', err);
+            }
+        })();
+        </script>
 </body>
 </html>
