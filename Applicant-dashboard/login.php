@@ -42,8 +42,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if ($is_approved === 0) {
                             $error_message = "Your account is pending admin approval. Please wait for approval before logging in.";
                         } elseif ($is_approved === 1) {
-                            // Regenerate session ID to prevent session fixation attacks
-                            session_regenerate_id(true);
+                            // Ensure session is active before regenerating the ID
+                            if (session_status() !== PHP_SESSION_ACTIVE) {
+                                session_start();
+                            }
+                            // Regenerate session ID to prevent session fixation attacks (guarded)
+                            if (function_exists('session_regenerate_id')) {
+                                @session_regenerate_id(true);
+                            }
 
                             $_SESSION['user_id'] = $user['id'];
                             $_SESSION['user_name'] = $user['name'];

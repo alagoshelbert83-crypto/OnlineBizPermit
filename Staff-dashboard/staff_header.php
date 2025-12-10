@@ -22,12 +22,15 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['staff', 'admi
 // --- Fetch current user's name for display ---
 $userName = 'Staff'; // Default name
 if (isset($_SESSION['user_id'])) {
+  try {
     $stmt = $conn->prepare("SELECT name FROM users WHERE id = ?");
-    $stmt->bind_param("i", $_SESSION['user_id']);
-    $stmt->execute();
-    $user = $stmt->get_result()->fetch_assoc();
+    $stmt->execute([$_SESSION['user_id']]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
     $userName = $user['name'] ?? 'Staff';
-    $stmt->close();
+  } catch (PDOException $e) {
+    error_log("Error fetching staff user name: " . $e->getMessage());
+    $userName = 'Staff';
+  }
 }
 // You can also include other common files here if needed, for example:
 // require_once __DIR__ . '/email_functions.php';
@@ -35,12 +38,16 @@ if (isset($_SESSION['user_id'])) {
 // --- Fetch unread notification count for sidebar ---
 $unread_notifications_count = 0;
 if (isset($_SESSION['user_id'])) {
+  try {
     $count_stmt = $conn->prepare("SELECT COUNT(*) as unread_count FROM notifications WHERE user_id IS NULL AND is_read = 0");
     // Staff notifications are where user_id is NULL
     $count_stmt->execute();
-    $count_result = $count_stmt->get_result()->fetch_assoc();
-    $unread_notifications_count = $count_result['unread_count'] ?? 0;
-    $count_stmt->close();
+    $count_result = $count_stmt->fetch(PDO::FETCH_ASSOC);
+    $unread_notifications_count = (int)($count_result['unread_count'] ?? 0);
+  } catch (PDOException $e) {
+    error_log("Error fetching unread notifications count: " . $e->getMessage());
+    $unread_notifications_count = 0;
+  }
 }
 ?>
 <!DOCTYPE html>
