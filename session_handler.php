@@ -34,21 +34,36 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
     }
 
     public function read($sessionId): string {
-        $stmt = $this->conn->prepare("SELECT session_data FROM {$this->table} WHERE session_id = :session_id AND session_expires > NOW()");
-        $stmt->execute(['session_id' => $sessionId]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result ? $result['session_data'] : '';
+        try {
+            $stmt = $this->conn->prepare("SELECT session_data FROM {$this->table} WHERE session_id = :session_id AND session_expires > NOW()");
+            $stmt->execute(['session_id' => $sessionId]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $result ? $result['session_data'] : '';
+        } catch (Exception $e) {
+            error_log("Session read error for session_id={$sessionId}: " . $e->getMessage());
+            return '';
+        }
     }
 
     public function write($sessionId, $data): bool {
         // Set session to expire in 24 hours
         $expires = date('Y-m-d H:i:s', strtotime('+24 hours'));
-        $stmt = $this->conn->prepare("INSERT INTO {$this->table} (session_id, session_data, session_expires) VALUES (:session_id, :session_data, :session_expires) ON CONFLICT (session_id) DO UPDATE SET session_data = EXCLUDED.session_data, session_expires = EXCLUDED.session_expires");
-        return $stmt->execute([
-            'session_id' => $sessionId,
-            'session_data' => $data,
-            'session_expires' => $expires
-        ]);
+        try {
+            $stmt = $this->conn->prepare("INSERT INTO {$this->table} (session_id, session_data, session_expires) VALUES (:session_id, :session_data, :session_expires) ON CONFLICT (session_id) DO UPDATE SET session_data = EXCLUDED.session_data, session_expires = EXCLUDED.session_expires");
+            $ok = $stmt->execute([
+                'session_id' => $sessionId,
+                'session_data' => $data,
+                'session_expires' => $expires
+            ]);
+            if (!$ok) {
+                $err = $stmt->errorInfo();
+                error_log("Session write failed for session_id={$sessionId}: " . json_encode($err));
+            }
+            return (bool)$ok;
+        } catch (Exception $e) {
+            error_log("Session write exception for session_id={$sessionId}: " . $e->getMessage());
+            return false;
+        }
     }
 
     public function destroy($sessionId): bool {
