@@ -38,7 +38,14 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
             $stmt = $this->conn->prepare("SELECT session_data FROM {$this->table} WHERE session_id = :session_id AND session_expires > NOW()");
             $stmt->execute(['session_id' => $sessionId]);
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            return $result ? $result['session_data'] : '';
+            if ($result) {
+                // Update expires to extend the session
+                $expires = date('Y-m-d H:i:s', strtotime('+24 hours'));
+                $update_stmt = $this->conn->prepare("UPDATE {$this->table} SET session_expires = :expires WHERE session_id = :session_id");
+                $update_stmt->execute(['expires' => $expires, 'session_id' => $sessionId]);
+                return $result['session_data'];
+            }
+            return '';
         } catch (Exception $e) {
             error_log("Session read error for session_id={$sessionId}: " . $e->getMessage());
             return '';
