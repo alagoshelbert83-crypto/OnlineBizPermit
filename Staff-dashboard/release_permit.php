@@ -1,6 +1,10 @@
 <?php
-session_start();
+// Include db.php FIRST to set up session handler
 require './db.php';
+// Start session AFTER db.php includes session_handler.php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 // We need the mail configuration for email sending to work.
 require_once __DIR__ . '/../config_mail.php';
 require_once './email_functions.php'; // Include email functions, which depend on the config

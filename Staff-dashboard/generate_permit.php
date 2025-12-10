@@ -1,6 +1,10 @@
 <?php
-session_start();
+// Include db.php FIRST to set up session handler
 require './db.php';
+// Start session AFTER db.php includes session_handler.php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'staff') {
     header("Location: login.php");

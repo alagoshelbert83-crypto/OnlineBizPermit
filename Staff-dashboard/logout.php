@@ -1,5 +1,10 @@
 <?php
-session_start();
+// Include db.php FIRST to set up session handler
+require './db.php';
+// Start session AFTER db.php includes session_handler.php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Destroy all session data
 $_SESSION = [];

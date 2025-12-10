@@ -79,19 +79,24 @@ try {
 // Include custom session handler for serverless compatibility
 // Set consistent session cookie parameters before sessions start
 // This ensures cookies are available across site paths and uses secure flag when applicable.
-$secureFlag = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443);
+// Check for HTTPS behind proxies (like Render) - check multiple indicators
+$secureFlag = ( (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+    || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
+    || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+);
+// Use empty domain (null) so browser uses current domain automatically - works better on Render
 // Use PHP 7.3+ style options array where available
 if (PHP_VERSION_ID >= 70300) {
     session_set_cookie_params([
         'lifetime' => 0,
         'path' => '/',
-        'domain' => $_SERVER['HTTP_HOST'] ?? '',
+        'domain' => '', // Empty domain works better on Render/proxy environments
         'secure' => $secureFlag,
         'httponly' => true,
         'samesite' => 'Lax'
     ]);
 } else {
-    session_set_cookie_params(0, '/', $_SERVER['HTTP_HOST'] ?? '', $secureFlag, true);
+    session_set_cookie_params(0, '/', '', $secureFlag, true);
 }
 
 require_once __DIR__ . '/../session_handler.php';
