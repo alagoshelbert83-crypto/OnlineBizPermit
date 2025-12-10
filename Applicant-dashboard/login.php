@@ -208,10 +208,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <a href="forgot-password.php" class="forgot-password">Forgot Password?</a>
                 </div>
 
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-sign-in-alt"></i>
-                    Sign In
-                </button>
+                                <button type="submit" class="btn btn-primary" id="appLoginBtn">
+                                        <span id="appLoginBtnText"><i class="fas fa-sign-in-alt"></i> Sign In</span>
+                                        <span id="appLoginSpinner" style="display:none; margin-left:8px;">
+                                                <svg width="18" height="18" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" stroke="#fff">
+                                                    <g fill="none" fill-rule="evenodd">
+                                                        <g transform="translate(1 1)" stroke-width="2">
+                                                            <circle stroke-opacity=".5" cx="22" cy="22" r="6"></circle>
+                                                            <path d="M28 22c0-3.314-2.686-6-6-6">
+                                                                <animateTransform attributeName="transform" type="rotate" from="0 22 22" to="360 22 22" dur="0.9s" repeatCount="indefinite" />
+                                                            </path>
+                                                        </g>
+                                                    </g>
+                                                </svg>
+                                        </span>
+                                </button>
+                                <script>
+                                        (function(){
+                                                const form = document.querySelector('form.auth-form');
+                                                const btn = document.getElementById('appLoginBtn');
+                                                const spinner = document.getElementById('appLoginSpinner');
+                                                const txt = document.getElementById('appLoginBtnText');
+                                                if (form) form.addEventListener('submit', function(){ btn.disabled = true; txt.textContent = 'Signing in...'; spinner.style.display = 'inline-block'; });
+                                        })();
+                                </script>
             </form>
 
             <div class="auth-footer">

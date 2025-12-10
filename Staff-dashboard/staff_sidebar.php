@@ -6,10 +6,27 @@ $current_page = $current_page ?? 'dashboard';
 
 // Fetch unread chat count for the notification badge.
 $unread_chats_count = 0;
-if (isset($conn)) {
-    $chat_count_result = $conn->query("SELECT COUNT(*) as count FROM live_chats WHERE status = 'Pending'");
-    if ($chat_count_result) {
-        $unread_chats_count = $chat_count_result->fetch_assoc()['count'] ?? 0;
+if (isset($conn) && $conn instanceof PDO) {
+    try {
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM live_chats WHERE status = 'Pending'");
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $unread_chats_count = (int)($row['count'] ?? 0);
+    } catch (Exception $e) {
+        error_log('Failed to fetch unread chat count: ' . $e->getMessage());
+        $unread_chats_count = 0;
+    }
+} elseif (isset($conn)) {
+    // Fallback for legacy mysqli connection
+    try {
+        $result = $conn->query("SELECT COUNT(*) as count FROM live_chats WHERE status = 'Pending'");
+        if ($result) {
+            $row = $result->fetch_assoc();
+            $unread_chats_count = (int)($row['count'] ?? 0);
+        }
+    } catch (Exception $e) {
+        error_log('Failed to fetch unread chat count (mysqli): ' . $e->getMessage());
+        $unread_chats_count = 0;
     }
 }
 ?>
