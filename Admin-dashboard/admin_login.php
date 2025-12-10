@@ -36,8 +36,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (password_verify($password, $user['password'])) {
                 // Check if the user is an admin or staff
                 if (in_array($user['role'], ['admin', 'staff'])) {
-                    // Regenerate session ID to prevent session fixation attacks
-                    session_regenerate_id(true);
+                    // Ensure session is active before regenerating ID
+                    if (session_status() !== PHP_SESSION_ACTIVE) {
+                        session_start();
+                    }
+                    // Regenerate session ID to prevent session fixation attacks (safely)
+                    if (function_exists('session_regenerate_id')) {
+                        @session_regenerate_id(true);
+                    }
                     $_SESSION['user_id'] = $user['id'];
                     $_SESSION['role'] = $user['role'];
                     $_SESSION['name'] = $user['name'] ?? 'User';

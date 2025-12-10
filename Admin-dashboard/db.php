@@ -77,5 +77,22 @@ try {
 }
 
 // Include custom session handler for serverless compatibility
+// Set consistent session cookie parameters before sessions start
+// This ensures cookies are available across site paths and uses secure flag when applicable.
+$secureFlag = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443);
+// Use PHP 7.3+ style options array where available
+if (PHP_VERSION_ID >= 70300) {
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'domain' => $_SERVER['HTTP_HOST'] ?? '',
+        'secure' => $secureFlag,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+} else {
+    session_set_cookie_params(0, '/', $_SERVER['HTTP_HOST'] ?? '', $secureFlag, true);
+}
+
 require_once __DIR__ . '/../session_handler.php';
 ?>
