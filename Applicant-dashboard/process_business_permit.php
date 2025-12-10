@@ -158,7 +158,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
         }
 
-        $conn->commit();
+        // Commit the transaction
+        try {
+            $conn->commit();
+        } catch (Exception $commit_e) {
+            // If commit fails, the transaction was aborted - rollback and throw user-friendly error
+            try {
+                $conn->rollback();
+            } catch (Exception $rollback_e) {
+                error_log('Rollback failed after commit error: ' . $rollback_e->getMessage());
+            }
+            throw new Exception('Failed to save application. Please check your data and try again.');
+        }
 
         // Create Staff Notification (outside transaction as it's best-effort)
         $notification_message = "New comprehensive application (#{$app_id}) for '{$business_name}' has been submitted.";
