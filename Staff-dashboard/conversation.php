@@ -14,30 +14,24 @@ if ($chat_id > 0) {
     $stmt = $conn->prepare(
         "SELECT lc.*, u.name as applicant_name
          FROM live_chats lc
-         JOIN users u ON lc.user_id = u.id
-         WHERE lc.id = ?"
+         LEFT JOIN users u ON lc.user_id = u.id
+         WHERE lc.id = :chat_id"
     );
-    $stmt->bind_param("i", $chat_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
+    $stmt->execute([':chat_id' => $chat_id]);
+    $chat_session = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($result->num_rows > 0) {
-        $chat_session = $result->fetch_assoc();
-
+    if ($chat_session) {
         // If chat is 'Pending', assign it to the current staff member and set status to 'Active'
-        if ($chat_session['status'] === 'Pending') {
-            $update_stmt = $conn->prepare("UPDATE live_chats SET staff_id = ?, status = 'Active' WHERE id = ?");
-            $update_stmt->bind_param("ii", $staff_id, $chat_id);
-            $update_stmt->execute();
-            $update_stmt->close();
-            // Refresh chat session data
+        if (($chat_session['status'] ?? '') === 'Pending') {
+            $update_stmt = $conn->prepare("UPDATE live_chats SET staff_id = :staff_id, status = 'Active' WHERE id = :chat_id");
+            $update_stmt->execute([':staff_id' => $staff_id, ':chat_id' => $chat_id]);
+            // Refresh chat session data locally
             $chat_session['status'] = 'Active';
             $chat_session['staff_id'] = $staff_id;
         }
     } else {
         $error_message = 'Chat session not found.';
     }
-    $stmt->close();
 } else {
     $error_message = 'No chat ID provided.';
 }
@@ -49,13 +43,12 @@ if ($chat_id > 0) {
     $msg_stmt = $conn->prepare(
         "SELECT cm.*, u.name as sender_name 
          FROM chat_messages cm
-         JOIN users u ON cm.sender_id = u.id
-         WHERE cm.chat_id = ? ORDER BY cm.id ASC"
+         LEFT JOIN users u ON cm.sender_id = u.id
+         WHERE cm.chat_id = :chat_id ORDER BY cm.id ASC"
     );
-    $msg_stmt->bind_param("i", $chat_id);
-    $msg_stmt->execute();
-    $existing_messages = $msg_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $msg_stmt->close();
+    $msg_stmt->execute([':chat_id' => $chat_id]);
+    $existing_messages = $msg_stmt->fetchAll(PDO::FETCH_ASSOC);
+    $msg_stmt = null;
 }
 
 require_once './staff_sidebar.php';
