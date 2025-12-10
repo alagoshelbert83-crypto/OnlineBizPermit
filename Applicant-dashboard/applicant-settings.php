@@ -13,14 +13,25 @@ $picture_message = '';
 $delete_message = '';
 
 // --- Fetch fresh user data ---
-// Note: This assumes you have added `email_notifications_enabled` to your `users` table.
+// Try to read optional columns, but fall back if the DB schema doesn't include them.
 try {
     $stmt = $conn->prepare("SELECT name, email, phone, email_notifications_enabled, profile_picture_path FROM users WHERE id = ?");
     $stmt->execute([$current_user_id]);
     $user_info = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 } catch (PDOException $e) {
-    error_log("Failed to fetch user info for settings: " . $e->getMessage());
-    $user_info = [];
+    error_log("Failed to fetch user info for settings (optional columns may be missing): " . $e->getMessage());
+    // Fallback: query only core columns
+    try {
+        $stmt = $conn->prepare("SELECT name, email, phone FROM users WHERE id = ?");
+        $stmt->execute([$current_user_id]);
+        $user_info = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        // Provide sensible defaults for optional fields
+        $user_info['email_notifications_enabled'] = $user_info['email_notifications_enabled'] ?? 1;
+        $user_info['profile_picture_path'] = $user_info['profile_picture_path'] ?? null;
+    } catch (PDOException $e2) {
+        error_log("Fallback failed fetching user info: " . $e2->getMessage());
+        $user_info = [];
+    }
 }
 
 // Set defaults if not present
@@ -50,15 +61,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_picture'])) {
             
             if (move_uploaded_file($file['tmp_name'], $upload_dir . $new_filename)) {
                 if ($profile_picture_path && file_exists($upload_dir . $profile_picture_path)) { @unlink($upload_dir . $profile_picture_path); }
-                $stmt = $conn->prepare("UPDATE users SET profile_picture_path = ? WHERE id = ?");
-                if ($stmt->execute([$new_filename, $current_user_id])) {
-                    $picture_message = '<div class="message success">Profile picture updated successfully.</div>';
-                    $profile_picture_path = $new_filename;
-                } else {
-                    $picture_message = '<div class="message error">Failed to update database.</div>';
+                try {
+                    $stmt = $conn->prepare("UPDATE users SET profile_picture_path = ? WHERE id = ?");
+                    if ($stmt->execute([$new_filename, $current_user_id])) {
+                        $picture_message = '<div class="message success">Profile picture updated successfully.</div>';
+                        $profile_picture_path = $new_filename;
+                    } else {
+                        $picture_message = '<div class="message error">Failed to update database.</div>';
+                        @unlink($upload_dir . $new_filename);
+                    }
+                } catch (PDOException $e) {
+                    error_log("Failed to update profile_picture_path: " . $e->getMessage());
+                    $picture_message = '<div class="message error">Failed to update database (profile picture field may be missing).</div>';
                     @unlink($upload_dir . $new_filename);
                 }
-                // no explicit close for PDO
             } else {
                 $picture_message = '<div class="message error">Failed to upload file.</div>';
             }
@@ -131,14 +147,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_notifications'])) {
     $email_notifications = isset($_POST['email_notifications']) ? 1 : 0;
 
-    $stmt = $conn->prepare("UPDATE users SET email_notifications_enabled = ? WHERE id = ?");
-    if ($stmt->execute([$email_notifications, $current_user_id])) {
-        $notifications_message = '<div class="message success">Notification settings updated.</div>';
-        $email_notifications_enabled = (bool)$email_notifications;
-    } else {
-        $notifications_message = '<div class="message error">Failed to update notification settings.</div>';
+    try {
+        $stmt = $conn->prepare("UPDATE users SET email_notifications_enabled = ? WHERE id = ?");
+        if ($stmt->execute([$email_notifications, $current_user_id])) {
+            $notifications_message = '<div class="message success">Notification settings updated.</div>';
+            $email_notifications_enabled = (bool)$email_notifications;
+        } else {
+            $notifications_message = '<div class="message error">Failed to update notification settings.</div>';
+        }
+    } catch (PDOException $e) {
+        error_log("Failed to update notification setting: " . $e->getMessage());
+        $notifications_message = '<div class="message error">Failed to update notification settings (field may be missing).</div>';
     }
-    $stmt->close();
 }
 
 // --- Handle Account Deletion ---

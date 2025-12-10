@@ -12,24 +12,26 @@ if (isset($_GET['id'])) {
     $applicationId = (int)$_GET['id'];
     
     // Fetch application details, ensuring it belongs to the current user for security
-    $stmt = $conn->prepare("SELECT * FROM applications WHERE id = ? AND user_id = ?");
-    $stmt->bind_param("ii", $applicationId, $current_user_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($result->num_rows > 0) {
-        $application = $result->fetch_assoc();
+    try {
+        $stmt = $conn->prepare("SELECT * FROM applications WHERE id = ? AND user_id = ?");
+        $stmt->execute([$applicationId, $current_user_id]);
+        $application = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (PDOException $e) {
+        error_log("Failed to fetch application details: " . $e->getMessage());
+        $application = null;
     }
-    $stmt->close();
 
     // Fetch existing documents for this application
     $documents = [];
     if ($application) {
-        $docs_stmt = $conn->prepare("SELECT * FROM documents WHERE application_id = ?");
-        $docs_stmt->bind_param("i", $applicationId);
-        $docs_stmt->execute();
-        $docs_result = $docs_stmt->get_result();
-        $documents = $docs_result->fetch_all(MYSQLI_ASSOC);
-        $docs_stmt->close();
+        try {
+            $docs_stmt = $conn->prepare("SELECT * FROM documents WHERE application_id = ?");
+            $docs_stmt->execute([$applicationId]);
+            $documents = $docs_stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Failed to fetch documents for application {$applicationId}: " . $e->getMessage());
+            $documents = [];
+        }
     }
 
 }

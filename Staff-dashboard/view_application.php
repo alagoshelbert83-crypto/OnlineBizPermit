@@ -17,9 +17,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_application'])
     try {
         $conn->beginTransaction();
 
-        // Update timestamp
+        // Update timestamp (skip silently if the column doesn't exist)
         $updateTimestampStmt = $conn->prepare("UPDATE applications SET updated_at = NOW() WHERE id = ?");
-        $updateTimestampStmt->execute([$applicationId]);
+        try {
+            $updateTimestampStmt->execute([$applicationId]);
+        } catch (PDOException $e) {
+            error_log("Failed to update updated_at (column may be missing): " . $e->getMessage());
+            // continue without failing the entire operation
+        }
 
         // Now, handle the LGU Section data
         $lgu_form_data = [

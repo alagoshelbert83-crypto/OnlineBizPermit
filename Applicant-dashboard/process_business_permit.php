@@ -71,7 +71,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // ----------------------------------------------------------------------
     // 3. DATABASE INSERTION
     // ----------------------------------------------------------------------
-    $conn->begin_transaction();
+    $conn->beginTransaction();
     try {
         // Prepare the comprehensive application data as JSON
         $form_details_json = json_encode($application_data);
@@ -81,23 +81,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             "INSERT INTO applications (user_id, business_name, business_address, type_of_business, status, form_details, submitted_at) 
              VALUES (?, ?, ?, ?, 'pending', ?, NOW())"
         );
-        
+
         if ($stmt === false) {
             throw new Exception("Database Error: Could not prepare the main application statement.");
         }
-        
+
         $business_name = $application_data['business_name'];
         $business_address = $application_data['business_address'] ?? '';
         $type_of_business = $application_data['type_of_business'] ?? '';
-        
-        $stmt->bind_param("issss", $current_user_id, $business_name, $business_address, $type_of_business, $form_details_json);
 
-        if (!$stmt->execute()) {
-            throw new Exception("Database Error: Could not execute the main application statement. " . $stmt->error);
+        if (!$stmt->execute([$current_user_id, $business_name, $business_address, $type_of_business, $form_details_json])) {
+            $err = $stmt->errorInfo();
+            throw new Exception("Database Error: Could not execute the main application statement. " . ($err[2] ?? 'Unknown'));
         }
-        
-        $app_id = $stmt->insert_id;
-        $stmt->close();
+
+        // Get last insert id (PDO returns string)
+        $app_id = (int)$conn->lastInsertId();
 
         // Handle File Uploads
         $allowed_types = ['application/pdf', 'image/jpeg', 'image/png'];
@@ -140,16 +139,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         throw new Exception('File System Error: Could not move uploaded file. Please check server permissions for the "uploads" folder.');
                     }
                     
-                    // Insert document record into DB
-                    $doc_stmt = $conn->prepare("INSERT INTO documents (application_id, document_name, file_path) VALUES (?, ?, ?)");
-                    if ($doc_stmt === false) {
-                        throw new Exception('Database Error: Could not prepare the document statement.');
+                    // Insert document record into DB (PDO)
+                    try {
+                        $doc_stmt = $conn->prepare("INSERT INTO documents (application_id, document_name, file_path) VALUES (?, ?, ?)");
+                        if ($doc_stmt === false) {
+                            throw new Exception('Database Error: Could not prepare the document statement.');
+                        }
+                        if (!$doc_stmt->execute([$app_id, $original_name, $unique_filename])) {
+                            $err = $doc_stmt->errorInfo();
+                            throw new Exception('Database Error: Could not save document record. ' . ($err[2] ?? 'Unknown'));
+                        }
+                    } catch (PDOException $e) {
+                        throw new Exception('Database Error while saving document: ' . $e->getMessage());
                     }
-                    $doc_stmt->bind_param("iss", $app_id, $original_name, $unique_filename);
-                    if (!$doc_stmt->execute()) {
-                        throw new Exception('Database Error: Could not save document record. ' . $doc_stmt->error);
-                    }
-                    $doc_stmt->close();
                 } elseif ($_FILES['documents']['error'][$key] !== UPLOAD_ERR_NO_FILE) {
                     throw new Exception('An error occurred during file upload. Code: ' . $_FILES['documents']['error'][$key]);
                 }
@@ -159,11 +161,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // Create Staff Notification
         $notification_message = "New comprehensive application (#{$app_id}) for '{$business_name}' has been submitted.";
         $notification_link = "view_application.php?id={$app_id}";
-        $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (NULL, ?, ?)");
-        if($notify_stmt) {
-            $notify_stmt->bind_param("ss", $notification_message, $notification_link);
-            $notify_stmt->execute();
-            $notify_stmt->close();
+        try {
+            $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (NULL, ?, ?)");
+            if ($notify_stmt) {
+                $notify_stmt->execute([$notification_message, $notification_link]);
+            }
+        } catch (PDOException $e) {
+            error_log('Failed to insert staff notification: ' . $e->getMessage());
         }
 
         // Send email notification to the applicant confirming submission

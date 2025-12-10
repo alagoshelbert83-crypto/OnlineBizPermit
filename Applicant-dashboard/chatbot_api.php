@@ -30,24 +30,39 @@ if ($is_live_chat_action) {
         echo json_encode(['success' => false, 'error' => 'Database configuration is missing.']);
         exit;
     }
-    // All live chat actions require a logged-in user.
-    if (!isset($_SESSION['user_id'])) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'error' => 'Authentication required for live chat.']);
-        exit;
-    }
-    $current_user_id = $_SESSION['user_id'];
-    $current_user_name = $_SESSION['name'] ?? 'User';
-    $current_user_role = $_SESSION['role'] ?? 'user';
+    // Determine authentication state: allow guest creation of chats if a guest name is provided.
+    $is_authenticated = isset($_SESSION['user_id']);
+    $current_user_id = $_SESSION['user_id'] ?? null;
+    $current_user_name = $_SESSION['name'] ?? ($_SESSION['guest_name'] ?? 'Guest');
+    $current_user_role = $_SESSION['role'] ?? (isset($_SESSION['guest_chat_id']) ? 'guest' : 'user');
     // All live chat action handlers go inside this block
     if ($action === 'create_live_chat') {
         try {
             $conn->beginTransaction();
 
+            // Allow guests to start a chat by supplying a 'guest_name' parameter.
+            $guest_name = trim($_REQUEST['guest_name'] ?? '');
+            if (!$is_authenticated && empty($guest_name)) {
+                // Require either authenticated user or a guest_name
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Authentication required for live chat or supply guest_name.']);
+                exit;
+            }
+
             // Insert new chat session and return the id (Postgres RETURNING)
+            // Use NULL for user_id when guest
+            $user_id_param = $is_authenticated ? $current_user_id : null;
             $stmt = $conn->prepare("INSERT INTO live_chats (user_id, status, created_at) VALUES (:user_id, 'Pending', NOW()) RETURNING id");
-            $stmt->execute([':user_id' => $current_user_id]);
+            $stmt->execute([':user_id' => $user_id_param]);
             $chat_id = $stmt->fetchColumn();
+
+            // If this is a guest, store guest info in session so they can continue the chat
+            if (!$is_authenticated) {
+                $_SESSION['guest_chat_id'] = (int)$chat_id;
+                $_SESSION['guest_name'] = $guest_name ?: 'Guest';
+                $current_user_name = $_SESSION['guest_name'];
+                $current_user_role = 'guest';
+            }
 
             // Notify all staff members about the new chat request.
             $notification_message = "New chat request from {$current_user_name}.";
@@ -74,7 +89,19 @@ if ($is_live_chat_action) {
         // Sanitize user-provided text message first to prevent XSS
         $message = htmlspecialchars(trim($_POST['message']), ENT_QUOTES, 'UTF-8');
         $sender_role = in_array($_POST['sender_role'], ['user', 'staff']) ? $_POST['sender_role'] : 'user';
-        $sender_id = (int)($_POST['sender_id'] ?? $current_user_id);
+        // Determine sender id: if authenticated use user id, if guest ensure session has guest_chat_id
+        if ($is_authenticated) {
+            $sender_id = (int)($current_user_id);
+        } else {
+            // Ensure guest is using the same chat id they started
+            if (!isset($_SESSION['guest_chat_id']) || (int)$_SESSION['guest_chat_id'] !== $chat_id) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Authentication required for live chat or invalid guest session.']);
+                exit;
+            }
+            $sender_id = null; // allow NULL for guest sender_id
+            $sender_role = 'guest';
+        }
         $final_message = nl2br($message); // Apply line breaks to the sanitized message
 
         // Handle file upload

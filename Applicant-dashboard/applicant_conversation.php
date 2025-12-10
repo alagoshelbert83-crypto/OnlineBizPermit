@@ -2,34 +2,43 @@
 session_start();
 require './db.php';
 
-// Security check: ensure user is a logged-in applicant
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'user') {
+
+// Security check: allow logged-in applicants or guests who started a chat (guest_chat_id in session)
+$chat_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+$chat_session = null;
+$error_message = '';
+$is_authenticated = isset($_SESSION['user_id']);
+$current_user_id = $_SESSION['user_id'] ?? null;
+
+// If not authenticated and no guest session, redirect to login
+if (!$is_authenticated && (!isset($_SESSION['guest_chat_id']) || (int)$_SESSION['guest_chat_id'] !== $chat_id)) {
     header("Location: ../login.php");
     exit;
 }
 
-$current_user_id = $_SESSION['user_id'];
-$chat_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-$chat_session = null;
-$error_message = '';
-
 if ($chat_id > 0) {
     // Fetch chat session and verify ownership
-    $stmt = $conn->prepare(
-        "SELECT lc.*, u.name as applicant_name 
-         FROM live_chats lc
-         JOIN users u ON lc.user_id = u.id
-         WHERE lc.id = ? AND lc.user_id = ?"
-    );
     try {
-        $stmt->execute([$chat_id, $current_user_id]);
-        $chat_session = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($chat_session) {
-            // If chat is 'Pending', we just display it. Only staff can change the status.
-            if ($chat_session['status'] === 'Pending') {
-                // No action needed from applicant side
+        if ($is_authenticated) {
+            $stmt = $conn->prepare(
+                "SELECT lc.*, u.name as applicant_name 
+                 FROM live_chats lc
+                 JOIN users u ON lc.user_id = u.id
+                 WHERE lc.id = ? AND lc.user_id = ?"
+            );
+            $stmt->execute([$chat_id, $current_user_id]);
+            $chat_session = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        } else {
+            // Guest: chat should exist and user_id is NULL, retrieve chat session
+            $stmt = $conn->prepare("SELECT * FROM live_chats WHERE id = ? AND user_id IS NULL");
+            $stmt->execute([$chat_id]);
+            $chat_session = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            if ($chat_session) {
+                // Set applicant_name from session guest_name if available
+                $chat_session['applicant_name'] = $_SESSION['guest_name'] ?? 'Guest';
             }
         }
+        // If chat is 'Pending', applicant side simply displays it; only staff change status.
     } catch (PDOException $e) {
         error_log("Failed to fetch chat session: " . $e->getMessage());
         $chat_session = null;
@@ -44,10 +53,11 @@ if (!$chat_session) {
 $existing_messages = [];
 $last_message_id = 0;
 if ($chat_id > 0) {
+    // Use LEFT JOIN so guest messages with NULL sender_id still return
     $msg_stmt = $conn->prepare(
         "SELECT cm.*, u.name as sender_name 
          FROM chat_messages cm
-         JOIN users u ON cm.sender_id = u.id
+         LEFT JOIN users u ON cm.sender_id = u.id
          WHERE cm.chat_id = ? ORDER BY cm.id ASC"
     );
     try {
@@ -140,11 +150,17 @@ if ($chat_id > 0) {
                     </div>
                     <!-- Inject existing messages here -->
                     <?php foreach ($existing_messages as $msg): ?>
-                        <?php $last_message_id = $msg['id']; // Track the last message ID ?>
-                        <div class="msg <?= htmlspecialchars($msg['sender_role']) === 'user' ? 'user' : 'staff' ?>">
-                            <div class="avatar <?= htmlspecialchars($msg['sender_role']) ?>-avatar"><?= strtoupper(substr($msg['sender_name'], 0, 1)) ?></div>
+                        <?php 
+                            $last_message_id = $msg['id']; // Track the last message ID
+                            // Determine a safe sender name for messages. For guest messages sender_name may be null.
+                            $sender_name = $msg['sender_name'] ?? ($_SESSION['guest_name'] ?? ($chat_session['applicant_name'] ?? 'Guest'));
+                            $sender_role = htmlspecialchars($msg['sender_role']) === 'user' ? 'user' : 'staff';
+                            $avatar_initial = strtoupper(substr($sender_name, 0, 1));
+                        ?>
+                        <div class="msg <?= $sender_role ?>">
+                            <div class="avatar <?= $sender_role ?>-avatar"><?= $avatar_initial ?></div>
                             <div class="msg-content">
-                                <div class="sender-name"><?= htmlspecialchars($msg['sender_name']) ?></div>
+                                <div class="sender-name"><?= htmlspecialchars($sender_name) ?></div>
                                 <div class="bubble"><?= $msg['message'] // Message is pre-sanitized in the API ?></div>
                                 <div class="timestamp"><?= date('h:i A', strtotime($msg['created_at'])) ?></div>
                             </div>

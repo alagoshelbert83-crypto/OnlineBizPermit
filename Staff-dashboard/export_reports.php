@@ -23,7 +23,14 @@ $sql = "SELECT
         ORDER BY 
             a.submitted_at DESC";
 
-$result = $conn->query($sql);
+try {
+    $stmt = $conn->prepare($sql);
+    $stmt->execute();
+    $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log('Report query error: ' . $e->getMessage());
+    $result = [];
+}
 
 // --- Generate CSV ---
 $filename = "business_applications_report_" . date('Y-m-d') . ".csv";
@@ -43,8 +50,8 @@ fputcsv($output, [
 ]);
 
 // Add data rows
-if ($result && $result->num_rows > 0) {
-    while ($row = $result->fetch_assoc()) {
+if (!empty($result)) {
+    foreach ($result as $row) {
         fputcsv($output, [
             $row['application_id'],
             $row['business_name'],

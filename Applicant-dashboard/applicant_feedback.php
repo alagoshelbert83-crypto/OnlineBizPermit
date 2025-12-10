@@ -15,28 +15,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_feedback'])) {
     if (empty($feedback_message)) {
         $message = '<div class="message error">Feedback message cannot be empty.</div>';
     } else {
-        $conn->begin_transaction();
+        $conn->beginTransaction();
         try {
             // 1. Insert the feedback
             $stmt = $conn->prepare("INSERT INTO feedback (user_id, message) VALUES (?, ?)");
-            $stmt->bind_param("is", $current_user_id, $feedback_message);
-            $stmt->execute();
-            $stmt->close();
+            if (!$stmt->execute([$current_user_id, $feedback_message])) {
+                $err = $stmt->errorInfo();
+                throw new Exception('Failed to insert feedback: ' . ($err[2] ?? 'Unknown'));
+            }
 
             // 2. Create a notification for staff
             $notification_message = "New feedback was submitted by " . htmlspecialchars($current_user_name);
             $notification_link = "feedback.php";
             $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (NULL, ?, ?)");
-            $notify_stmt->bind_param("ss", $notification_message, $notification_link);
-            $notify_stmt->execute();
-            $notify_stmt->close();
+            if ($notify_stmt) { $notify_stmt->execute([$notification_message, $notification_link]); }
 
             $conn->commit();
             $message = '<div class="message success">Thank you! Your feedback has been submitted successfully.</div>';
         } catch (Exception $e) {
-            $conn->rollback();
+            try { $conn->rollBack(); } catch (Exception $_) {}
             $message = '<div class="message error">An error occurred. Please try again.</div>';
-            // For debugging, you can log the error: error_log($e->getMessage());
+            error_log('Feedback submission error: ' . $e->getMessage());
         }
     }
 }

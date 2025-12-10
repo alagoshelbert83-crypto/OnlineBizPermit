@@ -56,9 +56,22 @@ try {
     );
     $stmt->bind_param("ssssi", $business_name, $business_address, $type_of_business, $form_details_json, $applicationId);
     if (!$stmt->execute()) {
-        throw new Exception("Database Error: Could not update application details. " . $stmt->error);
+        error_log("Primary update failed (updated_at may be missing): " . $stmt->error);
+        // Attempt fallback without updated_at
+        $stmt->close();
+        $stmt_fb = $conn->prepare(
+            "UPDATE applications 
+             SET business_name = ?, business_address = ?, type_of_business = ?, form_details = ?
+             WHERE id = ?"
+        );
+        $stmt_fb->bind_param("ssssi", $business_name, $business_address, $type_of_business, $form_details_json, $applicationId);
+        if (!$stmt_fb->execute()) {
+            throw new Exception("Database Error (fallback): Could not update application details. " . $stmt_fb->error);
+        }
+        $stmt_fb->close();
+    } else {
+        $stmt->close();
     }
-    $stmt->close();
 
     // 2. Handle File Uploads (New or Replacements)
     $upload_dir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;

@@ -13,11 +13,10 @@ function sendApprovalNotification($userEmail, $userName, $status, $conn = null) 
         try {
             $stmt = $conn->prepare("INSERT INTO notifications (type, recipient_email, message, created_at) VALUES (?, ?, ?, NOW())");
             $notificationType = $status === 'approved' ? 'account_approved' : 'account_rejected';
-            $stmt->bind_param("sss", $notificationType, $userEmail, $message);
-            $stmt->execute();
-            $stmt->close();
+            $stmt->execute([$notificationType, $userEmail, $message]);
         } catch (Exception $e) {
             // Table might not exist, continue without error
+            error_log('notify_user_approval DB insert failed: ' . $e->getMessage());
         }
     }
     

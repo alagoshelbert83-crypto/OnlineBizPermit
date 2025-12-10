@@ -5,11 +5,14 @@ require_once 'Applicant-dashboard/db.php';
 echo "<h2>Testing Edit Functionality</h2>";
 
 // Check if we have applications to test with
-$stmt = $conn->prepare("SELECT id, business_name, business_address, type_of_business, status FROM applications LIMIT 3");
-$stmt->execute();
-$result = $stmt->get_result();
-$applications = $result->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
+try {
+    $stmt = $conn->prepare("SELECT id, business_name, business_address, type_of_business, status FROM applications LIMIT 3");
+    $stmt->execute();
+    $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log('Test query error: ' . $e->getMessage());
+    $applications = [];
+}
 
 if (empty($applications)) {
     echo "<p>❌ No applications found to test with. Please create some applications first.</p>";

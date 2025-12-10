@@ -26,11 +26,24 @@ if (isset($_POST['update_status'])) {
 
     try {
         $conn->beginTransaction();
-        $stmt = $conn->prepare("UPDATE applications SET status=?, updated_at=NOW() WHERE id=?");
-        $stmt->execute([$status, $id]);
-        error_log("Status updated for application ID: {$id} to status: {$status}");
-
-        $conn->commit();
+        try {
+            $stmt = $conn->prepare("UPDATE applications SET status=?, updated_at=NOW() WHERE id=?");
+            $stmt->execute([$status, $id]);
+            error_log("Status updated for application ID: {$id} to status: {$status}");
+            $conn->commit();
+        } catch (PDOException $e) {
+            // If updated_at does not exist, fallback to updating only status
+            error_log("Failed to update status with updated_at (column may be missing): " . $e->getMessage());
+            try {
+                $stmt2 = $conn->prepare("UPDATE applications SET status=? WHERE id=?");
+                $stmt2->execute([$status, $id]);
+                error_log("Status updated (fallback) for application ID: {$id} to status: {$status}");
+                $conn->commit();
+            } catch (PDOException $e2) {
+                try { $conn->rollBack(); } catch (Exception $_) {}
+                throw $e2; // rethrow to be handled by outer catch
+            }
+        }
 
         // Fetch application and user details for notification (if user is assigned)
         $stmt = $conn->prepare("SELECT a.business_name, u.name, u.email 
@@ -129,8 +142,19 @@ try {
     $stmt->execute($params_for_query);
     $resultRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    error_log("Failed to fetch applications: " . $e->getMessage());
-    $resultRows = [];
+    error_log("Failed to fetch applications (permit_released_at may be missing): " . $e->getMessage());
+    // Fallback: try the same query without permit_released_at
+    try {
+        $alt_sql = "SELECT a.id, a.business_name, a.status, a.renewal_date, a.renewal_status, u.name, u.email, a.submitted_at
+            FROM applications a
+            LEFT JOIN users u ON a.user_id = u.id" . $where_sql . "\n            ORDER BY a.submitted_at DESC\n            LIMIT ? OFFSET ?";
+        $stmt_alt = $conn->prepare($alt_sql);
+        $stmt_alt->execute($params_for_query);
+        $resultRows = $stmt_alt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e2) {
+        error_log("Fallback failed to fetch applications: " . $e2->getMessage());
+        $resultRows = [];
+    }
 }
 require_once './staff_sidebar.php';
 ?>

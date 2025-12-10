@@ -13,8 +13,19 @@ try {
     $stmt->execute([$current_user_id]);
     $recent_app = $stmt->fetch(PDO::FETCH_ASSOC);
 } catch(PDOException $e) {
-    error_log("Error fetching recent application: " . $e->getMessage());
-    $recent_app = null;
+    error_log("Error fetching recent application (updated_at may be missing): " . $e->getMessage());
+    // Fallback to using submitted_at if updated_at is not available in the schema
+    try {
+        $stmt = $conn->prepare("SELECT id, business_name, status, submitted_at FROM applications WHERE user_id = ? ORDER BY submitted_at DESC LIMIT 1");
+        $stmt->execute([$current_user_id]);
+        $recent_app = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($recent_app && !isset($recent_app['updated_at'])) {
+            $recent_app['updated_at'] = $recent_app['submitted_at'] ?? null;
+        }
+    } catch (PDOException $e2) {
+        error_log("Fallback failed fetching recent application: " . $e2->getMessage());
+        $recent_app = null;
+    }
 }
 
 // Include Sidebar

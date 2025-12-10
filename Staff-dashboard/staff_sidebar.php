@@ -16,18 +16,6 @@ if (isset($conn) && $conn instanceof PDO) {
         error_log('Failed to fetch unread chat count: ' . $e->getMessage());
         $unread_chats_count = 0;
     }
-} elseif (isset($conn)) {
-    // Fallback for legacy mysqli connection
-    try {
-        $result = $conn->query("SELECT COUNT(*) as count FROM live_chats WHERE status = 'Pending'");
-        if ($result) {
-            $row = $result->fetch_assoc();
-            $unread_chats_count = (int)($row['count'] ?? 0);
-        }
-    } catch (Exception $e) {
-        error_log('Failed to fetch unread chat count (mysqli): ' . $e->getMessage());
-        $unread_chats_count = 0;
-    }
 }
 ?>
 <div class="sidebar">

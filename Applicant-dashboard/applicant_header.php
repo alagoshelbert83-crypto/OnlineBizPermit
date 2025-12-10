@@ -15,7 +15,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'user') {
 
 $current_user_id = $_SESSION['user_id'];
 
-// Fetch Current User Info
+// Fetch Current User Info (be defensive: some deployments may lack optional columns)
 try {
     $stmt = $conn->prepare("SELECT name, email, profile_picture_path FROM users WHERE id = ?");
     $stmt->execute([$current_user_id]);
@@ -23,9 +23,19 @@ try {
     $current_user_name = $user_info['name'] ?? 'Applicant';
     $current_user_picture = $user_info['profile_picture_path'] ?? null;
 } catch(PDOException $e) {
-    error_log("Error fetching user info: " . $e->getMessage());
-    $current_user_name = 'Applicant';
-    $current_user_picture = null;
+    error_log("Error fetching user info (profile_picture_path may be missing): " . $e->getMessage());
+    // Fallback: try without profile_picture_path
+    try {
+        $stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
+        $stmt->execute([$current_user_id]);
+        $user_info = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $current_user_name = $user_info['name'] ?? 'Applicant';
+        $current_user_picture = null;
+    } catch (PDOException $e2) {
+        error_log("Error fetching user info fallback: " . $e2->getMessage());
+        $current_user_name = 'Applicant';
+        $current_user_picture = null;
+    }
 }
 
 // --- Fetch unread notification count for the applicant ---

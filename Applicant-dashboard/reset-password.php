@@ -11,24 +11,30 @@ if (empty($token)) {
     $error = "No reset token provided. The link may be broken.";
 } else {
     // Validate the token
-    $stmt = $conn->prepare("SELECT email, expires FROM password_resets WHERE token = ? LIMIT 1");
-    $stmt->bind_param("s", $token);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if ($reset = $result->fetch_assoc()) {
+    try {
+      $stmt = $conn->prepare("SELECT email, expires FROM password_resets WHERE token = ? LIMIT 1");
+      $stmt->execute([$token]);
+      $reset = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+      if ($reset) {
         if ($reset['expires'] > time()) {
-            $showForm = true;
-            $resetData = $reset;
+          $showForm = true;
+          $resetData = $reset;
         } else {
-            $error = "This password reset link has expired. Please request a new one.";
-            // Clean up expired token
+          $error = "This password reset link has expired. Please request a new one.";
+          // Clean up expired token
+          try {
             $delStmt = $conn->prepare("DELETE FROM password_resets WHERE token = ?");
-            $delStmt->bind_param("s", $token);
-            $delStmt->execute();
+            $delStmt->execute([$token]);
+          } catch (PDOException $e) {
+            error_log('Failed to delete expired reset token: ' . $e->getMessage());
+          }
         }
-    } else {
+      } else {
         $error = "This password reset link is invalid. Please request a new one.";
+      }
+    } catch (PDOException $e) {
+      error_log('Failed to validate reset token: ' . $e->getMessage());
+      $error = "An internal error occurred. Please try again later.";
     }
 }
 
@@ -38,11 +44,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $password_confirm = $_POST['password_confirm'] ?? '';
 
     // Re-validate token from POST to ensure it's still valid
-    $stmt = $conn->prepare("SELECT email, expires FROM password_resets WHERE token = ? LIMIT 1");
-    $stmt->bind_param("s", $token);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $resetData = $result->fetch_assoc();
+    try {
+      $stmt = $conn->prepare("SELECT email, expires FROM password_resets WHERE token = ? LIMIT 1");
+      $stmt->execute([$token]);
+      $resetData = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (PDOException $e) {
+      error_log('Failed to re-validate token on POST: ' . $e->getMessage());
+      $resetData = null;
+    }
 
     if (!$resetData || $resetData['expires'] <= time()) {
         $error = "Invalid or expired token. Please try the reset process again.";
@@ -61,14 +70,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $email = $resetData['email'];
         $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
-        $updateStmt = $conn->prepare("UPDATE users SET password = ? WHERE email = ?");
-        $updateStmt->bind_param("ss", $hashedPassword, $email);
-        $updateStmt->execute();
+        try {
+          $updateStmt = $conn->prepare("UPDATE users SET password = ? WHERE email = ?");
+          $updateStmt->execute([$hashedPassword, $email]);
+        } catch (PDOException $e) {
+          error_log('Failed to update password: ' . $e->getMessage());
+          $error = 'Failed to update password. Please try again later.';
+        }
 
         // Invalidate the token by deleting it
-        $deleteStmt = $conn->prepare("DELETE FROM password_resets WHERE email = ?");
-        $deleteStmt->bind_param("s", $email);
-        $deleteStmt->execute();
+        try {
+          $deleteStmt = $conn->prepare("DELETE FROM password_resets WHERE email = ?");
+          $deleteStmt->execute([$email]);
+        } catch (PDOException $e) {
+          error_log('Failed to delete password reset token: ' . $e->getMessage());
+        }
 
         header("Location: login.php?status=reset_success");
         exit;

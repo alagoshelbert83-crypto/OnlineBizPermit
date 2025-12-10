@@ -97,6 +97,8 @@ require_once __DIR__ . '/applicant_sidebar.php';
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Expose current user name to client-side so guest chats can provide a name when unauthenticated
+    const CURRENT_USER_NAME = <?= json_encode($current_user_name ?? '') ?>;
     const chatWindow = document.getElementById('chatWindow');
     const quickReplies = document.getElementById('quickReplies');
     const chatForm = document.getElementById('chatForm');
@@ -142,12 +144,17 @@ document.addEventListener('DOMContentLoaded', function() {
             addMessage('bot', 'I am creating a live chat request for you now. Please wait a moment...');
             const typing = showTyping();
             
-            try {
+                try {
                 // Use API to create chat session
+                // Include guest_name for unauthenticated users (server will accept it)
+                const bodyParams = new URLSearchParams();
+                bodyParams.append('action', 'create_live_chat');
+                // If we have a current user name from PHP, include it; otherwise send empty and server will require guest_name
+                bodyParams.append('guest_name', CURRENT_USER_NAME || '');
                 const response = await fetch('chatbot_api.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'action=create_live_chat'
+                    body: bodyParams.toString()
                 });
 
                 const data = await response.json();

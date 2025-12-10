@@ -38,10 +38,21 @@ try {
     }
 
     // 2. Update the application status to 'complete' and mark as released
-    $update_stmt = $conn->prepare(
-        "UPDATE applications SET status = 'complete', permit_released_at = NOW(), updated_at = NOW() WHERE id = :id"
-    );
-    $update_stmt->execute([':id' => $application_id]);
+    try {
+        $update_stmt = $conn->prepare(
+            "UPDATE applications SET status = 'complete', permit_released_at = NOW(), updated_at = NOW() WHERE id = :id"
+        );
+        $update_stmt->execute([':id' => $application_id]);
+    } catch (PDOException $e) {
+        error_log("Failed to set permit_released_at/updated_at (columns may be missing): " . $e->getMessage());
+        // Fallback: at minimum mark the status as complete
+        try {
+            $fallback_stmt = $conn->prepare("UPDATE applications SET status = 'complete' WHERE id = :id");
+            $fallback_stmt->execute([':id' => $application_id]);
+        } catch (PDOException $e2) {
+            throw $e2; // Let outer catch handle rollback and messaging
+        }
+    }
 
     // 3. Create a notification for the applicant
     $business_name_safe = htmlspecialchars($app_data['business_name']);

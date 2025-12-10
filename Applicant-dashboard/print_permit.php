@@ -11,15 +11,17 @@ $application_id = (int)($_GET['id'] ?? 0);
 // Fetch application details, ensuring it belongs to the current user and is approved/complete
 $app = null;
 if ($application_id > 0) {
-    $stmt = $conn->prepare("SELECT a.*, u.name as applicant_name
-                             FROM applications a 
-                             JOIN users u ON a.user_id = u.id 
-                             WHERE a.id = ? AND a.user_id = ? AND a.status IN ('approved', 'complete')");
-    $stmt->bind_param("ii", $application_id, $current_user_id);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    $app = $res->fetch_assoc();
-    $stmt->close();
+    try {
+      $stmt = $conn->prepare("SELECT a.*, u.name as applicant_name
+                 FROM applications a 
+                 JOIN users u ON a.user_id = u.id 
+                 WHERE a.id = ? AND a.user_id = ? AND a.status IN ('approved', 'complete')");
+      $stmt->execute([$application_id, $current_user_id]);
+      $app = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (PDOException $e) {
+      error_log("Failed to fetch permit for printing: " . $e->getMessage());
+      $app = null;
+    }
 }
 
 if (!$app) {
