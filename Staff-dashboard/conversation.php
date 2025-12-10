@@ -240,6 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.getElementById('fileInput'), filePreview = document.getElementById('filePreview');
     let lastMessageId = <?= $last_message_id ?>; // Start polling from the last message loaded by PHP
     let typingTimeout;
+    let isSending = false; // Prevent multiple simultaneous sends
 
     function scrollToBottom() { chatWindow.scrollTop = chatWindow.scrollHeight; }
 
@@ -355,7 +356,18 @@ document.addEventListener('DOMContentLoaded', function() {
     chatForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         const message = userInput.value.trim();
-        if (!message) return;
+        if (!message && !fileInput.files[0]) return;
+
+        // Prevent multiple simultaneous sends
+        if (isSending) return;
+        isSending = true;
+
+        // Disable form to prevent spam
+        const submitBtn = chatForm.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        userInput.disabled = true;
 
         clearTimeout(typingTimeout);
         updateTypingStatus(false);
@@ -383,7 +395,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 addMessage('bot', 'Error: ' + (data.error || 'Could not send message.'));
             }
         } catch (error) {
-            console.error('Error sending message:', error); addMessage('bot', 'Error: Could not send message.');
+            console.error('Error sending message:', error);
+            addMessage('bot', 'Error: Could not send message.');
+        } finally {
+            // Re-enable form and reset sending flag
+            isSending = false;
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+            userInput.disabled = false;
+            userInput.focus();
         }
     });
 
