@@ -623,6 +623,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastMessageId = <?= $last_message_id ?>; // Start polling from the last message loaded by PHP
     let typingTimeout;
     let isSending = false; // Prevent multiple simultaneous sends
+    let lastSendTime = 0; // Track last send time to prevent spam
+    const MIN_SEND_INTERVAL = 1000; // Minimum 1 second between sends
 
     function scrollToBottom() { chatWindow.scrollTop = chatWindow.scrollHeight; }
 
@@ -742,7 +744,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Prevent multiple simultaneous sends
         if (isSending) return;
+
+        // Prevent spam by enforcing minimum time between sends
+        const now = Date.now();
+        if (now - lastSendTime < MIN_SEND_INTERVAL) {
+            addMessage('bot', 'Please wait a moment before sending another message.');
+            return;
+        }
+
         isSending = true;
+        lastSendTime = now;
 
         // Disable form to prevent spam
         const submitBtn = chatForm.querySelector('button[type="submit"]');
