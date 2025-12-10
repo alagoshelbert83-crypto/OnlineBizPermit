@@ -8,18 +8,18 @@ require_once __DIR__ . '/applicant_header.php';
 
 // --- Fetch applications for the logged-in user ---
 $my_apps = [];
-$stmt = $conn->prepare("SELECT id, business_name, status, submitted_at, business_address, type_of_business, 
-                               renewal_date, renewal_status, renewal_count
-                         FROM applications 
-                         WHERE user_id = ? 
-                         ORDER BY submitted_at DESC");
-$stmt->bind_param("i", $current_user_id);
-$stmt->execute();
-$result = $stmt->get_result();
-if ($result) {
-    $my_apps = $result->fetch_all(MYSQLI_ASSOC);
+try {
+    $stmt = $conn->prepare("SELECT id, business_name, status, submitted_at, business_address, type_of_business, 
+                                   renewal_date, renewal_status, renewal_count
+                             FROM applications 
+                             WHERE user_id = ? 
+                             ORDER BY submitted_at DESC");
+    $stmt->execute([$current_user_id]);
+    $my_apps = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch(PDOException $e) {
+    error_log("Error fetching applications: " . $e->getMessage());
+    $my_apps = [];
 }
-$stmt->close();
 
 // --- Fetch application statistics (Optimized) ---
 $app_stats = [
@@ -31,21 +31,20 @@ $app_stats = [
     'expired' => 0
 ];
 
-$stmt = $conn->prepare("
-    SELECT 
-        status, 
-        renewal_status,
-        COUNT(id) as count 
-    FROM applications 
-    WHERE user_id = ? 
-    GROUP BY status, renewal_status
-");
-$stmt->bind_param("i", $current_user_id);
-$stmt->execute();
-$result = $stmt->get_result();
+try {
+    $stmt = $conn->prepare("
+        SELECT 
+            status, 
+            renewal_status,
+            COUNT(id) as count 
+        FROM applications 
+        WHERE user_id = ? 
+        GROUP BY status, renewal_status
+    ");
+    $stmt->execute([$current_user_id]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-if ($result) {
-    while ($row = $result->fetch_assoc()) {
+    foreach ($rows as $row) {
         $status = strtolower($row['status']);
         $renewal_status = $row['renewal_status'];
         $count = (int)$row['count'];
@@ -65,8 +64,9 @@ if ($result) {
             $app_stats['rejected'] += $count;
         }
     }
+} catch(PDOException $e) {
+    error_log("Error fetching application stats: " . $e->getMessage());
 }
-$stmt->close();
 
 // Include Sidebar
 require_once __DIR__ . '/applicant_sidebar.php';

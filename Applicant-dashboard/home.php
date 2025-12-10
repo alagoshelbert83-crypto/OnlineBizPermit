@@ -8,14 +8,14 @@ require_once __DIR__ . '/applicant_header.php';
 
 // --- Fetch user's most recent application for the status widget ---
 $recent_app = null;
-$stmt = $conn->prepare("SELECT id, business_name, status, updated_at FROM applications WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1");
-$stmt->bind_param("i", $current_user_id);
-$stmt->execute();
-$result = $stmt->get_result();
-if ($result) {
-    $recent_app = $result->fetch_assoc();
+try {
+    $stmt = $conn->prepare("SELECT id, business_name, status, updated_at FROM applications WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1");
+    $stmt->execute([$current_user_id]);
+    $recent_app = $stmt->fetch(PDO::FETCH_ASSOC);
+} catch(PDOException $e) {
+    error_log("Error fetching recent application: " . $e->getMessage());
+    $recent_app = null;
 }
-$stmt->close();
 
 // Include Sidebar
 require_once __DIR__ . '/applicant_sidebar.php';

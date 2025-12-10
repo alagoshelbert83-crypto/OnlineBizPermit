@@ -5,7 +5,6 @@ require_once __DIR__ . '/db.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-require_once __DIR__ . '/db.php';
 
 // Authentication Check: Only allow users with the 'user' role
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'user') {
@@ -17,22 +16,29 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'user') {
 $current_user_id = $_SESSION['user_id'];
 
 // Fetch Current User Info
-$stmt = $conn->prepare("SELECT name, email, profile_picture_path FROM users WHERE id = ?");
-$stmt->bind_param("i", $current_user_id);
-$stmt->execute();
-$user_info = $stmt->get_result()->fetch_assoc();
-$current_user_name = $user_info['name'] ?? 'Applicant';
-$current_user_picture = $user_info['profile_picture_path'] ?? null;
-$stmt->close();
+try {
+    $stmt = $conn->prepare("SELECT name, email, profile_picture_path FROM users WHERE id = ?");
+    $stmt->execute([$current_user_id]);
+    $user_info = $stmt->fetch(PDO::FETCH_ASSOC);
+    $current_user_name = $user_info['name'] ?? 'Applicant';
+    $current_user_picture = $user_info['profile_picture_path'] ?? null;
+} catch(PDOException $e) {
+    error_log("Error fetching user info: " . $e->getMessage());
+    $current_user_name = 'Applicant';
+    $current_user_picture = null;
+}
 
 // --- Fetch unread notification count for the applicant ---
 $unread_notifications_count = 0;
-$count_stmt = $conn->prepare("SELECT COUNT(*) as unread_count FROM notifications WHERE user_id = ? AND is_read = 0");
-$count_stmt->bind_param("i", $current_user_id);
-$count_stmt->execute();
-$count_result = $count_stmt->get_result()->fetch_assoc();
-$unread_notifications_count = $count_result['unread_count'] ?? 0;
-$count_stmt->close();
+try {
+    $count_stmt = $conn->prepare("SELECT COUNT(*) as unread_count FROM notifications WHERE user_id = ? AND is_read = 0");
+    $count_stmt->execute([$current_user_id]);
+    $count_result = $count_stmt->fetch(PDO::FETCH_ASSOC);
+    $unread_notifications_count = $count_result['unread_count'] ?? 0;
+} catch(PDOException $e) {
+    error_log("Error fetching notification count: " . $e->getMessage());
+    $unread_notifications_count = 0;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
