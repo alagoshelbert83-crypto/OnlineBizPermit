@@ -20,6 +20,21 @@ ALTER TABLE applications
 ALTER TABLE applications
     ADD COLUMN IF NOT EXISTS permit_released_at TIMESTAMP WITH TIME ZONE;
 
+-- Add staff_id to live_chats (nullable integer, references users.id)
+ALTER TABLE live_chats
+    ADD COLUMN IF NOT EXISTS staff_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+
+-- Add closed_at to live_chats (nullable timestamp)
+ALTER TABLE live_chats
+    ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP WITH TIME ZONE;
+
+-- Add user_is_typing and staff_is_typing to live_chats (boolean flags for typing indicators)
+ALTER TABLE live_chats
+    ADD COLUMN IF NOT EXISTS user_is_typing BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE live_chats
+    ADD COLUMN IF NOT EXISTS staff_is_typing BOOLEAN DEFAULT FALSE;
+
 -- Optional: populate updated_at where NULL using submitted_at (if that column exists)
 DO $$
 BEGIN
@@ -33,5 +48,9 @@ END$$;
 -- ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `email_notifications_enabled` TINYINT(1) DEFAULT 1;
 -- ALTER TABLE `applications` ADD COLUMN IF NOT EXISTS `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
 -- ALTER TABLE `applications` ADD COLUMN IF NOT EXISTS `permit_released_at` TIMESTAMP NULL;
+-- ALTER TABLE `live_chats` ADD COLUMN IF NOT EXISTS `staff_id` INT NULL REFERENCES users(id) ON DELETE SET NULL;
+-- ALTER TABLE `live_chats` ADD COLUMN IF NOT EXISTS `closed_at` TIMESTAMP NULL;
+-- ALTER TABLE `live_chats` ADD COLUMN IF NOT EXISTS `user_is_typing` TINYINT(1) DEFAULT 0;
+-- ALTER TABLE `live_chats` ADD COLUMN IF NOT EXISTS `staff_is_typing` TINYINT(1) DEFAULT 0;
 
 -- End of migration

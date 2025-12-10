@@ -17,9 +17,34 @@ $sql = "SELECT lc.id, lc.status, lc.created_at, u.name as applicant_name, s.name
                 ELSE 3
             END,
             lc.created_at DESC";
-$result = $conn->query($sql);
-if ($result) {
-    $chats = $result->fetchAll(PDO::FETCH_ASSOC);
+
+try {
+    $result = $conn->query($sql);
+    if ($result) {
+        $chats = $result->fetchAll(PDO::FETCH_ASSOC);
+    }
+} catch (PDOException $e) {
+    // Fallback: if staff_id column doesn't exist, query without it
+    error_log('staff_conversastion.php error: ' . $e->getMessage());
+    $fallback_sql = "SELECT lc.id, lc.status, lc.created_at, u.name as applicant_name, NULL as staff_name
+                     FROM live_chats lc
+                     JOIN users u ON lc.user_id = u.id
+                     ORDER BY 
+                        CASE lc.status
+                            WHEN 'Pending' THEN 1
+                            WHEN 'Active' THEN 2
+                            ELSE 3
+                        END,
+                        lc.created_at DESC";
+    try {
+        $result = $conn->query($fallback_sql);
+        if ($result) {
+            $chats = $result->fetchAll(PDO::FETCH_ASSOC);
+        }
+    } catch (PDOException $fe) {
+        error_log('staff_conversastion.php fallback error: ' . $fe->getMessage());
+        $chats = [];
+    }
 }
 
 require_once './staff_sidebar.php';
