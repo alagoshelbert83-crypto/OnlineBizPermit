@@ -626,6 +626,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastSendTime = 0; // Track last send time to prevent spam
     const MIN_SEND_INTERVAL = 1000; // Minimum 1 second between sends
 
+    // Prevent multiple form submissions by removing/re-adding event listener
+    let submitHandler = null;
+
     function scrollToBottom() { chatWindow.scrollTop = chatWindow.scrollHeight; }
 
     function addMessage(sender, text, senderName = null, timestamp = null) {
@@ -737,23 +740,30 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 2000); // Considered "not typing" after 2 seconds
     });
 
-    chatForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const message = userInput.value.trim();
-        if (!message && !fileInput.files[0]) return;
-
-        // Prevent multiple simultaneous sends
-        if (isSending) return;
-
-        // Prevent spam by enforcing minimum time between sends
-        const now = Date.now();
-        if (now - lastSendTime < MIN_SEND_INTERVAL) {
-            addMessage('bot', 'Please wait a moment before sending another message.');
-            return;
+    function setupSubmitHandler() {
+        if (submitHandler) {
+            chatForm.removeEventListener('submit', submitHandler);
         }
 
-        isSending = true;
-        lastSendTime = now;
+        submitHandler = async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const message = userInput.value.trim();
+            if (!message && !fileInput.files[0]) return;
+
+            // Prevent multiple simultaneous sends
+            if (isSending) return;
+
+            // Prevent spam by enforcing minimum time between sends
+            const now = Date.now();
+            if (now - lastSendTime < MIN_SEND_INTERVAL) {
+                addMessage('bot', 'Please wait a moment before sending another message.');
+                return;
+            }
+
+            isSending = true;
+            lastSendTime = now;
 
         // Disable form to prevent spam
         const submitBtn = chatForm.querySelector('button[type="submit"]');
@@ -799,6 +809,9 @@ document.addEventListener('DOMContentLoaded', function() {
             userInput.focus();
         }
     });
+
+    // Set up the initial submit handler
+    setupSubmitHandler();
 
     fileInput.addEventListener('change', function() {
         if (this.files[0]) {

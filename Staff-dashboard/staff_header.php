@@ -57,6 +57,7 @@ if (isset($_SESSION['user_id'])) {
   <title><?= isset($page_title) ? htmlspecialchars($page_title) : 'Staff Dashboard' ?> - OnlineBizPermit</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
         --primary-color: #4a69bd; --secondary-color: #3c4b64; --bg-color: #f0f2f5; --card-bg: #ffffff; --text-primary: #343a40; --text-secondary: #6c757d; --border-color: #dee2e6; --shadow-sm: 0 1px 3px rgba(0,0,0,0.05); --border-radius: 8px;
