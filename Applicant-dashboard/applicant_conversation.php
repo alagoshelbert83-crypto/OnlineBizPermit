@@ -675,7 +675,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const typingIndicator = document.getElementById('typingIndicator');
 
             if (data.messages && data.messages.length > 0) {
-                data.messages.forEach(msg => { addMessage(msg.sender_role, msg.message, msg.sender_name, msg.created_at); lastMessageId = msg.id; });
+                data.messages.forEach(msg => {
+                    addMessage(msg.sender_role, msg.message, msg.sender_name, msg.created_at);
+                    lastMessageId = msg.id;
+                });
             } 
 
             if (data.status) {
