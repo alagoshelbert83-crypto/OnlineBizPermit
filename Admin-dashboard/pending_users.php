@@ -210,136 +210,44 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
     }
 
     if (isset($is_approved)) {
-        // Ensure connection is clean before starting transaction
+        // Simplify: Don't use transactions for a single UPDATE statement
+        // PostgreSQL can abort transactions on any error, making them unreliable
         try {
-            ensureCleanConnection($conn);
-        } catch (Exception $e) {
-            $message = '<div class="message error">' . htmlspecialchars($e->getMessage()) . '</div>';
-            goto skip_approval; // Skip to end of approval section
-        }
-        
-        // Clean connection again before starting transaction (in case SELECT left it in bad state)
-        try {
-            ensureCleanConnection($conn);
-        } catch (Exception $e) {
-            $message = '<div class="message error">' . htmlspecialchars($e->getMessage()) . '</div>';
-            goto skip_approval;
-        }
-        
-        try {
-            // Use a transaction for atomicity
-            // Wrap beginTransaction in try-catch in case connection is in bad state
-            try {
-                $conn->beginTransaction();
-                
-                // Verify transaction started successfully by checking if we're in a transaction
-                // and by executing a simple query to ensure it's not aborted
-                if (!$conn->inTransaction()) {
-                    throw new Exception("Transaction did not start properly");
-                }
-                
-                // Test the transaction with a simple query to ensure it's not aborted
-                try {
-                    $test_stmt = $conn->query("SELECT 1");
-                    $test_stmt->fetch();
-                } catch (PDOException $test_e) {
-                    // If test query fails, transaction is aborted
-                    $conn->exec("ROLLBACK");
-                    throw new Exception("Transaction is in an aborted state. Please refresh the page and try again.");
-                }
-            } catch (PDOException $begin_e) {
-                // If beginTransaction fails, connection might be in aborted state
-                // Try to clean it and retry
-                try {
-                    $conn->exec("ROLLBACK");
-                    $conn->beginTransaction();
-                    // Test again
-                    $conn->query("SELECT 1")->fetch();
-                } catch (PDOException $retry_e) {
-                    throw new Exception("Failed to start transaction. Connection may be in an invalid state: " . $begin_e->getMessage());
-                }
-            }
-            
-            // Update user approval status using RETURNING to get user details in one query
-            // Do the UPDATE first, then verify the result
-            $stmt = $conn->prepare("UPDATE users SET is_approved = ? WHERE id = ? AND role = 'user' RETURNING id, name, email");
-            
-            // Execute UPDATE - catch any errors immediately
-            try {
-                $stmt->execute([$is_approved, $userId]);
-            } catch (PDOException $execute_e) {
-                // If execute fails, rollback immediately
-                try {
-                    $conn->rollBack();
-                } catch (PDOException $rollback_e) {
-                    // Try exec() if rollBack() fails
-                    try {
-                        $conn->exec("ROLLBACK");
-                    } catch (PDOException $exec_e) {
-                        // Ignore - connection might be broken
-                    }
-                }
-                throw new Exception("UPDATE failed: " . $execute_e->getMessage());
-            }
-            
-            // Fetch the result - wrap in try-catch in case transaction was aborted
-            try {
-                $userDetails = $stmt->fetch(PDO::FETCH_ASSOC);
-            } catch (PDOException $fetch_e) {
-                // If fetch fails, transaction was likely aborted
-                try {
-                    $conn->rollBack();
-                } catch (PDOException $rollback_e) {
-                    try {
-                        $conn->exec("ROLLBACK");
-                    } catch (PDOException $exec_e) {
-                        // Ignore
-                    }
-                }
-                throw new Exception("Failed to retrieve updated user data. The UPDATE may have failed: " . $fetch_e->getMessage());
-            }
+            // First, verify the user exists and get their details
+            $verify_stmt = $conn->prepare("SELECT id, name, email FROM users WHERE id = ? AND role = 'user'");
+            $verify_stmt->execute([$userId]);
+            $userDetails = $verify_stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$userDetails) {
-                // No rows were updated - rollback and throw
-                try {
-                    $conn->rollBack();
-                } catch (PDOException $rollback_e) {
-                    try {
-                        $conn->exec("ROLLBACK");
-                    } catch (PDOException $exec_e) {
-                        // Ignore
-                    }
-                }
-                throw new Exception("No user found with ID {$userId} or user is not a regular user");
+                $message = '<div class="message error">No user found with ID ' . htmlspecialchars($userId) . ' or user is not a regular user</div>';
+                goto skip_approval;
             }
             
-            // Update succeeded - now create notification
+            // Now perform the UPDATE without a transaction
+            $update_stmt = $conn->prepare("UPDATE users SET is_approved = ? WHERE id = ?");
+            $update_stmt->execute([$is_approved, $userId]);
+            
             $status_text = $is_approved === 1 ? 'approved' : 'rejected';
             
-            // 1. Create in-app notification
+            // Create in-app notification
             if ($is_approved === 1) {
                 $notificationMessage = "Welcome! Your account has been approved. You can now submit and manage your business permit applications.";
                 $link = "../Applicant-dashboard/applicant_dashboard.php";
             } else {
                 $notificationMessage = "Your account registration has been rejected. Please contact support for more information.";
-                $link = null; // No link for rejection
+                $link = null;
             }
             
-            // Wrap notification insert in try-catch to handle potential constraint violations
+            // Try to create notification (non-critical)
             try {
                 $notifyStmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
                 $notifyStmt->execute([$userId, $notificationMessage, $link]);
             } catch (PDOException $notify_e) {
-                // Log the notification error but don't fail the entire transaction
-                // The user approval is still valid, just the notification failed
                 error_log("Failed to create notification for user {$userId}: " . $notify_e->getMessage());
-                // Continue with commit - the approval was already successful
+                // Continue - notification is non-critical
             }
             
-            // Commit the transaction
-            $conn->commit();
-            
-            // Send email notification AFTER transaction is committed
+            // Send email notification
             if (function_exists('sendApplicationEmail') && !empty($userDetails['email'])) {
                 try {
                     $email_subject = "Your OnlineBizPermit Account has been " . ucfirst($status_text);
@@ -358,29 +266,15 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                     </div>";
                     sendApplicationEmail($userDetails['email'], $userDetails['name'], $email_subject, $email_body);
                 } catch (Exception $e) {
-                    // Log email error but don't fail the transaction
                     error_log("Email sending failed for user {$userId}: " . $e->getMessage());
                 }
             }
-            $status_text = $is_approved === 1 ? 'approved' : 'rejected';
+            
             $message = '<div class="message success">User has been ' . $status_text . '. They have been notified.</div>';
         } catch (PDOException $e) {
-            // PDO exception - rollback immediately using exec() which works even if transaction is aborted
-            try {
-                $conn->exec("ROLLBACK");
-            } catch (PDOException $rollback_e) {
-                // Ignore rollback errors
-                error_log("Rollback error (ignored): " . $rollback_e->getMessage());
-            }
-            error_log("User approval PDO error: " . $e->getMessage());
+            error_log("User approval error: " . $e->getMessage());
             $message = '<div class="message error">Failed to update user status: ' . htmlspecialchars($e->getMessage()) . '</div>';
         } catch (Exception $e) {
-            // General exception - also rollback
-            try {
-                $conn->exec("ROLLBACK");
-            } catch (PDOException $rollback_e) {
-                error_log("Rollback error (ignored): " . $rollback_e->getMessage());
-            }
             error_log("User approval error: " . $e->getMessage());
             $message = '<div class="message error">Failed to update user status: ' . htmlspecialchars($e->getMessage()) . '</div>';
         }
