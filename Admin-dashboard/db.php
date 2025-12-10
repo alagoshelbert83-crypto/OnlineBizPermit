@@ -3,6 +3,13 @@
  * Database Connection for Admin Dashboard - PostgreSQL (Neon)
  */
 
+// Allow skipping DB connection during build/deploy by setting SKIP_DB_CONNECT=1
+if (getenv('SKIP_DB_CONNECT') === '1') {
+    // Set a null $conn to avoid undefined variable errors in build scripts
+    $conn = null;
+    return;
+}
+
 // --- Database Configuration for Neon ---
 // IMPORTANT: Vercel automatically provides POSTGRES_URL when Neon database is connected
 // This connection string includes all connection details
