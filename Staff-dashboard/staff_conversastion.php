@@ -19,7 +19,7 @@ $sql = "SELECT lc.id, lc.status, lc.created_at, u.name as applicant_name, s.name
             lc.created_at DESC";
 $result = $conn->query($sql);
 if ($result) {
-    $chats = $result->fetch_all(MYSQLI_ASSOC);
+    $chats = $result->fetchAll(PDO::FETCH_ASSOC);
 }
 
 require_once './staff_sidebar.php';
