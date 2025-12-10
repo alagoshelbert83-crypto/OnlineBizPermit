@@ -1,13 +1,27 @@
 <?php
 $current_page = 'notifications';
-require_once './staff_header.php'; // Handles session, DB, and auth
 
-$staff_id = $_SESSION['user_id']; // staff_header.php ensures this is set
-
-// Handle marking notification as read/unread
+// Handle marking notification as read/unread BEFORE including header
 if (isset($_GET['action']) && isset($_GET['id'])) {
     $action = $_GET['action'];
     $notification_id = (int)$_GET['id'];
+
+    // Need to include DB connection first for the action
+    require_once './db.php';
+
+    // Start session for authentication
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    // Basic auth check
+    if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['staff', 'admin'])) {
+        header("Location: login.php");
+        exit;
+    }
+
+    $staff_id = $_SESSION['user_id'];
+
     if ($action === 'toggle_read') {
       try {
         $stmt = $conn->prepare("UPDATE notifications SET is_read = NOT is_read WHERE id = ? AND (user_id = ? OR user_id IS NULL)");
@@ -19,6 +33,10 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
       exit;
     }
 }
+
+require_once './staff_header.php'; // Handles session, DB, and auth
+
+$staff_id = $_SESSION['user_id']; // staff_header.php ensures this is set
 
 $notifications = [];
 $sql = "SELECT id, message, link, created_at, is_read 
