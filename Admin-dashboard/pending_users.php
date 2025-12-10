@@ -6,6 +6,15 @@ $current_page = 'pending_users';
 // Include Header
 require_once __DIR__ . '/admin_header.php';
 
+// Clean connection after header includes (in case any queries left it in bad state)
+// This ensures we start with a clean connection for our operations
+try {
+    // Rollback any aborted transactions
+    $conn->exec("ROLLBACK");
+} catch (PDOException $e) {
+    // Ignore - might not be in a transaction
+}
+
 // Include mail functions. A better long-term solution would be a shared 'includes' directory.
 if (file_exists(__DIR__ . '/../config_mail.php')) {
     require_once __DIR__ . '/../config_mail.php';
@@ -199,26 +208,50 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
             goto skip_approval; // Skip to end of approval section
         }
         
-        // Verify user exists and is a regular user BEFORE starting transaction
+        // Clean connection again before starting transaction (in case SELECT left it in bad state)
         try {
-            $check_stmt = $conn->prepare("SELECT id, name, email FROM users WHERE id = ? AND role = 'user'");
-            $check_stmt->execute([$userId]);
-            $user_check = $check_stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$user_check) {
-                $message = '<div class="message error">No user found with ID ' . $userId . ' or user is not a regular user.</div>';
-                goto skip_approval;
-            }
-        } catch (PDOException $e) {
-            $message = '<div class="message error">Failed to verify user: ' . htmlspecialchars($e->getMessage()) . '</div>';
+            ensureCleanConnection($conn);
+        } catch (Exception $e) {
+            $message = '<div class="message error">' . htmlspecialchars($e->getMessage()) . '</div>';
             goto skip_approval;
         }
         
         try {
             // Use a transaction for atomicity
-            $conn->beginTransaction();
+            // Wrap beginTransaction in try-catch in case connection is in bad state
+            try {
+                $conn->beginTransaction();
+                
+                // Verify transaction started successfully by checking if we're in a transaction
+                // and by executing a simple query to ensure it's not aborted
+                if (!$conn->inTransaction()) {
+                    throw new Exception("Transaction did not start properly");
+                }
+                
+                // Test the transaction with a simple query to ensure it's not aborted
+                try {
+                    $test_stmt = $conn->query("SELECT 1");
+                    $test_stmt->fetch();
+                } catch (PDOException $test_e) {
+                    // If test query fails, transaction is aborted
+                    $conn->exec("ROLLBACK");
+                    throw new Exception("Transaction is in an aborted state. Please refresh the page and try again.");
+                }
+            } catch (PDOException $begin_e) {
+                // If beginTransaction fails, connection might be in aborted state
+                // Try to clean it and retry
+                try {
+                    $conn->exec("ROLLBACK");
+                    $conn->beginTransaction();
+                    // Test again
+                    $conn->query("SELECT 1")->fetch();
+                } catch (PDOException $retry_e) {
+                    throw new Exception("Failed to start transaction. Connection may be in an invalid state: " . $begin_e->getMessage());
+                }
+            }
             
             // Update user approval status using RETURNING to get user details in one query
+            // Do the UPDATE first, then verify the result
             $stmt = $conn->prepare("UPDATE users SET is_approved = ? WHERE id = ? AND role = 'user' RETURNING id, name, email");
             
             // Execute UPDATE - catch any errors immediately
@@ -226,7 +259,16 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                 $stmt->execute([$is_approved, $userId]);
             } catch (PDOException $execute_e) {
                 // If execute fails, rollback immediately
-                $conn->rollBack();
+                try {
+                    $conn->rollBack();
+                } catch (PDOException $rollback_e) {
+                    // Try exec() if rollBack() fails
+                    try {
+                        $conn->exec("ROLLBACK");
+                    } catch (PDOException $exec_e) {
+                        // Ignore - connection might be broken
+                    }
+                }
                 throw new Exception("UPDATE failed: " . $execute_e->getMessage());
             }
             
@@ -235,13 +277,29 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                 $userDetails = $stmt->fetch(PDO::FETCH_ASSOC);
             } catch (PDOException $fetch_e) {
                 // If fetch fails, transaction was likely aborted
-                $conn->rollBack();
+                try {
+                    $conn->rollBack();
+                } catch (PDOException $rollback_e) {
+                    try {
+                        $conn->exec("ROLLBACK");
+                    } catch (PDOException $exec_e) {
+                        // Ignore
+                    }
+                }
                 throw new Exception("Failed to retrieve updated user data. The UPDATE may have failed: " . $fetch_e->getMessage());
             }
             
             if (!$userDetails) {
                 // No rows were updated - rollback and throw
-                $conn->rollBack();
+                try {
+                    $conn->rollBack();
+                } catch (PDOException $rollback_e) {
+                    try {
+                        $conn->exec("ROLLBACK");
+                    } catch (PDOException $exec_e) {
+                        // Ignore
+                    }
+                }
                 throw new Exception("No user found with ID {$userId} or user is not a regular user");
             }
             
