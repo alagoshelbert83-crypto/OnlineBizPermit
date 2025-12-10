@@ -9,10 +9,12 @@ if (session_status() === PHP_SESSION_NONE) {
 if (isset($_SESSION['user_id'])) {
     if ($_SESSION['role'] === 'user') {
         header("Location: home.php");
+        exit;
     } else {
-        header("Location: login.php");
+        // User has wrong role for applicant dashboard - destroy session and show login
+        session_destroy();
+        // Don't redirect - just let them see the login form
     }
-    exit;
 }
 
 $error_message = '';
