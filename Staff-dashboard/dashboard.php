@@ -8,8 +8,8 @@ $kpi_sql = "SELECT
                 SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_count,
                 SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected_count
             FROM applications";
-$kpi_result = $conn->query($kpi_sql);
-$kpis = $kpi_result ? $kpi_result->fetch_assoc() : [];
+$kpi_stmt = $conn->query($kpi_sql);
+$kpis = $kpi_stmt ? $kpi_stmt->fetch(PDO::FETCH_ASSOC) : [];
 
 // --- Fetch recent applications ---
 $recent_apps_sql = "SELECT a.id, a.business_name, u.name as applicant_name, a.status, a.submitted_at
@@ -17,8 +17,8 @@ $recent_apps_sql = "SELECT a.id, a.business_name, u.name as applicant_name, a.st
                     JOIN users u ON a.user_id = u.id
                     ORDER BY a.submitted_at DESC
                     LIMIT 5";
-$recent_apps_result = $conn->query($recent_apps_sql);
-$recent_applications = $recent_apps_result ? $recent_apps_result->fetch_all(MYSQLI_ASSOC) : [];
+$recent_apps_stmt = $conn->query($recent_apps_sql);
+$recent_applications = $recent_apps_stmt ? $recent_apps_stmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
 // --- Fetch data for monthly trend chart ---
 $monthly_labels = [];
@@ -30,18 +30,18 @@ for ($i = 5; $i >= 0; $i--) {
     $counts_by_month[$month_key] = 0;
 }
 
-$monthly_sql = "SELECT DATE_FORMAT(submitted_at, '%Y-%m') AS month, COUNT(id) AS count
-                FROM applications
-                WHERE submitted_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
-                GROUP BY month
-                ORDER BY month ASC";
-$monthly_result = $conn->query($monthly_sql);
-if ($monthly_result) {
-    while ($row = $monthly_result->fetch_assoc()) {
-        if (isset($counts_by_month[$row['month']])) {
-            $counts_by_month[$row['month']] = (int)$row['count'];
-        }
+$monthly_sql = "SELECT to_char(submitted_at, 'YYYY-MM') AS month, COUNT(id) AS count
+        FROM applications
+        WHERE submitted_at >= (current_date - INTERVAL '6 months')
+        GROUP BY month
+        ORDER BY month ASC";
+$monthly_stmt = $conn->query($monthly_sql);
+if ($monthly_stmt) {
+  while ($row = $monthly_stmt->fetch(PDO::FETCH_ASSOC)) {
+    if (isset($counts_by_month[$row['month']])) {
+      $counts_by_month[$row['month']] = (int)$row['count'];
     }
+  }
 }
 $monthly_counts = array_values($counts_by_month);
 

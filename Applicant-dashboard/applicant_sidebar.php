@@ -7,12 +7,15 @@ $current_page = $current_page ?? 'dashboard';
 // Fetch unread notification count for the notification badge.
 $unread_notifications_count = 0;
 if (isset($conn) && isset($_SESSION['user_id'])) {
+  try {
     $count_stmt = $conn->prepare("SELECT COUNT(*) as unread_count FROM notifications WHERE user_id = ? AND is_read = 0");
-    $count_stmt->bind_param("i", $_SESSION['user_id']);
-    $count_stmt->execute();
-    $count_result = $count_stmt->get_result()->fetch_assoc();
-    $unread_notifications_count = $count_result['unread_count'] ?? 0;
-    $count_stmt->close();
+    $count_stmt->execute([$_SESSION['user_id']]);
+    $count_result = $count_stmt->fetch(PDO::FETCH_ASSOC);
+    $unread_notifications_count = (int)($count_result['unread_count'] ?? 0);
+  } catch (PDOException $e) {
+    error_log("Error fetching applicant unread notifications: " . $e->getMessage());
+    $unread_notifications_count = 0;
+  }
 }
 
 ?>
