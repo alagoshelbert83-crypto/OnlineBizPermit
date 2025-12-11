@@ -136,7 +136,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         );
 
         if (!$stmt) {
-            throw new PDOException('Failed to prepare INSERT statement: ' . implode(', ', $conn->errorInfo()));
+            $errorInfo = $conn->errorInfo();
+            throw new PDOException('Failed to prepare INSERT statement: ' . ($errorInfo[2] ?? 'Unknown error'), (int)($errorInfo[0] ?? 0));
         }
 
         $execute_result = $stmt->execute([$current_user_id, $business_name, $business_address, $type_of_business, $form_details_json]);
@@ -193,7 +194,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     // Insert document record into DB (PDO)
                     $doc_stmt = $conn->prepare("INSERT INTO documents (application_id, document_name, file_path) VALUES (?, ?, ?)");
                     if (!$doc_stmt) {
-                        throw new PDOException('Failed to prepare document INSERT statement: ' . implode(', ', $conn->errorInfo()));
+                        $doc_errorInfo = $conn->errorInfo();
+                        throw new PDOException('Failed to prepare document INSERT statement: ' . ($doc_errorInfo[2] ?? 'Unknown error'), (int)($doc_errorInfo[0] ?? 0));
                     }
                     $doc_execute_result = $doc_stmt->execute([$app_id, $original_name, $unique_filename]);
                     if (!$doc_execute_result) {
@@ -296,7 +298,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // Log the full error for debugging
         error_log('Application submission error: ' . $e->getMessage());
         error_log('SQL State: ' . $e->getCode());
-        error_log('Error Info: ' . print_r($e->errorInfo() ?? [], true));
+        
+        // PDOException doesn't have errorInfo() - get it from connection if available
+        $errorInfo = [];
+        if ($e instanceof PDOException) {
+            // Try to get errorInfo from the connection
+            if (isset($conn) && $conn instanceof PDO) {
+                $errorInfo = $conn->errorInfo() ?? [];
+            }
+            // PDOException has a code property that contains SQLSTATE
+            if (empty($errorInfo) && $e->getCode()) {
+                $errorInfo = [$e->getCode(), null, $e->getMessage()];
+            }
+        }
+        error_log('Error Info: ' . print_r($errorInfo, true));
         error_log('Rollback successful: ' . ($rollback_success ? 'Yes' : 'No'));
         
         // Get user-friendly error message
