@@ -659,7 +659,7 @@ if ($chat_id > 0) {
                             $sender_role = htmlspecialchars($msg['sender_role']) === 'user' ? 'user' : 'staff';
                             $avatar_initial = strtoupper(substr($sender_name, 0, 1));
                         ?>
-                        <div class="msg <?= $sender_role ?>">
+                        <div class="msg <?= $sender_role ?>" data-message-id="<?= (int)$msg['id'] ?>">
                             <div class="avatar <?= $sender_role ?>-avatar"><?= $avatar_initial ?></div>
                             <div class="msg-content">
                                 <div class="sender-name"><?= htmlspecialchars($sender_name) ?></div>
@@ -700,12 +700,34 @@ document.addEventListener('DOMContentLoaded', function() {
     let isSending = false; // Prevent multiple simultaneous sends
     let lastSendTime = 0; // Track last send time to prevent spam
     const MIN_SEND_INTERVAL = 1000; // Minimum 1 second between sends
+    const addedMessageIds = new Set(); // Track message IDs to prevent duplicates
+    
+    // Initialize with existing message IDs from PHP-rendered messages
+    document.querySelectorAll('[data-message-id]').forEach(el => {
+        const msgId = parseInt(el.getAttribute('data-message-id'));
+        if (msgId) addedMessageIds.add(msgId);
+    });
 
     function scrollToBottom() { chatWindow.scrollTop = chatWindow.scrollHeight; }
 
-    function addMessage(sender, text, senderName = null, timestamp = null) {
+    function addMessage(sender, text, senderName = null, timestamp = null, messageId = null) {
+        // Prevent duplicate messages by checking message ID
+        if (messageId && addedMessageIds.has(messageId)) {
+            return; // Message already added, skip
+        }
+        
+        // If messageId is provided, mark it as added
+        if (messageId) {
+            addedMessageIds.add(messageId);
+        }
+
         const wrapper = document.createElement('div');
         wrapper.className = 'msg ' + (sender === 'user' ? 'user' : (sender === 'staff' ? 'staff' : 'bot'));
+        
+        // Add data attribute to track message ID
+        if (messageId) {
+            wrapper.setAttribute('data-message-id', messageId);
+        }
 
         if (sender === 'bot') {
             wrapper.innerHTML = `<div class="bubble">${text}</div>`;
@@ -727,7 +749,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const timeSpan = document.createElement('div');
             timeSpan.className = 'timestamp';
-            timeSpan.textContent = 'now';
+            timeSpan.textContent = timestamp ? new Date(timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : 'now';
 
             msgContent.append(nameSpan, bubble, timeSpan);
             wrapper.append(avatar, msgContent);
@@ -751,8 +773,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (data.messages && data.messages.length > 0) {
                 data.messages.forEach(msg => {
-                    addMessage(msg.sender_role, msg.message, msg.sender_name, msg.created_at);
-                    lastMessageId = msg.id;
+                    addMessage(msg.sender_role, msg.message, msg.sender_name, msg.created_at, msg.id);
+                    // Update lastMessageId to the highest ID to prevent fetching old messages
+                    if (msg.id > lastMessageId) {
+                        lastMessageId = msg.id;
+                    }
                 });
             } 
 

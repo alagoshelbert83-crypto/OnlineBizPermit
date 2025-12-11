@@ -80,7 +80,7 @@ require_once './staff_sidebar.php';
                 <!-- Inject existing messages here -->
                 <?php foreach ($existing_messages as $msg): ?>
                     <?php $last_message_id = $msg['id']; // Track the last message ID ?>
-                    <div class="msg <?= htmlspecialchars($msg['sender_role']) === 'staff' ? 'staff' : 'user' ?>">
+                    <div class="msg <?= htmlspecialchars($msg['sender_role']) === 'staff' ? 'staff' : 'user' ?>" data-message-id="<?= (int)$msg['id'] ?>">
                         <div class="avatar <?= htmlspecialchars($msg['sender_role']) ?>-avatar"><?= strtoupper(substr($msg['sender_name'], 0, 1)) ?></div>
                         <div class="msg-content">
                             <div class="sender-name"><?= htmlspecialchars($msg['sender_name']) ?></div>
@@ -634,16 +634,38 @@ document.addEventListener('DOMContentLoaded', function() {
     let isSending = false; // Prevent multiple simultaneous sends
     let lastSendTime = 0; // Track last send time to prevent spam
     const MIN_SEND_INTERVAL = 1000; // Minimum 1 second between sends
+    const addedMessageIds = new Set(); // Track message IDs to prevent duplicates
+
+    // Initialize with existing message IDs from PHP-rendered messages
+    document.querySelectorAll('[data-message-id]').forEach(el => {
+        const msgId = parseInt(el.getAttribute('data-message-id'));
+        if (msgId) addedMessageIds.add(msgId);
+    });
 
     // Prevent multiple form submissions by removing/re-adding event listener
     let submitHandler = null;
 
     function scrollToBottom() { chatWindow.scrollTop = chatWindow.scrollHeight; }
 
-    function addMessage(sender, text, senderName = null, timestamp = null) {
+    function addMessage(sender, text, senderName = null, timestamp = null, messageId = null) {
+        // Prevent duplicate messages by checking message ID
+        if (messageId && addedMessageIds.has(messageId)) {
+            return; // Message already added, skip
+        }
+        
+        // If messageId is provided, mark it as added
+        if (messageId) {
+            addedMessageIds.add(messageId);
+        }
+        
         removeTypingIndicator(); // Remove any existing typing indicators
         const wrapper = document.createElement('div');
         wrapper.className = 'msg ' + (sender === 'staff' ? 'staff' : (sender === 'user' ? 'user' : 'bot'));
+        
+        // Add data attribute to track message ID
+        if (messageId) {
+            wrapper.setAttribute('data-message-id', messageId);
+        }
 
         if (sender === 'bot') {
             wrapper.innerHTML = `<div class="bubble">${text}</div>`;
@@ -719,7 +741,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
 
             if (data.messages && data.messages.length > 0) {
-                data.messages.forEach(msg => { addMessage(msg.sender_role, msg.message, msg.sender_name, msg.created_at); lastMessageId = msg.id; });
+                data.messages.forEach(msg => {
+                    addMessage(msg.sender_role, msg.message, msg.sender_name, msg.created_at, msg.id);
+                    // Update lastMessageId to the highest ID to prevent fetching old messages
+                    if (msg.id > lastMessageId) {
+                        lastMessageId = msg.id;
+                    }
+                });
             }
             if (data.status) {
                 // Handle typing indicator
