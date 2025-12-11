@@ -616,8 +616,128 @@ require_once './admin_sidebar.php';
 
 .modal-body {
     padding: 20px;
-    max-height: 400px;
+    max-height: 70vh;
     overflow-y: auto;
+}
+
+/* Log Details Styles */
+.log-details {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.detail-section {
+    background: var(--bg-color);
+    padding: 20px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+}
+
+.detail-section h4 {
+    margin: 0 0 15px 0;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.detail-section h4 i {
+    color: var(--primary-color);
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.detail-item.full-width {
+    grid-column: 1 / -1;
+}
+
+.detail-label {
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.detail-value {
+    color: var(--text-primary);
+    font-size: 1rem;
+    word-break: break-word;
+}
+
+.detail-value code {
+    background: rgba(59, 130, 246, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: var(--primary-color);
+    font-family: 'Courier New', monospace;
+}
+
+.metadata-section {
+    margin-top: 10px;
+}
+
+.metadata-section h4 {
+    margin: 0 0 15px 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.metadata-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.metadata-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 10px;
+    background: rgba(59, 130, 246, 0.05);
+    border-radius: 6px;
+    border-left: 3px solid var(--primary-color);
+}
+
+.metadata-key {
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.metadata-value {
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    word-break: break-word;
+}
+
+/* Responsive adjustments for modal */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95%;
+        margin: 10% auto;
+    }
+
+    .detail-grid,
+    .metadata-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .btn-sm {
@@ -689,17 +809,159 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function showLogDetails(logId) {
-    // In a real implementation, you would fetch the log details via AJAX
-    // For now, we'll show a placeholder
     const modal = document.getElementById('logDetailsModal');
     const content = document.getElementById('logDetailsContent');
 
-    content.innerHTML = `
-        <p><strong>Loading log details...</strong></p>
-        <p>This feature would show complete log information including metadata, user agent, and session details.</p>
-    `;
+    // Reset modal title
+    const modalTitle = document.querySelector('#logDetailsModal .modal-header h3');
+    if (modalTitle) {
+        modalTitle.textContent = 'Audit Log Details';
+    }
 
+    // Show loading state
+    content.innerHTML = `
+        <div style="text-align: center; padding: 40px;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary-color); margin-bottom: 15px;"></i>
+            <p><strong>Loading log details...</strong></p>
+        </div>
+    `;
     modal.style.display = 'block';
+
+    // Fetch log details via AJAX
+    fetch(`get_log_details.php?id=${logId}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to fetch log details');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Update modal title with log ID
+            const modalTitle = document.querySelector('#logDetailsModal .modal-header h3');
+            if (modalTitle) {
+                modalTitle.textContent = `Audit Log Details #${data.id}`;
+            }
+
+            // Format the date
+            const date = new Date(data.created_at);
+            const formattedDate = date.toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                timeZoneName: 'short'
+            });
+
+            // Parse user agent for better display
+            const userAgent = data.user_agent !== 'N/A' ? data.user_agent : 'Not available';
+            
+            // Format metadata
+            let metadataHtml = '';
+            if (data.metadata && Object.keys(data.metadata).length > 0) {
+                metadataHtml = '<div class="metadata-section"><h4><i class="fas fa-info-circle"></i> Additional Information</h4><div class="metadata-grid">';
+                for (const [key, value] of Object.entries(data.metadata)) {
+                    const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    metadataHtml += `
+                        <div class="metadata-item">
+                            <span class="metadata-key">${formattedKey}:</span>
+                            <span class="metadata-value">${typeof value === 'object' ? JSON.stringify(value, null, 2) : value}</span>
+                        </div>
+                    `;
+                }
+                metadataHtml += '</div></div>';
+            }
+
+            // Build the HTML content
+            content.innerHTML = `
+                <div class="log-details">
+                    <div class="detail-section">
+                        <h4><i class="fas fa-user"></i> User Information</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">Name:</span>
+                                <span class="detail-value">${data.user.name || 'System'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Email:</span>
+                                <span class="detail-value">${data.user.email || 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">User ID:</span>
+                                <span class="detail-value">${data.user.id || 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Role:</span>
+                                <span class="detail-value"><span class="role-badge role-${data.user.role.toLowerCase()}">${data.user.role.charAt(0).toUpperCase() + data.user.role.slice(1)}</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <h4><i class="fas fa-tasks"></i> Action Details</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">Action:</span>
+                                <span class="detail-value"><span class="action-badge action-${data.action.toLowerCase().replace(/[_\s]/g, '-')}">${data.action.replace(/_/g, ' ')}</span></span>
+                            </div>
+                            <div class="detail-item full-width">
+                                <span class="detail-label">Description:</span>
+                                <span class="detail-value">${data.description || 'N/A'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <h4><i class="fas fa-clock"></i> Timestamp</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item full-width">
+                                <span class="detail-label">Date & Time:</span>
+                                <span class="detail-value">${formattedDate}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <h4><i class="fas fa-network-wired"></i> Network Information</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">IP Address:</span>
+                                <span class="detail-value"><code>${data.ip_address}</code></span>
+                            </div>
+                            <div class="detail-item full-width">
+                                <span class="detail-label">User Agent:</span>
+                                <span class="detail-value"><code style="word-break: break-all; font-size: 0.85rem;">${userAgent}</code></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Session ID:</span>
+                                <span class="detail-value"><code style="font-size: 0.85rem;">${data.session_id}</code></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${metadataHtml}
+                </div>
+            `;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            // Reset modal title
+            const modalTitle = document.querySelector('#logDetailsModal .modal-header h3');
+            if (modalTitle) {
+                modalTitle.textContent = 'Audit Log Details';
+            }
+            content.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--error);">
+                    <i class="fas fa-exclamation-circle" style="font-size: 2rem; margin-bottom: 15px;"></i>
+                    <p><strong>Error loading log details</strong></p>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">${error.message}</p>
+                    <button onclick="this.closest('.modal').style.display='none'" class="btn btn-primary" style="margin-top: 20px;">
+                        <i class="fas fa-times"></i> Close
+                    </button>
+                </div>
+            `;
+        });
 }
 
 function exportLogs() {
