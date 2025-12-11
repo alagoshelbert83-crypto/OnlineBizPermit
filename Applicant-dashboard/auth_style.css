@@ -261,14 +261,26 @@ body {
 }
 
 .btn-primary {
-  background: var(--primary);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   color: var(--white);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(74, 105, 189, 0.3);
 }
 
 .btn-primary:hover {
-  background: var(--primary-dark);
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
   transform: translateY(-2px);
-  box-shadow: var(--shadow);
+  box-shadow: 0 6px 20px rgba(74, 105, 189, 0.4);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.9;
 }
 
 .auth-footer {

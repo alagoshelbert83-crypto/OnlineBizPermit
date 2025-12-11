@@ -186,18 +186,68 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     /* The main submit button */
     button[type="submit"] {
       padding: 12px;
-      background-color: var(--primary-color);
+      background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover-color) 100%);
       border: none;
       color: var(--form-bg);
       border-radius: var(--border-radius-md);
       font-weight: 600;
       font-size: 16px;
       cursor: pointer;
-      transition: background-color 0.2s ease;
+      transition: all 0.3s ease;
       width: 100%;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
     button[type="submit"]:hover {
-      background-color: var(--primary-hover-color);
+      background: linear-gradient(135deg, var(--primary-hover-color) 0%, var(--primary-color) 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(13, 110, 253, 0.4);
+    }
+    button[type="submit"]:active {
+      transform: translateY(0);
+    }
+    button[type="submit"]:disabled {
+      cursor: not-allowed;
+      opacity: 0.9;
+    }
+    #staffLoginIcon {
+      transition: transform 0.3s ease;
+    }
+    #staffLoginBtn:disabled #staffLoginIcon {
+      transform: scale(0);
+    }
+    #staffLoginSpinner {
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    #staffLoginBtn:disabled #staffLoginSpinner {
+      display: flex;
+    }
+    #staffLoginBtn:disabled #staffLoginBtnText {
+      opacity: 0;
+    }
+    .login-progress {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.3), rgba(255,255,255,0.8), rgba(255,255,255,0.3));
+      width: 0%;
+      animation: progressAnimation 2s ease-in-out infinite;
+    }
+    @keyframes progressAnimation {
+      0% { width: 0%; left: 0%; }
+      50% { width: 70%; left: 15%; }
+      100% { width: 0%; left: 100%; }
+    }
+    #staffLoginBtn:disabled .login-progress {
+      display: block;
     }
 
     /* --- Utility & Feedback --- */
@@ -302,19 +352,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
           </div>
         </div>
         <button type="submit" id="staffLoginBtn">
-            <span id="staffLoginBtnText">Log In</span>
-            <span id="staffLoginSpinner" style="display:none; margin-left:8px;">
-                <svg width="18" height="18" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" stroke="#fff">
-                    <g fill="none" fill-rule="evenodd">
-                        <g transform="translate(1 1)" stroke-width="2">
-                            <circle stroke-opacity=".5" cx="22" cy="22" r="6"></circle>
-                            <path d="M28 22c0-3.314-2.686-6-6-6">
-                                <animateTransform attributeName="transform" type="rotate" from="0 22 22" to="360 22 22" dur="0.9s" repeatCount="indefinite" />
-                            </path>
-                        </g>
-                    </g>
+            <span id="staffLoginBtnText">
+                <i class="fas fa-sign-in-alt" id="staffLoginIcon"></i>
+                <span id="staffLoginText">Log In</span>
+            </span>
+            <span id="staffLoginSpinner" style="display:none;">
+                <svg width="20" height="20" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="25" cy="25" r="20" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="4"/>
+                    <circle cx="25" cy="25" r="20" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-dasharray="31.416" stroke-dashoffset="31.416">
+                        <animate attributeName="stroke-dasharray" dur="2s" values="0 31.416;15.708 15.708;0 31.416;0 31.416" repeatCount="indefinite"/>
+                        <animate attributeName="stroke-dashoffset" dur="2s" values="0;-15.708;-31.416;-31.416" repeatCount="indefinite"/>
+                    </circle>
                 </svg>
             </span>
+            <div id="staffLoginProgress" class="login-progress" style="display:none;"></div>
         </button>
       </form>
       <div class="links-container">
@@ -366,15 +417,31 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       const form = document.querySelector('form[method="POST"]');
       const btn = document.getElementById('staffLoginBtn');
       const spinner = document.getElementById('staffLoginSpinner');
-      const btnText = document.getElementById('staffLoginBtnText');
-      if (form && btn && spinner && btnText) {
-        form.addEventListener('submit', function(){
+      const btnText = document.getElementById('staffLoginText');
+      const progress = document.getElementById('staffLoginProgress');
+      
+      if (form && btn) {
+        form.addEventListener('submit', function(e){
           btn.disabled = true;
-          btnText.textContent = 'Signing in...';
-          spinner.style.display = 'inline-block';
+          if (btnText) btnText.textContent = 'Signing in...';
+          if (spinner) spinner.style.display = 'flex';
+          if (progress) progress.style.display = 'block';
+          
+          // Add pulsing effect
+          btn.style.animation = 'pulse 2s ease-in-out infinite';
         });
       }
     })();
+    
+    // Add pulse animation
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes pulse {
+        0%, 100% { box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3); }
+        50% { box-shadow: 0 4px 25px rgba(13, 110, 253, 0.6); }
+      }
+    `;
+    document.head.appendChild(style);
   </script>
 </body>
 </html>
