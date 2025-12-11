@@ -179,15 +179,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <i class="fas fa-envelope"></i>
                         Email Address
                     </label>
-                    <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        value="<?= htmlspecialchars($email ?? '') ?>"
-                        required
-                        autocomplete="email"
-                        placeholder="Enter your email address"
-                    >
+                    <div class="password-input">
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            value="<?= htmlspecialchars($email ?? '') ?>"
+                            required
+                            autocomplete="email"
+                            placeholder="Enter your email address"
+                        >
+                    </div>
                 </div>
 
                 <div class="form-group">
