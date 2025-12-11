@@ -15,9 +15,13 @@ if (empty($file)) {
     die('File parameter is required');
 }
 
+// Store original request for logging
+$original_request = $file;
+
 // Remove any path prefixes that might be in the database (e.g., "uploads/", "/uploads/")
-$file = str_replace(['uploads/', '/uploads/', '\\uploads\\'], '', $file);
-$file = basename($file); // Remove any directory traversal attempts
+$file = str_replace(['uploads/', '/uploads/', '\\uploads\\', 'uploads\\'], '', $file);
+$file = basename($file); // Remove any directory traversal attempts - get just the filename
+
 $upload_dir = __DIR__ . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
 $file_path = $upload_dir . $file;
 
@@ -26,11 +30,25 @@ if (!is_dir($upload_dir)) {
     http_response_code(500);
     header('Content-Type: text/plain');
     error_log("Uploads directory does not exist: " . $upload_dir);
-    die('Server configuration error');
+    die('Server configuration error: Uploads directory not found');
 }
 
 // Check if file exists
 if (!file_exists($file_path)) {
+    // Log detailed information for debugging
+    error_log("File not found details:");
+    error_log("  Original request: " . $original_request);
+    error_log("  Processed filename: " . $file);
+    error_log("  Expected path: " . $file_path);
+    error_log("  Upload dir exists: " . (is_dir($upload_dir) ? 'Yes' : 'No'));
+    error_log("  Upload dir path: " . $upload_dir);
+    
+    // Try to list files in uploads directory for debugging (first 10 files)
+    if (is_dir($upload_dir)) {
+        $files_in_dir = array_slice(scandir($upload_dir), 0, 12);
+        error_log("  Files in uploads directory: " . implode(', ', $files_in_dir));
+    }
+    
     http_response_code(404);
     header('Content-Type: text/html; charset=utf-8');
     ?>
@@ -39,12 +57,12 @@ if (!file_exists($file_path)) {
     <head><title>File Not Found</title></head>
     <body>
         <h1>File Not Found</h1>
-        <p>The requested file could not be found.</p>
-        <p><small>Requested: <?= htmlspecialchars($file) ?></small></p>
+        <p>The requested file could not be found on the server.</p>
+        <p><small>Requested file: <?= htmlspecialchars($file) ?></small></p>
+        <p><small>If this file was recently uploaded, it may not have been saved properly. Please contact support.</small></p>
     </body>
     </html>
     <?php
-    error_log("File not found: " . $file_path . " (requested file: " . ($_GET['file'] ?? '') . ")");
     exit;
 }
 
