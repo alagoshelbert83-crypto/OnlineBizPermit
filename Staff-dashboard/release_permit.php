@@ -42,19 +42,34 @@ try {
     }
 
     // 2. Update the application status to 'complete' and mark as released
+    // First, try with all columns (permit_released_at, updated_at)
     try {
         $update_stmt = $conn->prepare(
             "UPDATE applications SET status = 'complete', permit_released_at = NOW(), updated_at = NOW() WHERE id = :id"
         );
         $update_stmt->execute([':id' => $application_id]);
     } catch (PDOException $e) {
+        // If the update failed (e.g., columns don't exist), rollback and retry with minimal update
         error_log("Failed to set permit_released_at/updated_at (columns may be missing): " . $e->getMessage());
+        
+        // CRITICAL: Rollback the transaction before trying fallback
+        // PostgreSQL requires rollback after an error in a transaction
+        if ($conn->inTransaction()) {
+            $conn->rollBack();
+            // Start a new transaction for the fallback
+            $conn->beginTransaction();
+        }
+        
         // Fallback: at minimum mark the status as complete
         try {
             $fallback_stmt = $conn->prepare("UPDATE applications SET status = 'complete' WHERE id = :id");
             $fallback_stmt->execute([':id' => $application_id]);
         } catch (PDOException $e2) {
-            throw $e2; // Let outer catch handle rollback and messaging
+            // Rollback again if fallback also fails
+            if ($conn->inTransaction()) {
+                $conn->rollBack();
+            }
+            throw new Exception("Failed to update application status: " . $e2->getMessage());
         }
     }
 

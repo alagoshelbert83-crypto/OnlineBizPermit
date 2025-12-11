@@ -81,14 +81,14 @@ if (isset($conn) && isset($_SESSION['user_id'])) {
   <div class="sidebar-bottom">
     <div class="user-profile-section">
       <div class="user-avatar">
-        <?php if ($current_user_picture): ?>
-          <img src="../uploads/<?= htmlspecialchars($current_user_picture) ?>" alt="<?= htmlspecialchars($current_user_name) ?>">
+        <?php if (!empty($current_user_picture)): ?>
+          <img src="../uploads/<?= htmlspecialchars($current_user_picture) ?>" alt="<?= htmlspecialchars($current_user_name ?? 'Applicant') ?>">
         <?php else: ?>
-          <span><?= strtoupper(substr($current_user_name, 0, 1)) ?></span>
+          <span><?= strtoupper(substr($current_user_name ?? 'A', 0, 1)) ?></span>
         <?php endif; ?>
       </div>
       <div class="user-info">
-        <span class="user-name"><?= htmlspecialchars($current_user_name) ?></span>
+        <span class="user-name"><?= htmlspecialchars($current_user_name ?? 'Applicant') ?></span>
         <span class="user-role">Applicant</span>
       </div>
     </div>
