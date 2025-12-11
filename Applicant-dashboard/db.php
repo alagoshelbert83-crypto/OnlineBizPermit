@@ -11,7 +11,16 @@ if (getenv('SKIP_DB_CONNECT') === '1') {
 }
 
 // --- Database Configuration for Neon ---
-$postgresUrl = getenv('DATABASE_POSTGRES_URL') ?: getenv('DATABASE_URL') ?: getenv('POSTGRES_URL');
+// IMPORTANT: For transactions, use DIRECT connection (not pooled)
+// Neon provides DATABASE_URL (pooled) and DATABASE_DIRECT_URL (direct)
+// Use direct URL for transactions to avoid connection pooling issues
+
+// Try direct connection first (recommended for transactions)
+$postgresUrl = getenv('DATABASE_DIRECT_URL') 
+    ?: getenv('POSTGRES_DIRECT_URL') 
+    ?: getenv('DATABASE_POSTGRES_URL') 
+    ?: getenv('DATABASE_URL') 
+    ?: getenv('POSTGRES_URL');
 
 $queryParams = null;
 
@@ -29,6 +38,13 @@ if ($postgresUrl) {
     // For SSL connections (Neon requires SSL)
     if (isset($parsedUrl['query'])) {
         parse_str($parsedUrl['query'], $queryParams);
+    }
+    
+    // Log connection type for debugging
+    if (strpos($host, 'pooler') !== false || strpos($postgresUrl, '-pooler') !== false) {
+        error_log('WARNING: Using POOLED connection (' . $host . '). For transactions, set DATABASE_DIRECT_URL environment variable.');
+    } else {
+        error_log('INFO: Using DIRECT connection (' . $host . ') - good for transactions.');
     }
 } else {
     // Fallback to individual environment variables
@@ -66,6 +82,25 @@ try {
         } catch (PDOException $e) {
             // If rollback fails, the connection is in a bad state - log but don't die
             error_log('WARNING: Could not rollback existing transaction: ' . $e->getMessage());
+            // Try to reset the connection state by executing a simple query
+            try {
+                $conn->query('SELECT 1');
+                error_log('Connection state reset successful');
+            } catch (PDOException $reset_e) {
+                error_log('Failed to reset connection state: ' . $reset_e->getMessage());
+                // If we can't reset, create a new connection
+                try {
+                    $conn = new PDO($dsn, $user, $pass, [
+                        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                        PDO::ATTR_TIMEOUT => 10,
+                        PDO::ATTR_PERSISTENT => false
+                    ]);
+                    error_log('Created new connection after failed rollback');
+                } catch (PDOException $new_conn_e) {
+                    error_log('Failed to create new connection: ' . $new_conn_e->getMessage());
+                }
+            }
         }
     }
     

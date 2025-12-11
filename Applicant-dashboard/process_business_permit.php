@@ -223,10 +223,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     throw new Exception('Invalid user ID. Please log in again.');
                 }
 
-                // Insert into applications table
+                // Insert into applications table using RETURNING clause for PostgreSQL
+                // This is more reliable than lastInsertId() especially with connection pooling
                 $stmt = $conn->prepare(
                     "INSERT INTO applications (user_id, business_name, business_address, type_of_business, status, form_details, submitted_at)
-                     VALUES (?, ?, ?, ?, 'pending', ?, NOW())"
+                     VALUES (?, ?, ?, ?, 'pending', ?, NOW())
+                     RETURNING id"
                 );
 
                 if (!$stmt) {
@@ -264,10 +266,35 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     throw new PDOException($errorMsg, (int)($errorInfo[0] ?? 0));
                 }
 
-                error_log('Application INSERT successful');
+                // Get the ID from RETURNING clause (more reliable than lastInsertId)
+                $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                if (!$result || !isset($result['id'])) {
+                    // Fallback to lastInsertId if RETURNING didn't work
+                    error_log('RETURNING clause did not return ID, trying lastInsertId()');
+                    try {
+                        $app_id = (int)$conn->lastInsertId('applications_id_seq');
+                        if (!$app_id || $app_id === 0) {
+                            $app_id = (int)$conn->lastInsertId();
+                        }
+                        if (!$app_id || $app_id === 0) {
+                            // Last resort: query the database directly
+                            $id_stmt = $conn->query("SELECT lastval()");
+                            $id_result = $id_stmt->fetchColumn();
+                            $app_id = (int)$id_result;
+                        }
+                    } catch (PDOException $id_e) {
+                        error_log('Error getting last insert ID: ' . $id_e->getMessage());
+                        throw new Exception('Failed to retrieve application ID. Please contact support.');
+                    }
+                } else {
+                    $app_id = (int)$result['id'];
+                }
 
-                // Get last insert id (PDO returns string)
-                $app_id = (int)$conn->lastInsertId();
+                if (!$app_id || $app_id === 0) {
+                    throw new Exception('Failed to retrieve application ID. The application may not have been saved correctly.');
+                }
+
+                error_log('Application INSERT successful, ID: ' . $app_id);
 
                 // Handle File Uploads
                 $allowed_types = ['application/pdf', 'image/jpeg', 'image/png'];
