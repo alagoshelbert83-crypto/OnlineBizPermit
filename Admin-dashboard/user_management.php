@@ -180,9 +180,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_user'])) {
             $message = '<div class="message error">An account with this email already exists.</div>';
         } else {
             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-            $insertStmt = $conn->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)");
-            $message = $insertStmt->execute([$name, $email, $hashedPassword, $role]) ? '<div class="message success">User added successfully.</div>' : '<div class="message error">Failed to add user.</div>';
+            // Staff and Admin should be auto-approved (is_approved = 1)
+            // Regular users (applicants) need approval (is_approved = 0)
+            $is_approved = in_array($role, ['staff', 'admin']) ? 1 : 0;
+            $insertStmt = $conn->prepare("INSERT INTO users (name, email, password, role, is_approved) VALUES (?, ?, ?, ?, ?)");
+            $message = $insertStmt->execute([$name, $email, $hashedPassword, $role, $is_approved]) ? '<div class="message success">User added successfully.' . ($is_approved ? ' Staff/Admin users are automatically approved.' : ' Applicant user is pending approval.') . '</div>' : '<div class="message error">Failed to add user.</div>';
         }
+    }
+}
+
+// --- Handle Approve User (for staff/admin) ---
+if (isset($_GET['action']) && $_GET['action'] === 'approve' && isset($_GET['id'])) {
+    $userId = (int)$_GET['id'];
+    try {
+        // Verify the user exists and is staff or admin
+        $verify_stmt = $conn->prepare("SELECT id, name, email, role FROM users WHERE id = ? AND role IN ('staff', 'admin')");
+        $verify_stmt->execute([$userId]);
+        $userDetails = $verify_stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$userDetails) {
+            $message = '<div class="message error">User not found or is not a staff/admin user.</div>';
+        } else {
+            // Update to approved
+            $update_stmt = $conn->prepare("UPDATE users SET is_approved = 1 WHERE id = ?");
+            $update_stmt->execute([$userId]);
+            
+            $message = '<div class="message success">' . ucfirst($userDetails['role']) . ' user has been approved successfully.</div>';
+        }
+    } catch (PDOException $e) {
+        error_log("User approval error: " . $e->getMessage());
+        $message = '<div class="message error">Failed to approve user: ' . htmlspecialchars($e->getMessage()) . '</div>';
     }
 }
 
@@ -422,6 +449,13 @@ require_once __DIR__ . '/admin_sidebar.php';
                                     <button class="btn btn-sm btn-outline btn-manual-link" data-userid="<?= $user['id'] ?>" data-username="<?= htmlspecialchars($user['name']) ?>">
                                         <i class="fas fa-link"></i> Link App
                                     </button>
+                                    <?php endif; ?>
+                                    <?php if ($is_approved != 1 && in_array($user['role'], ['staff', 'admin'])): ?>
+                                    <a href="user_management.php?action=approve&id=<?= $user['id'] ?>" 
+                                       class="btn btn-sm btn-primary"
+                                       onclick="return confirm('Approve this <?= $user['role'] ?> user?')">
+                                        <i class="fas fa-check"></i> Approve
+                                    </a>
                                     <?php endif; ?>
                                     <a href="user_management.php?action=delete&id=<?= $user['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this user?');"><i class="fas fa-trash-alt"></i> Delete</a>
                                 <?php endif; ?>

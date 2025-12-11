@@ -25,7 +25,7 @@ if ($user_id <= 0) {
 }
 
 // Fetch user details
-$stmt = $conn->prepare("SELECT id, name, email, role, created_at FROM users WHERE id = ?");
+$stmt = $conn->prepare("SELECT id, name, email, role, is_approved, created_at FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -51,23 +51,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
         if ($stmt->fetch()) {
             $message = '<div class="message error">An account with this email already exists.</div>';
         } else {
+            // Auto-approve staff and admin roles, keep current approval status for regular users unless changing to staff/admin
+            $current_role = $user['role'];
+            $new_is_approved = $user['is_approved'];
+            
+            // If changing to staff or admin, auto-approve
+            if (in_array($role, ['staff', 'admin'])) {
+                $new_is_approved = 1;
+            } elseif ($role === 'user' && in_array($current_role, ['staff', 'admin'])) {
+                // If changing from staff/admin to user, keep approval status (or set to pending if not approved)
+                // This allows flexibility - admin can decide later
+            }
+            
             // Update user with or without password
             if (!empty($password)) {
                 if (strlen($password) < 8) {
                     $message = '<div class="message error">Password must be at least 8 characters long.</div>';
                 } else {
                     $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-                    $updateStmt = $conn->prepare("UPDATE users SET name = ?, email = ?, role = ?, password = ? WHERE id = ?");
-                    $message = $updateStmt->execute([$name, $email, $role, $hashedPassword, $user_id]) ? '<div class="message success">User updated successfully.</div>' : '<div class="message error">Failed to update user.</div>';
+                    $updateStmt = $conn->prepare("UPDATE users SET name = ?, email = ?, role = ?, password = ?, is_approved = ? WHERE id = ?");
+                    $message = $updateStmt->execute([$name, $email, $role, $hashedPassword, $new_is_approved, $user_id]) ? '<div class="message success">User updated successfully.' . (in_array($role, ['staff', 'admin']) && $new_is_approved == 1 ? ' Staff/Admin users are automatically approved.' : '') . '</div>' : '<div class="message error">Failed to update user.</div>';
                 }
             } else {
-                $updateStmt = $conn->prepare("UPDATE users SET name = ?, email = ?, role = ? WHERE id = ?");
-                $message = $updateStmt->execute([$name, $email, $role, $user_id]) ? '<div class="message success">User updated successfully.</div>' : '<div class="message error">Failed to update user.</div>';
+                $updateStmt = $conn->prepare("UPDATE users SET name = ?, email = ?, role = ?, is_approved = ? WHERE id = ?");
+                $message = $updateStmt->execute([$name, $email, $role, $new_is_approved, $user_id]) ? '<div class="message success">User updated successfully.' . (in_array($role, ['staff', 'admin']) && $new_is_approved == 1 ? ' Staff/Admin users are automatically approved.' : '') . '</div>' : '<div class="message error">Failed to update user.</div>';
             }
             
             // Refresh user data after update
             if (strpos($message, 'success') !== false) {
-                $stmt = $conn->prepare("SELECT id, name, email, role, created_at FROM users WHERE id = ?");
+                $stmt = $conn->prepare("SELECT id, name, email, role, is_approved, created_at FROM users WHERE id = ?");
                 $stmt->execute([$user_id]);
                 $user = $stmt->fetch(PDO::FETCH_ASSOC);
             }
@@ -118,6 +130,30 @@ require_once __DIR__ . '/admin_sidebar.php';
                 <label for="password">New Password (leave blank to keep current password)</label>
                 <input type="password" id="password" name="password" placeholder="Enter new password">
                 <small>Password must be at least 8 characters long. Leave blank to keep current password.</small>
+            </div>
+            
+            <div class="form-group">
+                <label>Account Status</label>
+                <?php 
+                $is_approved = (int)$user['is_approved'];
+                $statusText = $is_approved == 1 ? 'Approved' : ($is_approved == 2 ? 'Rejected' : 'Pending');
+                $statusClass = $is_approved == 1 ? 'status-active' : ($is_approved == 2 ? 'status-rejected' : 'status-pending');
+                ?>
+                <div style="padding: 8px 12px; border: 2px solid #e1e5e9; border-radius: 6px; background: #f8f9fa;">
+                    <span class="status-badge <?= $statusClass ?>" style="padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">
+                        <?= $statusText ?>
+                    </span>
+                    <?php if (in_array($user['role'], ['staff', 'admin']) && $is_approved != 1): ?>
+                        <small style="display: block; margin-top: 8px; color: #f59e0b;">
+                            <i class="fas fa-exclamation-triangle"></i> This <?= $user['role'] ?> user is pending approval. 
+                            <a href="user_management.php?action=approve&id=<?= $user_id ?>">Approve now</a>
+                        </small>
+                    <?php elseif (in_array($user['role'], ['staff', 'admin'])): ?>
+                        <small style="display: block; margin-top: 8px; color: #10b981;">
+                            <i class="fas fa-check-circle"></i> Staff/Admin users are automatically approved.
+                        </small>
+                    <?php endif; ?>
+                </div>
             </div>
             
           <div class="form-group">
