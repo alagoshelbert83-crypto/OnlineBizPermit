@@ -1,12 +1,18 @@
 <?php
 require './db.php';
 
+// CRITICAL: Start session AFTER db.php is loaded (which sets up the session handler)
+// This must happen before any $_SESSION variable access
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Security check: allow logged-in applicants or guests who started a chat (guest_chat_id in session)
 $chat_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $chat_session = null;
 $error_message = '';
-$is_authenticated = isset($_SESSION['user_id']);
+// Check authentication - user must have user_id, and role should be 'user' (but don't fail if role isn't set yet)
+$is_authenticated = isset($_SESSION['user_id']) && (!isset($_SESSION['role']) || $_SESSION['role'] === 'user');
 $current_user_id = $_SESSION['user_id'] ?? null;
 
 // If authenticated user doesn't have chat_id in URL, try to find their active chat
@@ -20,6 +26,25 @@ if ($is_authenticated && $chat_id === 0) {
             // Redirect to the chat with proper ID
             header("Location: applicant_conversation.php?id=" . $chat_id);
             exit;
+        } else {
+            // No active chat found - create a new one automatically for authenticated users
+            try {
+                $conn->beginTransaction();
+                $stmt = $conn->prepare("INSERT INTO live_chats (user_id, status, created_at) VALUES (?, 'Pending', NOW()) RETURNING id");
+                $stmt->execute([$current_user_id]);
+                $new_chat_id = $stmt->fetchColumn();
+                $conn->commit();
+                
+                // Redirect to the new chat
+                header("Location: applicant_conversation.php?id=" . $new_chat_id);
+                exit;
+            } catch (PDOException $e) {
+                if ($conn->inTransaction()) {
+                    $conn->rollBack();
+                }
+                error_log("Error creating new chat: " . $e->getMessage());
+                $error_message = 'Failed to create chat session. Please try again.';
+            }
         }
     } catch (PDOException $e) {
         error_log("Error finding active chat: " . $e->getMessage());
@@ -28,7 +53,13 @@ if ($is_authenticated && $chat_id === 0) {
 
 // If not authenticated and no guest session, redirect to login
 if (!$is_authenticated && (!isset($_SESSION['guest_chat_id']) || (int)$_SESSION['guest_chat_id'] !== $chat_id)) {
-    header("Location: ../login.php");
+    // Check if user has a session but wrong role
+    if (isset($_SESSION['user_id']) && isset($_SESSION['role']) && $_SESSION['role'] !== 'user') {
+        error_log("User attempted to access applicant chat with role: " . $_SESSION['role']);
+        header("Location: login.php");
+        exit;
+    }
+    header("Location: login.php");
     exit;
 }
 

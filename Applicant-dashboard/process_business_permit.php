@@ -30,7 +30,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // CRITICAL: Close session BEFORE any database operations
     // This prevents session handler from interfering with transactions
-    session_write_close();
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
 
     // Initialize response variables
     $response = [
@@ -92,20 +94,49 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         while (!$connection_ready && $retry_count < $max_retries) {
             try {
                 // Check if connection exists
-                if (!$conn) {
-                    throw new Exception("Database connection is null");
+                if (!$conn || !($conn instanceof PDO)) {
+                    throw new Exception("Database connection is null or invalid");
                 }
 
                 // If we're in a transaction, roll it back (shouldn't happen if db.php worked correctly)
                 if ($conn->inTransaction()) {
-                    $conn->rollBack();
-                    error_log("WARNING: Rolled back unexpected transaction before application submission (attempt " . ($retry_count + 1) . ")");
+                    try {
+                        $conn->rollBack();
+                        error_log("WARNING: Rolled back unexpected transaction before application submission (attempt " . ($retry_count + 1) . ")");
+                    } catch (PDOException $rollback_e) {
+                        // If rollback fails, connection is in bad state - we need a new connection
+                        error_log("WARNING: Failed to rollback existing transaction: " . $rollback_e->getMessage());
+                        $conn = null;
+                        // Reconnect
+                        $old_skip = getenv('SKIP_DB_CONNECT');
+                        putenv('SKIP_DB_CONNECT=0');
+                        require_once __DIR__ . '/db.php';
+                        if ($old_skip !== false) {
+                            putenv('SKIP_DB_CONNECT=' . $old_skip);
+                        } else {
+                            putenv('SKIP_DB_CONNECT');
+                        }
+                        // Continue to test the new connection
+                    }
                 }
 
                 // Test the connection with a simple query
-                $test_stmt = $conn->query("SELECT 1");
+                // Use a prepared statement to avoid any potential issues
+                $test_stmt = $conn->prepare("SELECT 1");
                 if (!$test_stmt) {
-                    throw new Exception("Connection test query failed");
+                    throw new Exception("Failed to prepare connection test query");
+                }
+                
+                $test_result = $test_stmt->execute();
+                if (!$test_result) {
+                    $errorInfo = $test_stmt->errorInfo();
+                    throw new Exception("Connection test query failed: " . ($errorInfo[2] ?? 'Unknown error'));
+                }
+                
+                // Fetch the result to ensure the query actually worked
+                $test_row = $test_stmt->fetch(PDO::FETCH_ASSOC);
+                if (!$test_row) {
+                    throw new Exception("Connection test query returned no result");
                 }
 
                 // Connection is ready
@@ -121,8 +152,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     break;
                 }
 
-                // Small delay before retry (don't reconnect - db.php already did that)
+                // Small delay before retry
                 usleep(50000); // 50ms delay
+                
+                // Try to reconnect if connection is null
+                if (!$conn || !($conn instanceof PDO)) {
+                    try {
+                        $old_skip = getenv('SKIP_DB_CONNECT');
+                        putenv('SKIP_DB_CONNECT=0');
+                        require_once __DIR__ . '/db.php';
+                        if ($old_skip !== false) {
+                            putenv('SKIP_DB_CONNECT=' . $old_skip);
+                        } else {
+                            putenv('SKIP_DB_CONNECT');
+                        }
+                    } catch (Exception $reconnect_e) {
+                        error_log("Failed to reconnect during validation: " . $reconnect_e->getMessage());
+                    }
+                }
             }
         }
 
@@ -134,14 +181,47 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     session_write_close();
                 }
 
+                // Double-check connection is still valid before starting transaction
+                if (!$conn || !($conn instanceof PDO)) {
+                    throw new Exception("Database connection lost before transaction start");
+                }
+                
+                // Ensure we're not already in a transaction (safety check)
+                if ($conn->inTransaction()) {
+                    error_log("WARNING: Already in transaction before beginTransaction() call");
+                    try {
+                        $conn->rollBack();
+                    } catch (PDOException $e) {
+                        error_log("Failed to rollback existing transaction: " . $e->getMessage());
+                        throw new Exception("Connection is in an invalid transaction state");
+                    }
+                }
+
                 // Now we can safely begin the transaction
-                $conn->beginTransaction();
+                try {
+                    $conn->beginTransaction();
+                } catch (PDOException $begin_e) {
+                    error_log('Failed to begin transaction: ' . $begin_e->getMessage());
+                    error_log('SQL State: ' . $begin_e->getCode());
+                    throw new Exception('Failed to start database transaction. Please try again.');
+                }
+                
                 // Prepare the comprehensive application data as JSON
                 $form_details_json = json_encode($application_data);
+                if ($form_details_json === false) {
+                    $json_error = json_last_error_msg();
+                    error_log('JSON encoding failed: ' . $json_error);
+                    throw new Exception('Failed to encode application data. Please check your input.');
+                }
 
                 $business_name = $application_data['business_name'];
                 $business_address = $application_data['business_address'] ?? '';
                 $type_of_business = $application_data['type_of_business'] ?? '';
+
+                // Validate that user_id exists (foreign key constraint)
+                if (empty($current_user_id) || !is_numeric($current_user_id)) {
+                    throw new Exception('Invalid user ID. Please log in again.');
+                }
 
                 // Insert into applications table
                 $stmt = $conn->prepare(
@@ -156,8 +236,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                 // Log the data being inserted for debugging
                 error_log('Attempting to insert application: user_id=' . $current_user_id . ', business_name=' . $business_name);
+                error_log('Form details length: ' . strlen($form_details_json) . ' bytes');
 
-                $execute_result = $stmt->execute([$current_user_id, $business_name, $business_address, $type_of_business, $form_details_json]);
+                try {
+                    $execute_result = $stmt->execute([$current_user_id, $business_name, $business_address, $type_of_business, $form_details_json]);
+                } catch (PDOException $execute_e) {
+                    // Log the specific error immediately
+                    error_log('=== INSERT EXECUTE EXCEPTION ===');
+                    error_log('Error Message: ' . $execute_e->getMessage());
+                    error_log('SQL State: ' . $execute_e->getCode());
+                    error_log('Error Info: ' . print_r($stmt->errorInfo(), true));
+                    error_log('===========================');
+                    // Re-throw to be caught by outer catch block
+                    throw $execute_e;
+                }
 
                 if (!$execute_result) {
                     $errorInfo = $stmt->errorInfo();
@@ -296,61 +388,89 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 // Rollback transaction on database error - CRITICAL for PostgreSQL
                 // PostgreSQL requires explicit rollback after any error in a transaction
                 $rollback_success = false;
+                $connection_reset_needed = false;
+                
+                // Get error details before attempting rollback
+                $error_message = $e->getMessage();
+                $sql_state = $e->getCode();
+                
+                // Log the full error for debugging BEFORE rollback attempts
+                error_log('Application submission error: ' . $error_message);
+                error_log('SQL State: ' . $sql_state);
+                
+                // For 25P02 (transaction aborted) or other transaction errors, we MUST rollback
                 if ($conn && $conn->inTransaction()) {
                     try {
                         $conn->rollback();
                         $rollback_success = true;
+                        error_log('Transaction rollback successful');
                     } catch (PDOException $rollback_e) {
                         error_log('Rollback failed: ' . $rollback_e->getMessage());
-                        // If rollback fails, the connection is in a bad state
-                        // We need to reconnect for future requests
-                        try {
-                            $conn = null;
-                            require_once __DIR__ . '/db.php';
-                        } catch (Exception $reconnect_e) {
-                            error_log('Failed to reconnect after rollback failure: ' . $reconnect_e->getMessage());
+                        error_log('Rollback SQL State: ' . $rollback_e->getCode());
+                        // If rollback fails, the connection is in a bad state - mark for reset
+                        $connection_reset_needed = true;
+                    }
+                } elseif ($sql_state == '25P02') {
+                    // Even if not in a transaction according to inTransaction(), 
+                    // 25P02 means the connection is in an aborted state - we need to reset it
+                    error_log('25P02 error detected - connection reset needed');
+                    $connection_reset_needed = true;
+                }
+                
+                // If connection is in a bad state, try to create a new connection
+                if ($connection_reset_needed) {
+                    try {
+                        // Close the bad connection
+                        $conn = null;
+                        
+                        // Re-establish connection by re-including db.php
+                        // We need to temporarily bypass the SKIP_DB_CONNECT check
+                        $old_skip = getenv('SKIP_DB_CONNECT');
+                        putenv('SKIP_DB_CONNECT=0');
+                        
+                        // Reconnect
+                        require_once __DIR__ . '/db.php';
+                        
+                        // Restore SKIP_DB_CONNECT if it was set
+                        if ($old_skip !== false) {
+                            putenv('SKIP_DB_CONNECT=' . $old_skip);
+                        } else {
+                            putenv('SKIP_DB_CONNECT');
                         }
+                        
+                        error_log('Connection reset successful after transaction error');
+                    } catch (Exception $reconnect_e) {
+                        error_log('Failed to reset connection after transaction error: ' . $reconnect_e->getMessage());
                     }
                 }
 
-                // CRITICAL: Reopen session AFTER rollback
+                // CRITICAL: Reopen session AFTER rollback/reset
                 // This allows session data to be saved even after transaction failure
                 if (session_status() === PHP_SESSION_NONE) {
                     session_start();
                 }
 
-                // Log the full error for debugging
-                error_log('Application submission error: ' . $e->getMessage());
-                error_log('SQL State: ' . $e->getCode());
-
-                // PDOException doesn't have errorInfo() - get it from connection if available
+                // Try to get errorInfo from the exception itself
                 $errorInfo = [];
                 if ($e instanceof PDOException) {
-                    // Try to get errorInfo from the connection
-                    if (isset($conn) && $conn instanceof PDO) {
-                        $errorInfo = $conn->errorInfo() ?? [];
-                    }
                     // PDOException has a code property that contains SQLSTATE
-                    if (empty($errorInfo) && $e->getCode()) {
-                        $errorInfo = [$e->getCode(), null, $e->getMessage()];
-                    }
+                    $errorInfo = [$sql_state, null, $error_message];
                 }
                 error_log('Error Info: ' . print_r($errorInfo, true));
                 error_log('Rollback successful: ' . ($rollback_success ? 'Yes' : 'No'));
-
-                // Get user-friendly error message
-                $error_message = $e->getMessage();
-                $sql_state = $e->getCode();
+                error_log('Connection reset needed: ' . ($connection_reset_needed ? 'Yes' : 'No'));
 
                 // Provide more specific error messages for common issues
                 if (strpos($error_message, 'duplicate key') !== false || strpos($error_message, 'unique constraint') !== false) {
                     $user_message = "An application with similar details already exists. Please check your submissions.";
                 } elseif (strpos($error_message, 'foreign key') !== false) {
                     $user_message = "Invalid data reference. Please ensure all required information is correct.";
-                } elseif (strpos($error_message, 'not null') !== false) {
+                } elseif (strpos($error_message, 'not null') !== false || strpos($error_message, 'null value') !== false) {
                     $user_message = "Some required fields are missing. Please fill in all required information.";
-                } elseif ($sql_state == '25P02') {
+                } elseif ($sql_state == '25P02' || strpos($error_message, 'current transaction is aborted') !== false) {
                     $user_message = "A database transaction error occurred. Please try again.";
+                } elseif (strpos($error_message, 'connection') !== false || strpos($error_message, 'timeout') !== false) {
+                    $user_message = "Database connection issue. Please wait a moment and try again.";
                 } else {
                     $user_message = "Database Error: " . htmlspecialchars($error_message);
                 }
