@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS applications (
     business_name VARCHAR(255) NOT NULL,
     business_address TEXT,
     type_of_business VARCHAR(255),
-    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'processing')),
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'processing', 'complete')),
     form_details TEXT,
     submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     application_type VARCHAR(20) DEFAULT 'New' CHECK (application_type IN ('New', 'Renewal')),

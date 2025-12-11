@@ -155,19 +155,35 @@ if ($is_live_chat_action) {
         $chat_id = (int)$_POST['chat_id'];
         // Sanitize user-provided text message first to prevent XSS
         $message = htmlspecialchars(trim($_POST['message']), ENT_QUOTES, 'UTF-8');
-        $sender_role = in_array($_POST['sender_role'], ['user', 'staff']) ? $_POST['sender_role'] : 'user';
-        // Determine sender id: if authenticated use user id, if guest ensure session has guest_chat_id
-        if ($is_authenticated) {
+        $sender_role = in_array($_POST['sender_role'], ['user', 'staff', 'guest']) ? $_POST['sender_role'] : 'user';
+        
+        // Determine sender id: 
+        // 1. If sender_id is provided in POST (for staff messages from Staff-dashboard), use it
+        // 2. If authenticated and sender_role is not staff, use session user_id
+        // 3. If guest, ensure session has guest_chat_id
+        if ($sender_role === 'staff' && isset($_POST['sender_id']) && !empty($_POST['sender_id'])) {
+            // Staff member sending from Staff-dashboard - use provided sender_id
+            $sender_id = (int)$_POST['sender_id'];
+        } elseif ($is_authenticated && $sender_role !== 'staff') {
+            // Regular authenticated user (applicant)
             $sender_id = (int)($current_user_id);
         } else {
-            // Ensure guest is using the same chat id they started
+            // Guest user - ensure session has guest_chat_id
             if (!isset($_SESSION['guest_chat_id']) || (int)$_SESSION['guest_chat_id'] !== $chat_id) {
-                http_response_code(403);
-                echo json_encode(['success' => false, 'error' => 'Authentication required for live chat or invalid guest session.']);
-                exit;
+                // For staff messages, allow even without guest_chat_id if sender_id is provided
+                if ($sender_role === 'staff' && isset($_POST['sender_id']) && !empty($_POST['sender_id'])) {
+                    $sender_id = (int)$_POST['sender_id'];
+                } else {
+                    ob_clean();
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Authentication required for live chat or invalid guest session.']);
+                    ob_end_flush();
+                    exit;
+                }
+            } else {
+                $sender_id = null; // allow NULL for guest sender_id
+                $sender_role = 'guest';
             }
-            $sender_id = null; // allow NULL for guest sender_id
-            $sender_role = 'guest';
         }
         $final_message = nl2br($message); // Apply line breaks to the sanitized message
 
@@ -242,13 +258,20 @@ if ($is_live_chat_action) {
 
         try {
             // Fetch new messages with sender's name
+            // Use COALESCE to provide fallback name if user not found
             $stmt = $conn->prepare(
                 "SELECT 
                     cm.id, 
                     cm.message, 
                     cm.sender_role, 
                     cm.created_at, 
-                    u.name as sender_name 
+                    COALESCE(u.name, 
+                        CASE 
+                            WHEN cm.sender_role = 'staff' THEN 'Staff'
+                            WHEN cm.sender_role = 'guest' THEN 'Guest'
+                            ELSE 'User'
+                        END
+                    ) as sender_name 
                  FROM chat_messages cm
                  LEFT JOIN users u ON cm.sender_id = u.id
                  WHERE cm.chat_id = :chat_id AND cm.id > :last_id

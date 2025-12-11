@@ -6,6 +6,18 @@ $current_page = 'applications';
 // Include Header
 require_once __DIR__ . '/admin_header.php';
 
+// Include email functions for sending notifications
+if (file_exists(__DIR__ . '/../config_mail.php')) {
+    require_once __DIR__ . '/../config_mail.php';
+}
+if (file_exists(__DIR__ . '/../Staff-dashboard/email_functions.php')) {
+    require_once __DIR__ . '/../Staff-dashboard/email_functions.php';
+}
+// Include functions for getting settings
+if (file_exists(__DIR__ . '/functions.php')) {
+    require_once __DIR__ . '/functions.php';
+}
+
 $message = '';
 
 // --- Handle Application Status Update ---
@@ -39,8 +51,71 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                 $notificationMessage = "Your application for '{$appData['business_name']}' has been {$status_text}.";
                 $link = "../Applicant-dashboard/view_my_application.php?id={$applicationId}";
                 
+                // Create in-app notification
                 $notifyStmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
                 $notifyStmt->execute([$appData['user_id'], $notificationMessage, $link]);
+                
+                // Send email notification if email function is available and user has email
+                // Check if email notifications are enabled in system settings
+                $email_notifications_enabled = true; // Default to true
+                if (function_exists('get_setting')) {
+                    $email_notifications_enabled = (bool)get_setting($conn, 'email_notifications_enabled', '1');
+                }
+                
+                if (!empty($appData['applicant_email']) && function_exists('sendApplicationEmail') && $email_notifications_enabled) {
+                    try {
+                        // Build absolute link for email
+                        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                        $absolute_link = "{$protocol}://{$host}/onlinebizpermit/Applicant-dashboard/view_my_application.php?id={$applicationId}";
+                        
+                        // Status color mapping
+                        $status_colors = [
+                            'approved' => '#10b981',
+                            'rejected' => '#ef4444'
+                        ];
+                        $status_color = $status_colors[$new_status] ?? '#64748b';
+                        
+                        // Prepare email content
+                        $email_subject = "Application Status Updated - " . htmlspecialchars($appData['business_name']);
+                        $email_body = "
+                        <div style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
+                            <div style='max-width: 600px; margin: 20px auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px; background-color: #ffffff;'>
+                                <h2 style='color: #4a69bd; margin-top: 0;'>Application Status Updated</h2>
+                                <p>Dear " . htmlspecialchars($appData['applicant_name']) . ",</p>
+                                <p>Your application for <strong>" . htmlspecialchars($appData['business_name']) . "</strong> has been updated.</p>
+                                <div style='background-color: #f8f9fa; border-left: 4px solid {$status_color}; padding: 15px; margin: 20px 0; border-radius: 4px;'>
+                                    <p style='margin: 0;'><strong>New Status:</strong> <span style='color: {$status_color}; font-weight: bold; text-transform: uppercase;'>" . htmlspecialchars(ucfirst($new_status)) . "</span></p>
+                                </div>";
+                        
+                        if ($new_status === 'approved') {
+                            $email_body .= "<p style='color: #10b981; font-weight: 600;'>Congratulations! Your application has been approved.</p>";
+                        } else {
+                            $email_body .= "<p>If you have any questions about this decision, please contact our support team.</p>";
+                        }
+                        
+                        $email_body .= "
+                                <p>You can view your application and check for any additional details or required actions by clicking the button below:</p>
+                                <p style='text-align: center; margin: 30px 0;'>
+                                    <a href='" . htmlspecialchars($absolute_link) . "' style='background-color: #4a69bd; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;'>View My Application</a>
+                                </p>
+                                <hr style='border: none; border-top: 1px solid #eee; margin: 20px 0;'>
+                                <p style='font-size: 0.9em; color: #777; margin-bottom: 0;'>Thank you for using our service.<br><strong>The OnlineBizPermit Team</strong></p>
+                            </div>
+                        </div>";
+                        
+                        // Send email
+                        $email_sent = @sendApplicationEmail($appData['applicant_email'], $appData['applicant_name'], $email_subject, $email_body);
+                        if ($email_sent) {
+                            error_log("Approval email sent successfully to {$appData['applicant_email']} for application ID {$applicationId}");
+                        } else {
+                            error_log("Email sending failed for application ID {$applicationId} to {$appData['applicant_email']} - SMTP configuration issue");
+                        }
+                    } catch (Exception $e) {
+                        // Log email error but don't break the approval process
+                        error_log("Email sending error for application ID {$applicationId}: " . $e->getMessage());
+                    }
+                }
             }
             
             $conn->commit();

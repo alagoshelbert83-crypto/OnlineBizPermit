@@ -41,7 +41,14 @@ $existing_messages = [];
 $last_message_id = 0;
 if ($chat_id > 0) {
     $msg_stmt = $conn->prepare(
-        "SELECT cm.*, u.name as sender_name 
+        "SELECT cm.*, 
+         COALESCE(u.name, 
+             CASE 
+                 WHEN cm.sender_role = 'staff' THEN 'Staff'
+                 WHEN cm.sender_role = 'guest' THEN 'Guest'
+                 ELSE 'User'
+             END
+         ) as sender_name 
          FROM chat_messages cm
          LEFT JOIN users u ON cm.sender_id = u.id
          WHERE cm.chat_id = :chat_id ORDER BY cm.id ASC"
@@ -49,6 +56,11 @@ if ($chat_id > 0) {
     $msg_stmt->execute([':chat_id' => $chat_id]);
     $existing_messages = $msg_stmt->fetchAll(PDO::FETCH_ASSOC);
     $msg_stmt = null;
+    
+    // Get the last message ID for polling
+    if (!empty($existing_messages)) {
+        $last_message_id = (int)end($existing_messages)['id'];
+    }
 }
 
 require_once './staff_sidebar.php';
@@ -79,11 +91,12 @@ require_once './staff_sidebar.php';
                 </div>
                 <!-- Inject existing messages here -->
                 <?php foreach ($existing_messages as $msg): ?>
-                    <?php $last_message_id = $msg['id']; // Track the last message ID ?>
-                    <div class="msg <?= htmlspecialchars($msg['sender_role']) === 'staff' ? 'staff' : 'user' ?>" data-message-id="<?= (int)$msg['id'] ?>">
-                        <div class="avatar <?= htmlspecialchars($msg['sender_role']) ?>-avatar"><?= strtoupper(substr($msg['sender_name'], 0, 1)) ?></div>
+                    <div class="msg <?= htmlspecialchars($msg['sender_role']) === 'staff' ? 'staff' : ($msg['sender_role'] === 'guest' ? 'user' : 'user') ?>" data-message-id="<?= (int)$msg['id'] ?>">
+                        <div class="avatar <?= htmlspecialchars($msg['sender_role']) ?>-avatar">
+                            <?= strtoupper(substr($msg['sender_name'] ?? ($msg['sender_role'] === 'staff' ? 'Staff' : 'User'), 0, 1)) ?>
+                        </div>
                         <div class="msg-content">
-                            <div class="sender-name"><?= htmlspecialchars($msg['sender_name']) ?></div>
+                            <div class="sender-name"><?= htmlspecialchars($msg['sender_name'] ?? ($msg['sender_role'] === 'staff' ? 'Staff' : 'User')) ?></div>
                             <div class="bubble"><?= $msg['message'] // Message is pre-sanitized in the API ?></div>
                             <div class="timestamp"><?= date('h:i A', strtotime($msg['created_at'])) ?></div>
                         </div>

@@ -16,13 +16,8 @@ $applicationId = $_GET['id'] ?? 0;
 
 if ($applicationId > 0) {
     $stmt = $conn->prepare("SELECT a.*, u.name as applicant_name FROM applications a LEFT JOIN users u ON a.user_id = u.id WHERE a.id = ? AND a.status IN ('approved', 'complete')");
-    $stmt->bind_param("i", $applicationId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($result->num_rows > 0) {
-        $application = $result->fetch_assoc();
-    }
-    $stmt->close();
+    $stmt->execute([$applicationId]);
+    $application = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
 if (!$application) {

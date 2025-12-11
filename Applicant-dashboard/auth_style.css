@@ -160,6 +160,12 @@ body {
   font-size: 1rem;
   transition: var(--transition);
   background: var(--white);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.password-input input[type="password"] {
+  padding-right: 50px;
 }
 
 .form-group input:focus {
@@ -170,6 +176,11 @@ body {
 
 .password-input {
   position: relative;
+  width: 100%;
+}
+
+.password-input input {
+  padding-right: 50px;
 }
 
 .password-toggle {
@@ -183,6 +194,7 @@ body {
   cursor: pointer;
   padding: 5px;
   transition: var(--transition);
+  z-index: 1;
 }
 
 .password-toggle:hover {

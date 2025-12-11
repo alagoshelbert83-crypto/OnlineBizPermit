@@ -90,7 +90,7 @@ BEGIN
     ) THEN
         ALTER TABLE applications 
         ADD CONSTRAINT applications_status_check 
-        CHECK (status IN ('pending', 'approved', 'rejected', 'processing'));
+        CHECK (status IN ('pending', 'approved', 'rejected', 'processing', 'complete'));
     END IF;
 END $$;
 
