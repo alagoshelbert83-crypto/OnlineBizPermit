@@ -260,7 +260,15 @@ require_once __DIR__ . '/admin_sidebar.php';
     <header class="header">
         <div class="header-left">
             <button id="hamburger"><i class="fas fa-bars"></i></button>
-            <h1>User Management</h1>
+            <div>
+                <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-users-cog" style="color: var(--accent-color);"></i>
+                    User Management
+                </h1>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+                    Manage all system users and their accounts
+                </p>
+            </div>
         </div>
         <div class="header-right">
             <form action="user_management.php" method="GET" class="filter-controls">

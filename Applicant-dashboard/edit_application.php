@@ -26,10 +26,21 @@ if (isset($_GET['id'])) {
         $form_details = [];
     }
 
+    // Document type labels mapping
+    $document_type_labels = [
+        'dti_registration' => 'DTI Registration Certificate',
+        'bir_registration' => 'BIR Registration Certificate',
+        'barangay_clearance' => 'Barangay Clearance',
+        'fire_safety_certificate' => 'Fire Safety Certificate',
+        'sanitary_permit' => 'Sanitary Permit',
+        'health_inspection' => 'Health Inspection Certificate',
+        'building_permit' => 'Building Permit'
+    ];
+
     // Fetch existing documents for this application
     if ($application) {
         try {
-            $docs_stmt = $conn->prepare("SELECT * FROM documents WHERE application_id = ?");
+            $docs_stmt = $conn->prepare("SELECT * FROM documents WHERE application_id = ? ORDER BY document_type, upload_date");
             $docs_stmt->execute([$applicationId]);
             $documents = $docs_stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
@@ -209,21 +220,26 @@ require_once __DIR__ . '/applicant_sidebar.php';
                             <p>No documents have been uploaded for this application yet.</p>
                         <?php else: ?>
                             <?php foreach ($documents as $doc): ?>
+                                <?php
+                                $doc_type = $doc['document_type'] ?? 'Other';
+                                $doc_label = $document_type_labels[$doc_type] ?? ucfirst(str_replace('_', ' ', $doc_type));
+                                $file_extension = strtolower(pathinfo($doc['document_name'], PATHINFO_EXTENSION));
+                                $file_path = '../uploads/' . htmlspecialchars($doc['file_path']);
+                                ?>
                                 <div class="document-item">
                                     <div class="doc-preview">
-                                        <?php
-                                        $file_extension = strtolower(pathinfo($doc['document_name'], PATHINFO_EXTENSION));
-                                        $file_path = '../uploads/' . htmlspecialchars($doc['file_path']);
-                                        if (in_array($file_extension, ['jpg', 'jpeg', 'png', 'gif'])):
-                                        ?>
-                                            <img src="<?= $file_path ?>" alt="<?= htmlspecialchars($doc['document_name']) ?>">
+                                        <?php if (in_array($file_extension, ['jpg', 'jpeg', 'png', 'gif'])): ?>
+                                            <img src="<?= $file_path ?>" alt="<?= htmlspecialchars($doc_label) ?>">
                                         <?php elseif ($file_extension === 'pdf'): ?>
                                             <i class="fas fa-file-pdf"></i>
                                         <?php else: ?>
                                             <i class="fas fa-file-alt"></i>
                                         <?php endif; ?>
                                     </div>
-                                    <p title="<?= htmlspecialchars($doc['document_name']) ?>"><?= htmlspecialchars($doc['document_name']) ?></p>
+                                    <div class="doc-info">
+                                        <p class="doc-type-label"><strong><?= htmlspecialchars($doc_label) ?></strong></p>
+                                        <p class="doc-filename" title="<?= htmlspecialchars($doc['document_name']) ?>"><?= htmlspecialchars($doc['document_name']) ?></p>
+                                    </div>
                                     <a href="<?= $file_path ?>" class="btn btn-secondary" target="_blank" style="padding: 8px 16px; font-size: 0.9rem;">
                                         <i class="fas fa-eye"></i> View
                                     </a>
@@ -434,11 +450,14 @@ require_once __DIR__ . '/applicant_sidebar.php';
 
     /* Document List Styles (from view_application.php) */
     .document-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
-    .document-item { border: 1px solid var(--border-color); border-radius: var(--border-radius); text-align: center; padding: 15px; transition: all 0.2s ease; background: #fff; }
+    .document-item { border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 15px; display: flex; align-items: center; gap: 15px; transition: all 0.2s ease; background: #fff; flex-wrap: wrap; }
     .document-item:hover { box-shadow: var(--shadow); transform: translateY(-3px); }
-    .document-item .doc-preview { height: 120px; display: flex; align-items: center; justify-content: center; background: #f8fafc; border-radius: 8px; margin-bottom: 10px; }
+    .document-item .doc-preview { height: 100px; width: 100px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #f8fafc; border-radius: 8px; }
     .document-item .doc-preview img { max-height: 100%; max-width: 100%; object-fit: cover; border-radius: 4px; }
-    .document-item .doc-preview i { font-size: 3rem; color: var(--text-secondary-color); }
+    .document-item .doc-preview i { font-size: 2.5rem; color: var(--text-secondary-color); }
+    .document-item .doc-info { flex: 1; min-width: 200px; }
+    .document-item .doc-type-label { font-weight: 600; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 5px; display: block; }
+    .document-item .doc-filename { font-weight: 400; font-size: 0.8rem; color: var(--text-muted); margin: 0; word-break: break-word; line-height: 1.3; }
     .document-item p { font-weight: 600; margin-bottom: 10px; word-break: break-word; }
 
     /* Document Upload Section Styles (from submit_application.php) */

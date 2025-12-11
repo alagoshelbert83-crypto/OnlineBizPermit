@@ -37,7 +37,17 @@ require_once __DIR__ . '/applicant_sidebar.php';
 <!-- Main Content -->
 <div class="main">
     <header class="header">
-        <h1>My Notifications</h1>
+        <div class="header-left">
+            <div>
+                <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-bell" style="color: var(--accent-color);"></i>
+                    My Notifications
+                </h1>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+                    Stay updated with your application status and important messages
+                </p>
+            </div>
+        </div>
     </header>
 
     <div class="notification-container">

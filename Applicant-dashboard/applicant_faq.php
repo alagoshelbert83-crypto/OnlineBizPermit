@@ -25,9 +25,19 @@ require_once __DIR__ . '/applicant_sidebar.php';
 <div class="main">
     <div class="form-container" style="max-width: 900px;">
         <header class="header">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <a href="applicant_dashboard.php" class="btn" style="padding: 8px 12px;"><i class="fas fa-arrow-left"></i> Back</a>
-                <h1>Help & FAQ Assistant</h1>
+            <div class="header-left">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <a href="applicant_dashboard.php" class="btn" style="padding: 8px 12px;"><i class="fas fa-arrow-left"></i> Back</a>
+                    <div>
+                        <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-question-circle" style="color: var(--accent-color);"></i>
+                            Help & FAQ Assistant
+                        </h1>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+                            Get instant answers to your questions
+                        </p>
+                    </div>
+                </div>
             </div>
         </header>
 

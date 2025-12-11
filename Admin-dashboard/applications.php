@@ -130,8 +130,15 @@ require_once __DIR__ . '/admin_sidebar.php';
 <div class="main">
     <header class="header">
         <div class="header-left">
-            <button id="hamburger" aria-label="Open Menu"><i class="fas fa-bars"></i></button>
-            <h1><?= htmlspecialchars($page_heading) ?></h1>
+            <div>
+                <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-file-alt" style="color: var(--accent-color);"></i>
+                    <?= htmlspecialchars($page_heading) ?>
+                </h1>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+                    Manage and review all business permit applications
+                </p>
+            </div>
         </div>
         <div class="header-right">
             <form action="pending_applications.php" method="GET" class="search-form">

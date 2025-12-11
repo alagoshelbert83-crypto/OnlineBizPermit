@@ -21,11 +21,22 @@ if (isset($_GET['id'])) {
         $application = null;
     }
 
+    // Document type labels mapping
+    $document_type_labels = [
+        'dti_registration' => 'DTI Registration Certificate',
+        'bir_registration' => 'BIR Registration Certificate',
+        'barangay_clearance' => 'Barangay Clearance',
+        'fire_safety_certificate' => 'Fire Safety Certificate',
+        'sanitary_permit' => 'Sanitary Permit',
+        'health_inspection' => 'Health Inspection Certificate',
+        'building_permit' => 'Building Permit'
+    ];
+
     // Fetch existing documents for this application
     $documents = [];
     if ($application) {
         try {
-            $docs_stmt = $conn->prepare("SELECT * FROM documents WHERE application_id = ?");
+            $docs_stmt = $conn->prepare("SELECT * FROM documents WHERE application_id = ? ORDER BY document_type, upload_date");
             $docs_stmt->execute([$applicationId]);
             $documents = $docs_stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
@@ -43,9 +54,19 @@ require_once __DIR__ . '/applicant_sidebar.php';
 <!-- Main Content -->
 <div class="main">
     <header class="header">
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <a href="applicant_dashboard.php" class="btn" style="padding: 8px 12px;"><i class="fas fa-arrow-left"></i> Back</a>
-            <h1>Application Details</h1>
+        <div class="header-left">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <a href="applicant_dashboard.php" class="btn" style="padding: 8px 12px;"><i class="fas fa-arrow-left"></i> Back</a>
+                <div>
+                    <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-file-alt" style="color: var(--accent-color);"></i>
+                        Application Details
+                    </h1>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+                        View and manage your business permit application
+                    </p>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -258,21 +279,26 @@ require_once __DIR__ . '/applicant_sidebar.php';
                         <p>No documents have been uploaded for this application.</p>
                     <?php else: ?>
                         <?php foreach ($documents as $doc): ?>
+                            <?php
+                            $doc_type = $doc['document_type'] ?? 'Other';
+                            $doc_label = $document_type_labels[$doc_type] ?? ucfirst(str_replace('_', ' ', $doc_type));
+                            $file_extension = strtolower(pathinfo($doc['document_name'], PATHINFO_EXTENSION));
+                            $file_path = '../uploads/' . htmlspecialchars($doc['file_path']);
+                            ?>
                             <div class="document-item">
                                 <div class="doc-preview">
-                                    <?php
-                                    $file_extension = strtolower(pathinfo($doc['document_name'], PATHINFO_EXTENSION));
-                                    $file_path = '../uploads/' . htmlspecialchars($doc['file_path']);
-                                    if (in_array($file_extension, ['jpg', 'jpeg', 'png', 'gif'])):
-                                    ?>
-                                        <a href="<?= $file_path ?>" target="_blank"><img src="<?= $file_path ?>" alt="<?= htmlspecialchars($doc['document_name']) ?>"></a>
+                                    <?php if (in_array($file_extension, ['jpg', 'jpeg', 'png', 'gif'])): ?>
+                                        <a href="<?= $file_path ?>" target="_blank"><img src="<?= $file_path ?>" alt="<?= htmlspecialchars($doc_label) ?>"></a>
                                     <?php elseif ($file_extension === 'pdf'): ?>
                                         <a href="<?= $file_path ?>" target="_blank"><i class="fas fa-file-pdf"></i></a>
                                     <?php else: ?>
                                         <a href="<?= $file_path ?>" target="_blank"><i class="fas fa-file-alt"></i></a>
                                     <?php endif; ?>
                                 </div>
-                                <p title="<?= htmlspecialchars($doc['document_name']) ?>"><?= htmlspecialchars($doc['document_name']) ?></p>
+                                <div class="doc-info">
+                                    <p class="doc-type-label"><strong><?= htmlspecialchars($doc_label) ?></strong></p>
+                                    <p class="doc-filename" title="<?= htmlspecialchars($doc['document_name']) ?>"><?= htmlspecialchars($doc['document_name']) ?></p>
+                                </div>
                                 <a href="<?= $file_path ?>" class="btn btn-secondary" target="_blank">
                                     <i class="fas fa-eye"></i> View
                                 </a>
@@ -556,10 +582,13 @@ p {
 .document-item {
     border: 1px solid #e2e8f0;
     border-radius: 12px;
-    text-align: center;
-    padding: 12px;
+    padding: 15px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
     transition: all 0.2s ease;
     background: #fff;
+    flex-wrap: wrap;
 }
 .document-item:hover {
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
@@ -567,17 +596,21 @@ p {
 }
 .document-item .doc-preview {
     height: 100px;
+    width: 100px;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #f8fafc;
     border-radius: 8px;
-    margin-bottom: 10px;
 }
 .document-item .doc-preview img { max-height: 100%; max-width: 100%; object-fit: cover; border-radius: 4px; }
 .document-item .doc-preview i { font-size: 2.5rem; color: #64748b; }
+.document-item .doc-info { flex: 1; min-width: 200px; }
+.document-item .doc-type-label { font-weight: 600; font-size: 0.95rem; color: #1e293b; margin-bottom: 5px; display: block; }
+.document-item .doc-filename { font-weight: 400; font-size: 0.8rem; color: #64748b; margin: 0; word-break: break-all; line-height: 1.3; }
 .document-item p { font-weight: 500; font-size: 0.8rem; margin-bottom: 10px; word-break: break-all; line-height: 1.3; }
-.document-item .btn { padding: 6px 12px; font-size: 0.8rem; }
+.document-item .btn { padding: 6px 12px; font-size: 0.8rem; flex-shrink: 0; }
 
 @media (max-width: 768px) {
     .action-buttons {

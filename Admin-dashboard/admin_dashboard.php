@@ -56,41 +56,65 @@ $recent_users_result = $conn->query($recent_users_sql);
 $recent_users = $recent_users_result ? $recent_users_result->fetchAll(PDO::FETCH_ASSOC) : [];
 
 // --- Fetch All Dashboard Stats in a Single, Optimized Query ---
-$user_kpi_sql = "SELECT
+$dashboard_stats_sql = "SELECT
     (SELECT COUNT(*) FROM users) as total_users,
     (SELECT COUNT(*) FROM users WHERE role = 'staff') as staff_count,
     (SELECT COUNT(*) FROM users WHERE role = 'user' AND is_approved = 0) as pending_users,
-    (SELECT COUNT(*) FROM users WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)) as new_users_this_month";
-$user_kpi_result = $conn->query($user_kpi_sql);
-$user_kpis = $user_kpi_result ? $user_kpi_result->fetch(PDO::FETCH_ASSOC) : [];
+    (SELECT COUNT(*) FROM users WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)) as new_users_this_month,
+    (SELECT COUNT(*) FROM applications) as total_applications,
+    (SELECT COUNT(*) FROM applications WHERE status = 'pending') as pending_applications,
+    (SELECT COUNT(*) FROM applications WHERE status = 'approved') as approved_applications,
+    (SELECT COUNT(*) FROM applications WHERE submitted_at >= DATE_TRUNC('month', CURRENT_DATE)) as new_applications_this_month";
+$dashboard_stats_result = $conn->query($dashboard_stats_sql);
+$dashboard_stats = $dashboard_stats_result ? $dashboard_stats_result->fetch(PDO::FETCH_ASSOC) : [];
+$user_kpis = $dashboard_stats; // Keep for backward compatibility
 
-// --- Monthly User Registrations for Bar Chart ---
-// Initialize an array for the last 12 months with 0 counts to ensure a complete dataset for the chart.
-$monthlyData = [];
+// --- Monthly User Registrations and Applications for Combined Chart ---
+// Initialize arrays for the last 12 months with 0 counts
+$monthlyUserData = [];
+$monthlyAppData = [];
 for ($i = 11; $i >= 0; $i--) {
     $date = new DateTime("first day of -$i month");
     $monthKey = $date->format('M Y');
-    $monthlyData[$monthKey] = 0;
+    $monthlyUserData[$monthKey] = 0;
+    $monthlyAppData[$monthKey] = 0;
 }
 // Fetch actual user registration counts from the database for the last 12 months
 $twelveMonthsAgo = new DateTime('-11 months');
 $startDate = $twelveMonthsAgo->format('Y-m-01 00:00:00');
 
-$res = $conn->query("SELECT TO_CHAR(created_at, 'Mon YYYY') AS month, COUNT(*) AS total
+$userRes = $conn->query("SELECT TO_CHAR(created_at, 'Mon YYYY') AS month, COUNT(*) AS total
                      FROM users
                      WHERE created_at >= '{$startDate}'
                      GROUP BY TO_CHAR(created_at, 'YYYY-MM'), TO_CHAR(created_at, 'Mon YYYY')
                      ORDER BY TO_CHAR(created_at, 'YYYY-MM') ASC");
 
-if ($res) {
-    while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
-        if (isset($monthlyData[$row['month']])) {
-            $monthlyData[$row['month']] = (int)$row['total'];
+if ($userRes) {
+    while ($row = $userRes->fetch(PDO::FETCH_ASSOC)) {
+        if (isset($monthlyUserData[$row['month']])) {
+            $monthlyUserData[$row['month']] = (int)$row['total'];
         }
     }
 }
-$months = json_encode(array_keys($monthlyData));
-$values = json_encode(array_values($monthlyData));
+
+// Fetch application counts for the last 12 months
+$appRes = $conn->query("SELECT TO_CHAR(submitted_at, 'Mon YYYY') AS month, COUNT(*) AS total
+                     FROM applications
+                     WHERE submitted_at >= '{$startDate}'
+                     GROUP BY TO_CHAR(submitted_at, 'YYYY-MM'), TO_CHAR(submitted_at, 'Mon YYYY')
+                     ORDER BY TO_CHAR(submitted_at, 'YYYY-MM') ASC");
+
+if ($appRes) {
+    while ($row = $appRes->fetch(PDO::FETCH_ASSOC)) {
+        if (isset($monthlyAppData[$row['month']])) {
+            $monthlyAppData[$row['month']] = (int)$row['total'];
+        }
+    }
+}
+
+$months = json_encode(array_keys($monthlyUserData));
+$userValues = json_encode(array_values($monthlyUserData));
+$appValues = json_encode(array_values($monthlyAppData));
 
 // Include Sidebar
 require_once __DIR__ . '/admin_sidebar.php';
@@ -100,8 +124,15 @@ require_once __DIR__ . '/admin_sidebar.php';
     <div class="main">
       <header class="header">
         <div class="header-left">
-            <button id="hamburger"><i class="fas fa-bars"></i></button>
-            <h1>Dashboard</h1>
+            <div>
+                <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-tachometer-alt" style="color: var(--accent-color);"></i>
+                    Admin Dashboard
+                </h1>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+                    Welcome back, <strong><?= htmlspecialchars($current_user_name) ?></strong>! Here's your system overview.
+                </p>
+            </div>
         </div>
         <div class="header-actions">
           <?php if ($current_user_role === 'admin'): ?>
@@ -125,46 +156,61 @@ require_once __DIR__ . '/admin_sidebar.php';
       <!-- Statistics Grid -->
       <div class="stat-grid">
         <div class="stat-card">
-            <div class="stat-icon icon-total-apps"><i class="fas fa-users"></i></div>
+            <div class="stat-icon" style="background: linear-gradient(135deg, #3b82f6, #2563eb);"><i class="fas fa-file-alt"></i></div>
             <div class="stat-info">
-                <p>Total Users</p>
-                <span><?= $user_kpis['total_users'] ?? 0 ?></span>
+                <p>Total Applications</p>
+                <span><?= number_format($dashboard_stats['total_applications'] ?? 0) ?></span>
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon icon-approved-apps"><i class="fas fa-user-plus"></i></div>
+        <a href="applications.php?status=pending" class="stat-card interactive">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);"><i class="fas fa-clock"></i></div>
             <div class="stat-info">
-                <p>New Users (This Month)</p>
-                <span><?= $user_kpis['new_users_this_month'] ?? 0 ?></span>
-            </div>
-        </div>
-        <a href="pending_users.php" class="stat-card interactive">
-            <div class="stat-icon icon-pending-users"><i class="fas fa-user-clock"></i></div>
-            <div class="stat-info">
-                <p>Pending Users</p>
-                <span><?= $user_kpis['pending_users'] ?? 0 ?></span>
+                <p>Pending Applications</p>
+                <span><?= number_format($dashboard_stats['pending_applications'] ?? 0) ?></span>
             </div>
             <i class="fas fa-arrow-right card-arrow"></i>
         </a>
         <div class="stat-card">
-            <div class="stat-icon" style="background-color: #64748b;"><i class="fas fa-user-shield"></i></div>
+            <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #059669);"><i class="fas fa-check-circle"></i></div>
             <div class="stat-info">
-                <p>Staff Accounts</p>
-                <span><?= $user_kpis['staff_count'] ?? 0 ?></span>
+                <p>Approved Applications</p>
+                <span><?= number_format($dashboard_stats['approved_applications'] ?? 0) ?></span>
             </div>
         </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);"><i class="fas fa-file-plus"></i></div>
+            <div class="stat-info">
+                <p>New This Month</p>
+                <span><?= number_format($dashboard_stats['new_applications_this_month'] ?? 0) ?></span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #6366f1, #4f46e5);"><i class="fas fa-users"></i></div>
+            <div class="stat-info">
+                <p>Total Users</p>
+                <span><?= number_format($dashboard_stats['total_users'] ?? 0) ?></span>
+            </div>
+        </div>
+        <a href="pending_users.php" class="stat-card interactive">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #ef4444, #dc2626);"><i class="fas fa-user-clock"></i></div>
+            <div class="stat-info">
+                <p>Pending Users</p>
+                <span><?= number_format($dashboard_stats['pending_users'] ?? 0) ?></span>
+            </div>
+            <i class="fas fa-arrow-right card-arrow"></i>
+        </a>
       </div>
 
       <!-- Main Data Grid -->
       <div class="data-grid">
         <div class="chart-box">
-          <h3>Monthly User Registrations (Last 12 Months)</h3>
+          <h3><i class="fas fa-chart-line"></i> Monthly Statistics (Last 12 Months)</h3>
           <div class="chart-container">
-            <canvas id="barChart"></canvas>
+            <canvas id="combinedChart"></canvas>
           </div>
         </div>
         <div class="chart-box">
-          <h3>Recent Activity</h3>
+          <h3><i class="fas fa-clock"></i> Recent Activity</h3>
             <div class="activity-container">
                 <ul id="activity-list" class="activity-list">
                     <?php if (empty($recent_users)): ?>
@@ -212,7 +258,7 @@ require_once __DIR__ . '/admin_sidebar.php';
     if (addStaffModal && addStaffBtn) {
         const closeBtn = addStaffModal.querySelector('.close-btn');
         addStaffBtn.onclick = () => addStaffModal.style.display = 'block';
-        if (closeBtn) closeBtn.onclick = () => modal.style.display = 'none';
+        if (closeBtn) closeBtn.onclick = () => addStaffModal.style.display = 'none';
         window.addEventListener('click', (event) => {
             if (event.target === addStaffModal) addStaffModal.style.display = 'none';
         });
@@ -223,27 +269,75 @@ require_once __DIR__ . '/admin_sidebar.php';
     Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.2)';
 
     document.addEventListener('DOMContentLoaded', function() {
-        // Bar Chart for Monthly Applications
-        const barChartCanvas = document.getElementById('barChart');
-        if (barChartCanvas && <?= array_sum(array_values($monthlyData)) ?> > 0) {
-            new Chart(barChartCanvas, {
-                type: 'bar',
+        // Combined Chart for Users and Applications
+        const combinedChartCanvas = document.getElementById('combinedChart');
+        if (combinedChartCanvas) {
+            new Chart(combinedChartCanvas, {
+                type: 'line',
                 data: {
                     labels: <?= $months ?>,
-                    datasets: [{
-                        label: 'New Users',
-                        data: <?= $values ?>,
-                        backgroundColor: 'rgba(74, 105, 189, 0.7)',
-                        borderColor: 'rgba(74, 105, 189, 1)',
-                        borderWidth: 1,
-                        borderRadius: 4,
-                    }]
+                    datasets: [
+                        {
+                            label: 'New Users',
+                            data: <?= $userValues ?>,
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                        },
+                        {
+                            label: 'New Applications',
+                            data: <?= $appValues ?>,
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                    plugins: { 
+                        legend: { 
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 15,
+                                font: { size: 12, weight: '500' }
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        }
+                    },
+                    scales: { 
+                        y: { 
+                            beginAtZero: true, 
+                            ticks: { precision: 0 },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
                 }
             });
         }

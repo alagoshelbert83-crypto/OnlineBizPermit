@@ -44,7 +44,17 @@ require_once __DIR__ . '/applicant_sidebar.php';
 <!-- Main Content -->
 <div class="main">
     <header class="header">
-        <h1>My Reports</h1>
+        <div class="header-left">
+            <div>
+                <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-chart-pie" style="color: var(--accent-color);"></i>
+                    My Reports
+                </h1>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+                    View statistics and insights about your applications
+                </p>
+            </div>
+        </div>
     </header>
 
     <div class="reports-container">

@@ -154,9 +154,19 @@ require_once './staff_sidebar.php';
 ?>
     <!-- Main Content -->
     <div class="main">
-      <div class="main-header">
-        <h1>Welcome, <?= htmlspecialchars($userName) ?>!</h1>
-      </div>
+      <header class="header">
+        <div class="header-left">
+            <div>
+                <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-tachometer-alt" style="color: var(--accent-color);"></i>
+                    Welcome, <?= htmlspecialchars($userName) ?>!
+                </h1>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+                    Here's an overview of your dashboard and pending tasks
+                </p>
+            </div>
+        </div>
+      </header>
       
       <!-- KPI Cards -->
       <div class="kpi-grid">

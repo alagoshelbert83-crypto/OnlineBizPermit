@@ -86,11 +86,18 @@ require_once __DIR__ . '/applicant_sidebar.php';
 <!-- Main Content -->
 <div class="main">
     <header class="header">
-        <div>
-            <h1>My Applications</h1>
-            <p>Welcome back, <?= htmlspecialchars($current_user_name) ?>! Here's an overview of your application history.</p>
+        <div class="header-left">
+            <div>
+                <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-folder-open" style="color: var(--accent-color);"></i>
+                    My Applications
+                </h1>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+                    Welcome back, <strong><?= htmlspecialchars($current_user_name) ?></strong>! Here's an overview of your application history.
+                </p>
+            </div>
         </div>
-        <div class="header-actions">
+        <div class="header-right">
             <a href="submit_application.php" class="btn btn-primary"><i class="fas fa-plus"></i> New Application</a>
         </div>
     </header>

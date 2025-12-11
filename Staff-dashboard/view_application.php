@@ -61,6 +61,27 @@ if (!$application) {
 
 $form_details = json_decode($application['form_details'], true) ?? [];
 
+// Document type labels mapping
+$document_type_labels = [
+    'dti_registration' => 'DTI Registration Certificate',
+    'bir_registration' => 'BIR Registration Certificate',
+    'barangay_clearance' => 'Barangay Clearance',
+    'fire_safety_certificate' => 'Fire Safety Certificate',
+    'sanitary_permit' => 'Sanitary Permit',
+    'health_inspection' => 'Health Inspection Certificate',
+    'building_permit' => 'Building Permit'
+];
+
+// Fetch uploaded documents for this application
+$documents = [];
+try {
+    $docs_stmt = $conn->prepare("SELECT * FROM documents WHERE application_id = ? ORDER BY document_type, upload_date");
+    $docs_stmt->execute([$applicationId]);
+    $documents = $docs_stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log("Failed to fetch documents for application {$applicationId}: " . $e->getMessage());
+    $documents = [];
+}
 
 // Fetch LGU/staff form data
 $staff_form_data = [];
@@ -146,10 +167,19 @@ if (isset($_GET['status']) && $_GET['status'] === 'updated') {
   </style>
 
     <div class="main">
-        <div class="main-header">
-
-            <h1>Application #<?= $application['id'] ?></h1>
-        </div>
+        <header class="header">
+            <div class="header-left">
+                <div>
+                    <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-file-alt" style="color: var(--accent-color);"></i>
+                        Application #<?= $application['id'] ?>
+                    </h1>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+                        Review application details and update status
+                    </p>
+                </div>
+            </div>
+        </header>
 
         <?= $message ?>
         <div class="tab-nav">
@@ -245,7 +275,39 @@ if (isset($_GET['status']) && $_GET['status'] === 'updated') {
 
                 </div>
 
-
+                <h3 class="section-divider">II. UPLOADED DOCUMENTS</h3>
+                <div class="document-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; margin: 20px 0;">
+                    <?php if (empty($documents)): ?>
+                        <p style="grid-column: 1 / -1; color: var(--text-secondary);">No documents have been uploaded for this application.</p>
+                    <?php else: ?>
+                        <?php foreach ($documents as $doc): ?>
+                            <?php
+                            $doc_type = $doc['document_type'] ?? 'Other';
+                            $doc_label = $document_type_labels[$doc_type] ?? ucfirst(str_replace('_', ' ', $doc_type));
+                            $file_extension = strtolower(pathinfo($doc['document_name'], PATHINFO_EXTENSION));
+                            $file_path = '../uploads/' . htmlspecialchars($doc['file_path']);
+                            ?>
+                            <div class="document-item" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; background: #fff; display: flex; flex-direction: column; align-items: center; text-align: center; transition: all 0.2s ease;">
+                                <div class="doc-preview" style="height: 100px; width: 100%; display: flex; align-items: center; justify-content: center; background: #f8fafc; border-radius: 8px; margin-bottom: 10px;">
+                                    <?php if (in_array($file_extension, ['jpg', 'jpeg', 'png', 'gif'])): ?>
+                                        <a href="<?= $file_path ?>" target="_blank"><img src="<?= $file_path ?>" alt="<?= htmlspecialchars($doc_label) ?>" style="max-height: 100%; max-width: 100%; object-fit: cover; border-radius: 4px;"></a>
+                                    <?php elseif ($file_extension === 'pdf'): ?>
+                                        <a href="<?= $file_path ?>" target="_blank"><i class="fas fa-file-pdf" style="font-size: 2.5rem; color: #64748b;"></i></a>
+                                    <?php else: ?>
+                                        <a href="<?= $file_path ?>" target="_blank"><i class="fas fa-file-alt" style="font-size: 2.5rem; color: #64748b;"></i></a>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="doc-info" style="width: 100%;">
+                                    <p class="doc-type-label" style="font-weight: 600; font-size: 0.95rem; color: #1e293b; margin-bottom: 5px;"><strong><?= htmlspecialchars($doc_label) ?></strong></p>
+                                    <p class="doc-filename" style="font-weight: 400; font-size: 0.8rem; color: #64748b; margin: 0; word-break: break-all; line-height: 1.3;" title="<?= htmlspecialchars($doc['document_name']) ?>"><?= htmlspecialchars($doc['document_name']) ?></p>
+                                </div>
+                                <a href="<?= $file_path ?>" class="btn btn-secondary" target="_blank" style="margin-top: 10px; padding: 6px 12px; font-size: 0.8rem; width: 100%;">
+                                    <i class="fas fa-eye"></i> View Document
+                                </a>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
 
                 <?php if (!empty($staff_form_data)): ?>
                 <h3 class="section-divider">LGU Section Assessment</h3>

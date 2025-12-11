@@ -386,75 +386,75 @@ require_once __DIR__ . '/applicant_sidebar.php';
                     
                     <div class="document-upload-section">
                         <div class="document-item">
-                            <label for="dti_registration">DTI Registration Certificate:</label>
+                            <label for="dti_registration"><strong>DTI Registration Certificate:</strong></label>
                             <div class="file-upload-wrapper">
-                                <input type="file" id="dti_registration" name="documents[]" class="file-input" accept=".pdf,.jpg,.jpeg,.png" required>
+                                <input type="file" id="dti_registration" name="documents[dti_registration]" class="file-input" accept=".pdf,.jpg,.jpeg,.png" required>
                                 <label for="dti_registration" class="file-label">
                                     <i class="fas fa-upload"></i> Choose File
                                 </label>
                                 <span class="file-name">No file selected</span>
-                </div>
-                </div>
+                            </div>
+                        </div>
 
                         <div class="document-item">
-                            <label for="bir_registration">BIR Registration Certificate:</label>
+                            <label for="bir_registration"><strong>BIR Registration Certificate:</strong></label>
                             <div class="file-upload-wrapper">
-                                <input type="file" id="bir_registration" name="documents[]" class="file-input" accept=".pdf,.jpg,.jpeg,.png" required>
+                                <input type="file" id="bir_registration" name="documents[bir_registration]" class="file-input" accept=".pdf,.jpg,.jpeg,.png" required>
                                 <label for="bir_registration" class="file-label">
                                     <i class="fas fa-upload"></i> Choose File
                                 </label>
                                 <span class="file-name">No file selected</span>
-                </div>
+                            </div>
                         </div>
 
                         <div class="document-item">
-                            <label for="barangay_clearance">Barangay Clearance:</label>
+                            <label for="barangay_clearance"><strong>Barangay Clearance:</strong></label>
                             <div class="file-upload-wrapper">
-                                <input type="file" id="barangay_clearance" name="documents[]" class="file-input" accept=".pdf,.jpg,.jpeg,.png" required>
+                                <input type="file" id="barangay_clearance" name="documents[barangay_clearance]" class="file-input" accept=".pdf,.jpg,.jpeg,.png" required>
                                 <label for="barangay_clearance" class="file-label">
                                     <i class="fas fa-upload"></i> Choose File
                                 </label>
                                 <span class="file-name">No file selected</span>
-                </div>
-            </div>
+                            </div>
+                        </div>
 
                         <div class="document-item">
-                            <label for="fire_safety_certificate">Fire Safety Certificate:</label>
+                            <label for="fire_safety_certificate"><strong>Fire Safety Certificate:</strong></label>
                             <div class="file-upload-wrapper">
-                                <input type="file" id="fire_safety_certificate" name="documents[]" class="file-input" accept=".pdf,.jpg,.jpeg,.png" required>
+                                <input type="file" id="fire_safety_certificate" name="documents[fire_safety_certificate]" class="file-input" accept=".pdf,.jpg,.jpeg,.png" required>
                                 <label for="fire_safety_certificate" class="file-label">
                                     <i class="fas fa-upload"></i> Choose File
                                 </label>
                                 <span class="file-name">No file selected</span>
                             </div>
-                </div>
+                        </div>
 
                         <div class="document-item">
-                            <label for="sanitary_permit">Sanitary Permit:</label>
+                            <label for="sanitary_permit"><strong>Sanitary Permit:</strong></label>
                             <div class="file-upload-wrapper">
-                                <input type="file" id="sanitary_permit" name="documents[]" class="file-input" accept=".pdf,.jpg,.jpeg,.png" required>
+                                <input type="file" id="sanitary_permit" name="documents[sanitary_permit]" class="file-input" accept=".pdf,.jpg,.jpeg,.png" required>
                                 <label for="sanitary_permit" class="file-label">
                                     <i class="fas fa-upload"></i> Choose File
                                 </label>
                                 <span class="file-name">No file selected</span>
-                </div>
-                </div>
+                            </div>
+                        </div>
 
                         <div class="document-item">
-                            <label for="health_inspection">Health Inspection Certificate:</label>
+                            <label for="health_inspection"><strong>Health Inspection Certificate:</strong></label>
                             <div class="file-upload-wrapper">
-                                <input type="file" id="health_inspection" name="documents[]" class="file-input" accept=".pdf,.jpg,.jpeg,.png" required>
+                                <input type="file" id="health_inspection" name="documents[health_inspection]" class="file-input" accept=".pdf,.jpg,.jpeg,.png" required>
                                 <label for="health_inspection" class="file-label">
                                     <i class="fas fa-upload"></i> Choose File
                                 </label>
                                 <span class="file-name">No file selected</span>
-                </div>
-            </div>
+                            </div>
+                        </div>
 
                         <div class="document-item">
-                            <label for="building_permit">Building Permit:</label>
+                            <label for="building_permit"><strong>Building Permit:</strong></label>
                             <div class="file-upload-wrapper">
-                                <input type="file" id="building_permit" name="documents[]" class="file-input" accept=".pdf,.jpg,.jpeg,.png" required>
+                                <input type="file" id="building_permit" name="documents[building_permit]" class="file-input" accept=".pdf,.jpg,.jpeg,.png" required>
                                 <label for="building_permit" class="file-label">
                                     <i class="fas fa-upload"></i> Choose File
                                 </label>

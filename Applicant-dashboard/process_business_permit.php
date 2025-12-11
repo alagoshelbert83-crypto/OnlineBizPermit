@@ -317,39 +317,65 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     throw new Exception('Configuration Error: The uploads directory is not writable: ' . $upload_dir);
                 }
 
-                // Process uploaded documents
+                // Document type mapping for display labels
+                $document_type_labels = [
+                    'dti_registration' => 'DTI Registration Certificate',
+                    'bir_registration' => 'BIR Registration Certificate',
+                    'barangay_clearance' => 'Barangay Clearance',
+                    'fire_safety_certificate' => 'Fire Safety Certificate',
+                    'sanitary_permit' => 'Sanitary Permit',
+                    'health_inspection' => 'Health Inspection Certificate',
+                    'building_permit' => 'Building Permit'
+                ];
+
+                // Process uploaded documents with named types
                 if (isset($_FILES['documents']) && is_array($_FILES['documents']['name'])) {
-                    foreach ($_FILES['documents']['name'] as $key => $name) {
-                        if ($_FILES['documents']['error'][$key] === UPLOAD_ERR_OK) {
-                            $tmp_name = $_FILES['documents']['tmp_name'][$key];
+                    foreach ($_FILES['documents']['name'] as $doc_type => $name) {
+                        // Handle both array format (documents[]) and named format (documents[type])
+                        if (is_numeric($doc_type)) {
+                            // Legacy array format - use generic type
+                            $document_type = 'Other';
+                            $document_label = basename($name);
+                        } else {
+                            // Named format - use the type as key
+                            $document_type = $doc_type;
+                            $document_label = $document_type_labels[$doc_type] ?? ucfirst(str_replace('_', ' ', $doc_type));
+                        }
+
+                        $error_key = is_numeric($doc_type) ? $doc_type : $doc_type;
+                        if (isset($_FILES['documents']['error'][$error_key]) && $_FILES['documents']['error'][$error_key] === UPLOAD_ERR_OK) {
+                            $tmp_name = $_FILES['documents']['tmp_name'][$error_key];
                             $file_type = mime_content_type($tmp_name);
-                            $file_size = $_FILES['documents']['size'][$key];
+                            $file_size = $_FILES['documents']['size'][$error_key];
 
                             if (!in_array($file_type, $allowed_types) || $file_size > 100000000) { // 100MB limit
-                                throw new Exception('Invalid file type or size. Only PDF, JPG, PNG under 100MB are allowed.');
+                                throw new Exception('Invalid file type or size for ' . $document_label . '. Only PDF, JPG, PNG under 100MB are allowed.');
                             }
 
                             $original_name = basename($name);
                             $file_extension = pathinfo($original_name, PATHINFO_EXTENSION);
-                            $unique_filename = uniqid('doc_' . $app_id . '_', true) . '.' . $file_extension;
+                            $unique_filename = uniqid('doc_' . $app_id . '_' . $document_type . '_', true) . '.' . $file_extension;
 
                             if (!move_uploaded_file($tmp_name, $upload_dir . $unique_filename)) {
-                                throw new Exception('File System Error: Could not move uploaded file. Please check server permissions for the "uploads" folder.');
+                                throw new Exception('File System Error: Could not move uploaded file for ' . $document_label . '. Please check server permissions for the "uploads" folder.');
                             }
 
-                            // Insert document record into DB (PDO)
-                            $doc_stmt = $conn->prepare("INSERT INTO documents (application_id, document_name, file_path, upload_date) VALUES (?, ?, ?, NOW())");
+                            // Insert document record into DB with document_type
+                            $doc_stmt = $conn->prepare("INSERT INTO documents (application_id, document_name, file_path, document_type, upload_date) VALUES (?, ?, ?, ?, NOW())");
                             if (!$doc_stmt) {
                                 $doc_errorInfo = $conn->errorInfo();
                                 throw new PDOException('Failed to prepare document INSERT statement: ' . ($doc_errorInfo[2] ?? 'Unknown error'), (int)($doc_errorInfo[0] ?? 0));
                             }
-                            $doc_execute_result = $doc_stmt->execute([$app_id, $original_name, $unique_filename]);
+                            $doc_execute_result = $doc_stmt->execute([$app_id, $original_name, $unique_filename, $document_type]);
                             if (!$doc_execute_result) {
                                 $doc_errorInfo = $doc_stmt->errorInfo();
-                                throw new PDOException('Failed to execute document INSERT: ' . ($doc_errorInfo[2] ?? 'Unknown error'), (int)$doc_errorInfo[0]);
+                                throw new PDOException('Failed to execute document INSERT for ' . $document_label . ': ' . ($doc_errorInfo[2] ?? 'Unknown error'), (int)$doc_errorInfo[0]);
                             }
-                        } elseif (isset($_FILES['documents']['error'][$key]) && $_FILES['documents']['error'][$key] !== UPLOAD_ERR_NO_FILE) {
-                            throw new Exception('An error occurred during file upload. Code: ' . $_FILES['documents']['error'][$key]);
+                            
+                            error_log('Document uploaded: ' . $document_label . ' (Type: ' . $document_type . ')');
+                        } elseif (isset($_FILES['documents']['error'][$error_key]) && $_FILES['documents']['error'][$error_key] !== UPLOAD_ERR_NO_FILE) {
+                            $error_label = isset($document_type_labels[$doc_type]) ? $document_type_labels[$doc_type] : 'document';
+                            throw new Exception('An error occurred during file upload for ' . $error_label . '. Code: ' . $_FILES['documents']['error'][$error_key]);
                         }
                     }
                 }

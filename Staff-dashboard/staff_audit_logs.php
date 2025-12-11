@@ -69,10 +69,19 @@ require_once './staff_sidebar.php';
 ?>
 
 <div class="main">
-    <div class="main-header">
-        <h1>My Activity Log</h1>
-        <p>Track your recent activities and interactions</p>
-    </div>
+    <header class="header">
+        <div class="header-left">
+            <div>
+                <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-history" style="color: var(--accent-color);"></i>
+                    My Activity Log
+                </h1>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+                    Track your recent activities and interactions
+                </p>
+            </div>
+        </div>
+    </header>
 
     <!-- Filters -->
     <div class="filters-card">

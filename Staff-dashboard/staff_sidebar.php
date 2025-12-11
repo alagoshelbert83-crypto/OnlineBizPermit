@@ -18,50 +18,402 @@ if (isset($conn) && $conn instanceof PDO) {
     }
 }
 ?>
+<?php
+// Fetch current user info for profile section
+$current_staff_name = $userName ?? 'Staff';
+$current_staff_role = $_SESSION['role'] ?? 'staff';
+$current_staff_picture = null;
+try {
+    $stmt = $conn->prepare("SELECT profile_picture_path FROM users WHERE id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $user_info = $stmt->fetch(PDO::FETCH_ASSOC);
+    $current_staff_picture = $user_info['profile_picture_path'] ?? null;
+} catch (PDOException $e) {
+    error_log("Error fetching staff profile picture: " . $e->getMessage());
+}
+?>
 <div class="sidebar">
-    <div>
+    <div class="sidebar-top">
         <div class="sidebar-header">
-            <i class="fas fa-leaf"></i>
-            <span>OnlineBizPermit</span>
+            <div class="logo-icon">
+                <i class="fas fa-leaf"></i>
+            </div>
+            <span class="logo-text">OnlineBizPermit</span>
         </div>
-        <a href="dashboard.php" class="btn-nav <?= ($current_page === 'dashboard') ? 'active' : '' ?>"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
-        <a href="applicants.php" class="btn-nav <?= ($current_page === 'applicants') ? 'active' : '' ?>"><i class="fas fa-users"></i><span>Applicants</span></a>
-        <a href="staff_conversations.php" class="btn-nav <?= ($current_page === 'live_chats') ? 'active' : '' ?>"><i class="fas fa-headset"></i><span>Live Chats <?php if ($unread_chats_count > 0): ?><span class="notification-count"><?= $unread_chats_count ?></span><?php endif; ?></span></a>
-        <a href="notifications.php" class="btn-nav <?= ($current_page === 'notifications') ? 'active' : '' ?>"><i class="fas fa-bell"></i><span>Notifications</span></a>
-        <hr class="sidebar-divider">
-        <a href="reports.php" class="btn-nav <?= ($current_page === 'reports') ? 'active' : '' ?>"><i class="fas fa-chart-bar"></i><span>Reports</span></a>
-        <a href="feedback.php" class="btn-nav <?= ($current_page === 'feedback') ? 'active' : '' ?>"><i class="fas fa-comment-dots"></i><span>Feedback</span></a>
-        <a href="staff_audit_logs.php" class="btn-nav <?= ($current_page === 'audit_logs') ? 'active' : '' ?>"><i class="fas fa-history"></i><span>My Activity</span></a>
+        
+        <nav class="sidebar-nav">
+            <a href="dashboard.php" class="btn-nav <?= ($current_page === 'dashboard') ? 'active' : '' ?>">
+                <i class="fas fa-tachometer-alt"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="applicants.php" class="btn-nav <?= ($current_page === 'applicants') ? 'active' : '' ?>">
+                <i class="fas fa-users"></i>
+                <span>Applicants</span>
+            </a>
+            <a href="staff_conversations.php" class="btn-nav <?= ($current_page === 'live_chats') ? 'active' : '' ?>">
+                <i class="fas fa-headset"></i>
+                <span>Live Chats</span>
+                <?php if ($unread_chats_count > 0): ?>
+                    <span class="notification-badge"><?= $unread_chats_count ?></span>
+                <?php endif; ?>
+            </a>
+            <a href="notifications.php" class="btn-nav <?= ($current_page === 'notifications') ? 'active' : '' ?>">
+                <i class="fas fa-bell"></i>
+                <span>Notifications</span>
+            </a>
+            
+            <hr class="sidebar-divider">
+            
+            <a href="reports.php" class="btn-nav <?= ($current_page === 'reports') ? 'active' : '' ?>">
+                <i class="fas fa-chart-bar"></i>
+                <span>Reports</span>
+            </a>
+            <a href="feedback.php" class="btn-nav <?= ($current_page === 'feedback') ? 'active' : '' ?>">
+                <i class="fas fa-comment-dots"></i>
+                <span>Feedback</span>
+            </a>
+            <a href="staff_audit_logs.php" class="btn-nav <?= ($current_page === 'audit_logs') ? 'active' : '' ?>">
+                <i class="fas fa-history"></i>
+                <span>My Activity</span>
+            </a>
+        </nav>
     </div>
-    <div>
-        <a href="settings.php" class="btn-nav <?= ($current_page === 'settings') ? 'active' : '' ?>"><i class="fas fa-cog"></i><span>Settings</span></a>
-        <a href="./logout.php" class="btn-nav logout"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
+    
+    <div class="sidebar-bottom">
+        <div class="user-profile-section">
+            <div class="user-avatar">
+                <?php if ($current_staff_picture): ?>
+                    <img src="../uploads/<?= htmlspecialchars($current_staff_picture) ?>" alt="<?= htmlspecialchars($current_staff_name) ?>">
+                <?php else: ?>
+                    <span><?= strtoupper(substr($current_staff_name, 0, 1)) ?></span>
+                <?php endif; ?>
+            </div>
+            <div class="user-info">
+                <span class="user-name"><?= htmlspecialchars($current_staff_name) ?></span>
+                <span class="user-role"><?= ucfirst($current_staff_role) ?></span>
+            </div>
+        </div>
+        
+        <div class="sidebar-actions">
+            <a href="settings.php" class="btn-nav <?= ($current_page === 'settings') ? 'active' : '' ?>">
+                <i class="fas fa-cog"></i>
+                <span>Settings</span>
+            </a>
+            <a href="./logout.php" class="btn-nav logout">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </a>
+        </div>
     </div>
 </div>
 <style>
-    /* --- Enhanced Sidebar Styles (Copied from Applicant Sidebar) --- */
-    .sidebar { width: 80px; background: #1e293b; padding: 20px 10px; display: flex; flex-direction: column; justify-content: space-between; color: #e2e8f0; flex-shrink: 0; transition: width 0.3s ease; overflow-x: hidden; position: fixed; height: 100%; z-index: 1000; }
-    .sidebar:hover { width: 240px; }
-    .sidebar-header { display: flex; align-items: center; justify-content: center; margin-bottom: 30px; height: 40px; }
-    .sidebar-header i { font-size: 2rem; color: #34d399; transition: transform 0.3s ease; }
-    .sidebar-header span { font-size: 1.25rem; font-weight: 700; color: #fff; white-space: nowrap; opacity: 0; transition: opacity 0.2s ease 0.1s; margin-left: 12px; }
-    .sidebar:hover .sidebar-header { justify-content: flex-start; padding-left: 10px; }
-    .sidebar:hover .sidebar-header i { transform: rotate(-15deg); }
-    .sidebar:hover ~ .main { margin-left: 240px; }
-    .sidebar:hover .sidebar-header span { opacity: 1; }
-    .btn-nav { display: flex; align-items: center; justify-content: center; padding: 14px 15px; margin-bottom: 8px; border-radius: 8px; text-decoration: none; background: transparent; color: #94a3b8; font-weight: 600; transition: all 0.2s ease; position: relative; }
-    .btn-nav i { min-width: 20px; text-align: center; font-size: 1.2em; flex-shrink: 0; }
-    .btn-nav span { white-space: nowrap; opacity: 0; max-width: 0; overflow: hidden; transition: opacity 0.1s ease, max-width 0.2s ease 0.1s, margin-left 0.2s ease 0.1s; position: relative; }
-    .sidebar:hover .btn-nav { justify-content: flex-start; }
-    .sidebar:hover .btn-nav span { opacity: 1; max-width: 150px; margin-left: 12px; }
-    .btn-nav:hover { background: #334155; color: #fff; }
-    .btn-nav.active { background: linear-gradient(90deg, #4a69bd, #3c5aa6); color: #fff; box-shadow: 0 4px 10px rgba(74, 105, 189, 0.3); }
-    .btn-nav.logout { margin-top: 20px; color: #e74c3c; }
-    .btn-nav.logout:hover { background: #e74c3c; color: #fff; }
-    .notification-count { background-color: #ef4444; color: white; border-radius: 6px; padding: 1px 6px; font-size: 11px; margin-left: 8px; font-weight: 700; position: absolute; top: 10px; right: -15px; }
-    .sidebar:not(:hover) .notification-count { top: 5px; right: 5px; }
-    .sidebar-divider { border: none; height: 1px; background-color: #334155; margin: 20px 0; }
-    .main { margin-left: 80px; transition: margin-left 0.3s ease; }
+    /* --- Enhanced Staff Sidebar Styles --- */
+    .sidebar { 
+        width: 80px; 
+        background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); 
+        padding: 0; 
+        display: flex; 
+        flex-direction: column; 
+        justify-content: space-between; 
+        color: #e2e8f0; 
+        flex-shrink: 0; 
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+        overflow: hidden; 
+        position: fixed; 
+        height: 100vh; 
+        z-index: 1000;
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
+    }
+    .sidebar:hover { width: 280px; }
+    
+    .sidebar-top {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px 12px;
+    }
+    
+    .sidebar-bottom {
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 16px 12px;
+        background: rgba(0, 0, 0, 0.2);
+    }
+    
+    .sidebar-header { 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        margin-bottom: 32px; 
+        padding: 12px;
+        border-radius: 12px;
+        background: rgba(74, 105, 189, 0.1);
+        transition: all 0.3s ease;
+    }
+    .sidebar:hover .sidebar-header { 
+        justify-content: flex-start; 
+        padding-left: 16px;
+        background: rgba(74, 105, 189, 0.2);
+    }
+    
+    .logo-icon {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #4a69bd, #3c5aa6);
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(74, 105, 189, 0.4);
+        transition: transform 0.3s ease;
+    }
+    .sidebar:hover .logo-icon {
+        transform: rotate(-5deg) scale(1.05);
+    }
+    
+    .logo-icon i { 
+        font-size: 1.5rem; 
+        color: #fff;
+    }
+    
+    .logo-text { 
+        font-size: 1.1rem; 
+        font-weight: 700; 
+        color: #fff; 
+        white-space: nowrap; 
+        opacity: 0; 
+        transition: opacity 0.3s ease 0.1s; 
+        margin-left: 12px;
+        letter-spacing: -0.5px;
+    }
+    .sidebar:hover .logo-text { opacity: 1; }
+    
+    .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .btn-nav { 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        padding: 12px 16px; 
+        margin-bottom: 4px; 
+        border-radius: 10px; 
+        text-decoration: none; 
+        background: transparent; 
+        color: #94a3b8; 
+        font-weight: 500; 
+        font-size: 14px;
+        transition: all 0.2s ease; 
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .btn-nav::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%) scaleY(0);
+        width: 3px;
+        height: 0;
+        background: linear-gradient(180deg, #4a69bd, #3c5aa6);
+        border-radius: 0 3px 3px 0;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-nav i { 
+        min-width: 24px; 
+        text-align: center; 
+        font-size: 1.2em; 
+        flex-shrink: 0;
+        transition: transform 0.2s ease;
+    }
+    
+    .btn-nav span { 
+        white-space: nowrap; 
+        opacity: 0; 
+        max-width: 0; 
+        overflow: hidden; 
+        transition: opacity 0.2s ease 0.1s, max-width 0.3s ease 0.1s, margin-left 0.2s ease 0.1s; 
+        position: relative;
+        margin-left: 0;
+    }
+    
+    .sidebar:hover .btn-nav { 
+        justify-content: flex-start; 
+        padding-left: 16px;
+    }
+    .sidebar:hover .btn-nav span { 
+        opacity: 1; 
+        max-width: 200px; 
+        margin-left: 12px; 
+    }
+    
+    .btn-nav:hover { 
+        background: rgba(255, 255, 255, 0.08); 
+        color: #fff;
+        transform: translateX(4px);
+    }
+    .btn-nav:hover::before {
+        height: 60%;
+        transform: translateY(-50%) scaleY(1);
+    }
+    .btn-nav:hover i {
+        transform: scale(1.1);
+    }
+    
+    .btn-nav.active { 
+        background: linear-gradient(90deg, rgba(74, 105, 189, 0.2), rgba(60, 90, 166, 0.15)); 
+        color: #fff; 
+        box-shadow: 0 2px 8px rgba(74, 105, 189, 0.3);
+        border-left: 3px solid #4a69bd;
+    }
+    .btn-nav.active::before {
+        height: 60%;
+        transform: translateY(-50%) scaleY(1);
+    }
+    .btn-nav.active i {
+        color: #60a5fa;
+    }
+    
+    .btn-nav.logout { 
+        color: #f87171;
+        margin-top: 8px;
+    }
+    .btn-nav.logout:hover { 
+        background: rgba(248, 113, 113, 0.2); 
+        color: #fff;
+    }
+    
+    .notification-badge { 
+        background: linear-gradient(135deg, #ef4444, #dc2626); 
+        color: white; 
+        border-radius: 10px; 
+        padding: 2px 8px; 
+        font-size: 11px; 
+        font-weight: 700; 
+        margin-left: auto;
+        min-width: 20px;
+        text-align: center;
+        box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+    
+    .sidebar:not(:hover) .notification-badge { 
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        margin-left: 0;
+    }
+    
+    .sidebar-divider { 
+        border: none; 
+        height: 1px; 
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+        margin: 16px 0; 
+    }
+    
+    .user-profile-section {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.05);
+        margin-bottom: 12px;
+        transition: all 0.3s ease;
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    .sidebar:hover .user-profile-section {
+        opacity: 1;
+        transform: translateY(0);
+        justify-content: flex-start;
+    }
+    
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #4a69bd, #3c5aa6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-weight: 700;
+        font-size: 16px;
+        flex-shrink: 0;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+    .user-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .user-info {
+        margin-left: 12px;
+        display: flex;
+        flex-direction: column;
+        opacity: 0;
+        max-width: 0;
+        overflow: hidden;
+        transition: opacity 0.3s ease 0.1s, max-width 0.3s ease 0.1s, margin-left 0.3s ease 0.1s;
+    }
+    .sidebar:hover .user-info {
+        opacity: 1;
+        max-width: 150px;
+        margin-left: 12px;
+    }
+    
+    .user-name {
+        font-weight: 600;
+        font-size: 14px;
+        color: #fff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .user-role {
+        font-size: 12px;
+        color: #94a3b8;
+        white-space: nowrap;
+    }
+    
+    .sidebar-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .main { 
+        margin-left: 80px; 
+        transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+    }
+    
+    /* Scrollbar styling for sidebar */
+    .sidebar-top::-webkit-scrollbar {
+        width: 4px;
+    }
+    .sidebar-top::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .sidebar-top::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 2px;
+    }
+    .sidebar-top::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
 
     /* Mobile Responsive */
     @media (max-width: 768px) {

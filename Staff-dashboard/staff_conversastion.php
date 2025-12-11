@@ -53,8 +53,17 @@ require_once './staff_sidebar.php';
 <!-- Main Content -->
 <div class="main">
     <header class="header">
-        <h1>Live Chat Management</h1>
-        <p>Review and respond to applicant chat requests.</p>
+        <div class="header-left">
+            <div>
+                <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-headset" style="color: var(--accent-color);"></i>
+                    Live Chat Management
+                </h1>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+                    Review and respond to applicant chat requests
+                </p>
+            </div>
+        </div>
     </header>
 
     <?php if (empty($chats)): ?>

@@ -589,9 +589,19 @@ if ($chat_id > 0) {
 
     <div class="main">
         <header class="header">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <a href="applicant_dashboard.php" class="btn" style="padding: 8px 12px;"><i class="fas fa-arrow-left"></i> Back</a>
-                <h1>Live Chat Support</h1>
+            <div class="header-left">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <a href="applicant_dashboard.php" class="btn" style="padding: 8px 12px;"><i class="fas fa-arrow-left"></i> Back</a>
+                    <div>
+                        <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-headset" style="color: var(--accent-color);"></i>
+                            Live Chat Support
+                        </h1>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+                            Get instant help from our support team
+                        </p>
+                    </div>
+                </div>
             </div>
         </header>
 

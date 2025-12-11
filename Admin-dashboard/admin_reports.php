@@ -82,8 +82,18 @@ require_once __DIR__ . '/admin_sidebar.php';
 <!-- Main Content -->
 <div class="main">
   <header class="header">
-    <h1>Reports</h1>
-    <div class="header-actions">
+    <div class="header-left">
+        <div>
+            <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-chart-bar" style="color: var(--accent-color);"></i>
+                Reports & Analytics
+            </h1>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+                View system statistics and generate reports
+            </p>
+        </div>
+    </div>
+    <div class="header-right">
         <a href="generate_reports.php" class="btn btn-primary">
             <i class="fas fa-file-csv"></i> Export as CSV
         </a>

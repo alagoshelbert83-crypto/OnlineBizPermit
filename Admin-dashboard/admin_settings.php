@@ -103,7 +103,15 @@ require_once __DIR__ . '/admin_sidebar.php';
 <div class="main">
     <header class="header">
         <button id="hamburger" aria-label="Open Menu"><i class="fas fa-bars"></i></button>
-        <h1>Settings</h1>
+        <div>
+            <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-cog" style="color: var(--accent-color);"></i>
+                Settings
+            </h1>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+                Manage your profile and system settings
+            </p>
+        </div>
     </header>
 
     <div class="settings-grid">

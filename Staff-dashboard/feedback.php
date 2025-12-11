@@ -57,7 +57,19 @@ require_once './staff_sidebar.php';
 
     <!-- Main Content -->
     <div class="main">
-      <div class="main-header"><h1>User Feedback</h1></div>
+      <header class="header">
+        <div class="header-left">
+            <div>
+                <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-comment-dots" style="color: var(--accent-color);"></i>
+                    User Feedback
+                </h1>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+                    Review feedback and suggestions from applicants
+                </p>
+            </div>
+        </div>
+      </header>
       <div class="feedback-grid">
         <?php if (empty($feedbacks)): ?>
           <p>No feedback received yet.</p>

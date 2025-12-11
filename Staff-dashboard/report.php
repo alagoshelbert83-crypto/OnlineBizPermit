@@ -24,13 +24,24 @@ if ($application_id > 0) {
     $stmt->execute([$application_id]);
     $app = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // ✅ Fixed query: match your actual columns
-    $d = $conn->prepare("SELECT document_name AS file_name, file_path, upload_date AS uploaded_at 
+    // ✅ Fixed query: match your actual columns, include document_type
+    $d = $conn->prepare("SELECT document_name AS file_name, file_path, document_type, upload_date AS uploaded_at 
                FROM documents 
                WHERE application_id=? 
-               ORDER BY id DESC");
+               ORDER BY document_type, upload_date DESC");
     $d->execute([$application_id]);
     $docs = $d->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Document type labels mapping
+    $document_type_labels = [
+        'dti_registration' => 'DTI Registration Certificate',
+        'bir_registration' => 'BIR Registration Certificate',
+        'barangay_clearance' => 'Barangay Clearance',
+        'fire_safety_certificate' => 'Fire Safety Certificate',
+        'sanitary_permit' => 'Sanitary Permit',
+        'health_inspection' => 'Health Inspection Certificate',
+        'building_permit' => 'Building Permit'
+    ];
 }
 
 if (!$app) {
@@ -62,7 +73,15 @@ if (!$app) {
 <body>
   <div class="card">
     <a class="btn" href="applicants.php" style="background:#6c757d; margin-bottom:12px; display:inline-block;">&larr; Back</a>
-    <h1>Application Report</h1>
+    <div style="margin-bottom: 20px;">
+        <h1 style="margin: 0; display: flex; align-items: center; gap: 10px; color: #1e293b;">
+            <i class="fas fa-file-alt" style="color: #4a69bd;"></i>
+            Application Report
+        </h1>
+        <p style="color: #64748b; font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
+            Detailed application information and documents
+        </p>
+    </div>
     <div class="grid">
       <div class="section">
         <h3>Applicant</h3>
@@ -107,10 +126,15 @@ if (!$app) {
       <h3>Documents</h3>
       <?php if (!empty($docs)): ?>
         <table class="docs">
-          <thead><tr><th>File</th><th>Uploaded</th><th></th></tr></thead>
+          <thead><tr><th>Document Type</th><th>File Name</th><th>Uploaded</th><th></th></tr></thead>
           <tbody>
             <?php foreach ($docs as $doc): ?>
+              <?php
+              $doc_type = $doc['document_type'] ?? 'Other';
+              $doc_label = $document_type_labels[$doc_type] ?? ucfirst(str_replace('_', ' ', $doc_type));
+              ?>
               <tr>
+                <td><strong><?= htmlspecialchars($doc_label) ?></strong></td>
                 <td><?= htmlspecialchars($doc['file_name']) ?></td>
                 <td><?= htmlspecialchars($doc['uploaded_at'] ?? '-') ?></td>
                 <td><a href="../uploads/<?= htmlspecialchars($doc['file_path']) ?>" target="_blank" rel="noopener" class="btn" style="padding:6px 10px;">Open</a></td>
