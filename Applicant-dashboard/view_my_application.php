@@ -283,43 +283,39 @@ require_once __DIR__ . '/applicant_sidebar.php';
                         <?php foreach ($documents as $doc): ?>
                             <?php
                             $doc_type = trim($doc['document_type'] ?? '');
-                            // Handle null, empty, or 'Other' document_type - infer from filename if possible
+                            // Handle null, empty, or 'Other' document_type - infer from file_path or filename
                             if (empty($doc_type) || $doc_type === null || $doc_type === '' || strtolower($doc_type) === 'other') {
-                                // Try to infer from filename first
+                                $file_path_lower = strtolower($doc['file_path'] ?? '');
                                 $filename_lower = strtolower($doc['document_name'] ?? '');
-                                $filepath_lower = strtolower($doc['file_path'] ?? '');
-                                $combined_text = $filename_lower . ' ' . $filepath_lower;
+                                $combined_text = $file_path_lower . ' ' . $filename_lower;
                                 
-                                if (strpos($combined_text, 'dti') !== false || (strpos($combined_text, 'registration') !== false && strpos($combined_text, 'bir') === false)) {
-                                    $doc_type = 'dti_registration';
-                                } elseif (strpos($combined_text, 'bir') !== false) {
-                                    $doc_type = 'bir_registration';
-                                } elseif (strpos($combined_text, 'barangay') !== false || strpos($combined_text, 'clearance') !== false) {
-                                    $doc_type = 'barangay_clearance';
-                                } elseif (strpos($combined_text, 'fire') !== false || strpos($combined_text, 'safety') !== false) {
-                                    $doc_type = 'fire_safety_certificate';
-                                } elseif (strpos($combined_text, 'sanitary') !== false) {
-                                    $doc_type = 'sanitary_permit';
-                                } elseif (strpos($combined_text, 'health') !== false || strpos($combined_text, 'inspection') !== false) {
-                                    $doc_type = 'health_inspection';
-                                } elseif (strpos($combined_text, 'building') !== false) {
-                                    $doc_type = 'building_permit';
-                                } else {
-                                    // If we can't infer, check if file_path contains the document type hint
-                                    $file_path_lower = strtolower($doc['file_path'] ?? '');
-                                    if (strpos($file_path_lower, 'dti') !== false) {
+                                // First, check if file_path contains the exact document_type keys (most reliable)
+                                // File paths are generated as: doc_{app_id}_{document_type}_{uniqid}.ext
+                                $document_type_keys = array_keys($document_type_labels);
+                                $found_type = false;
+                                foreach ($document_type_keys as $type_key) {
+                                    if ($type_key !== 'other' && strpos($file_path_lower, $type_key) !== false) {
+                                        $doc_type = $type_key;
+                                        $found_type = true;
+                                        break;
+                                    }
+                                }
+                                
+                                // If not found in file_path, try keyword matching
+                                if (!$found_type) {
+                                    if (strpos($combined_text, 'dti_registration') !== false || (strpos($combined_text, 'dti') !== false && strpos($combined_text, 'registration') !== false && strpos($combined_text, 'bir') === false)) {
                                         $doc_type = 'dti_registration';
-                                    } elseif (strpos($file_path_lower, 'bir') !== false) {
+                                    } elseif (strpos($combined_text, 'bir_registration') !== false || strpos($combined_text, 'bir') !== false) {
                                         $doc_type = 'bir_registration';
-                                    } elseif (strpos($file_path_lower, 'barangay') !== false || strpos($file_path_lower, 'clearance') !== false) {
+                                    } elseif (strpos($combined_text, 'barangay_clearance') !== false || strpos($combined_text, 'barangay') !== false || strpos($combined_text, 'clearance') !== false) {
                                         $doc_type = 'barangay_clearance';
-                                    } elseif (strpos($file_path_lower, 'fire') !== false || strpos($file_path_lower, 'safety') !== false) {
+                                    } elseif (strpos($combined_text, 'fire_safety') !== false || strpos($combined_text, 'fire') !== false || strpos($combined_text, 'safety') !== false) {
                                         $doc_type = 'fire_safety_certificate';
-                                    } elseif (strpos($file_path_lower, 'sanitary') !== false) {
+                                    } elseif (strpos($combined_text, 'sanitary_permit') !== false || strpos($combined_text, 'sanitary') !== false) {
                                         $doc_type = 'sanitary_permit';
-                                    } elseif (strpos($file_path_lower, 'health') !== false || strpos($file_path_lower, 'inspection') !== false) {
+                                    } elseif (strpos($combined_text, 'health_inspection') !== false || strpos($combined_text, 'health') !== false || strpos($combined_text, 'inspection') !== false) {
                                         $doc_type = 'health_inspection';
-                                    } elseif (strpos($file_path_lower, 'building') !== false) {
+                                    } elseif (strpos($combined_text, 'building_permit') !== false || strpos($combined_text, 'building') !== false) {
                                         $doc_type = 'building_permit';
                                     } else {
                                         $doc_type = 'other';
@@ -332,14 +328,21 @@ require_once __DIR__ . '/applicant_sidebar.php';
                             $file_extension = strtolower(pathinfo($doc['document_name'], PATHINFO_EXTENSION));
                             // Use secure file viewer PHP script instead of direct file access
                             $file_path = '../view_file.php?file=' . urlencode($doc['file_path']);
+                            // For image preview, use the same path
+                            $image_preview_path = $file_path;
                             ?>
                             <div class="document-item">
                                 <div class="doc-preview">
                                     <?php if (in_array($file_extension, ['jpg', 'jpeg', 'png', 'gif'])): ?>
                                         <a href="<?= $file_path ?>" target="_blank" title="View <?= htmlspecialchars($doc_label) ?>">
-                                            <img src="<?= $file_path ?>" 
+                                            <img src="<?= $image_preview_path ?>" 
                                                  alt="<?= htmlspecialchars($doc_label) ?>"
-                                                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'%3E%3Crect fill=\'%23f8fafc\' width=\'100\' height=\'100\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%2364748b\' font-family=\'sans-serif\' font-size=\'14\'%3EImage%3C/text%3E%3C/svg%3E';">
+                                                 style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;"
+                                                 loading="lazy"
+                                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                            <div style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center; background: #f8fafc; border-radius: 8px;">
+                                                <i class="fas fa-image" style="font-size: 2.5rem; color: #64748b;"></i>
+                                            </div>
                                         </a>
                                     <?php elseif ($file_extension === 'pdf'): ?>
                                         <a href="<?= $file_path ?>" target="_blank" title="View PDF: <?= htmlspecialchars($doc_label) ?>">
@@ -640,31 +643,34 @@ p {
     border-radius: 12px;
     padding: 15px;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 15px;
+    text-align: center;
+    gap: 10px;
     transition: all 0.2s ease;
     background: #fff;
-    flex-wrap: wrap;
 }
 .document-item:hover {
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     transform: translateY(-3px);
 }
 .document-item .doc-preview {
-    height: 100px;
-    width: 100px;
+    height: 150px;
+    width: 100%;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #f8fafc;
     border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
 }
 .document-item .doc-preview img { 
-    max-height: 100%; 
-    max-width: 100%; 
+    width: 100%;
+    height: 100%;
     object-fit: cover; 
-    border-radius: 4px; 
+    border-radius: 8px; 
     display: block;
     cursor: pointer;
     transition: transform 0.2s ease;
@@ -679,11 +685,45 @@ p {
     text-decoration: none;
 }
 .document-item .doc-preview i { font-size: 2.5rem; color: #64748b; }
-.document-item .doc-info { flex: 1; min-width: 200px; }
-.document-item .doc-type-label { font-weight: 600; font-size: 0.95rem; color: #1e293b; margin-bottom: 5px; display: block; }
-.document-item .doc-filename { font-weight: 400; font-size: 0.8rem; color: #64748b; margin: 0; word-break: break-all; line-height: 1.3; }
-.document-item p { font-weight: 500; font-size: 0.8rem; margin-bottom: 10px; word-break: break-all; line-height: 1.3; }
-.document-item .btn { padding: 6px 12px; font-size: 0.8rem; flex-shrink: 0; }
+.document-item .doc-info { 
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+.document-item .doc-type-label { 
+    font-weight: 600; 
+    font-size: 0.95rem; 
+    color: #1e293b; 
+    margin: 0;
+    display: block;
+    text-align: center;
+}
+.document-item .doc-filename { 
+    font-weight: 400; 
+    font-size: 0.85rem; 
+    color: #64748b; 
+    margin: 0; 
+    word-break: break-word; 
+    line-height: 1.3;
+    text-align: center;
+}
+.document-item p { 
+    font-weight: 500; 
+    font-size: 0.8rem; 
+    margin-bottom: 10px; 
+    word-break: break-all; 
+    line-height: 1.3; 
+}
+.document-item .btn { 
+    padding: 8px 16px; 
+    font-size: 0.9rem; 
+    width: 100%;
+    justify-content: center;
+    margin-top: auto;
+}
 
 @media (max-width: 768px) {
     .action-buttons {
