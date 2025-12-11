@@ -483,16 +483,22 @@ require_once __DIR__ . '/applicant_sidebar.php';
 
 <!-- Custom Styles for Business Permit Form -->
 <style>
+    /* Smooth scrolling */
+    html {
+        scroll-behavior: smooth;
+    }
+
     .form-container {
-        max-width: 1100px;
+        max-width: 1200px;
         margin: auto;
         background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        padding: 40px;
-        border-radius: 16px;
-        box-shadow: 0 10px 30px rgba(0, 86, 179, 0.1);
-        border: 2px solid #e2e8f0;
+        padding: 50px;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 86, 179, 0.12), 0 8px 25px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(59, 130, 246, 0.1);
         overflow: hidden;
         position: relative;
+        backdrop-filter: blur(10px);
     }
 
     .form-container::before {
@@ -501,8 +507,15 @@ require_once __DIR__ . '/applicant_sidebar.php';
         top: 0;
         left: 0;
         right: 0;
-        height: 4px;
-        background: linear-gradient(90deg, #0056b3 0%, #3b82f6 50%, #0056b3 100%);
+        height: 5px;
+        background: linear-gradient(90deg, #1e40af 0%, #3b82f6 25%, #60a5fa 50%, #3b82f6 75%, #1e40af 100%);
+        background-size: 200% 100%;
+        animation: shimmer 3s ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
     }
 
     /* Official Header Styling */
@@ -510,12 +523,24 @@ require_once __DIR__ . '/applicant_sidebar.php';
         display: flex;
         align-items: center;
         gap: 30px;
-        margin-bottom: 30px;
-        padding: 25px;
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border-radius: 12px;
-        border: 3px solid #0056b3;
-        box-shadow: 0 4px 15px rgba(0, 86, 179, 0.1);
+        margin-bottom: 35px;
+        padding: 35px;
+        background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+        border-radius: 16px;
+        border: 2px solid rgba(59, 130, 246, 0.2);
+        box-shadow: 0 8px 25px rgba(0, 86, 179, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .official-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #1e40af 0%, #3b82f6 50%, #1e40af 100%);
     }
 
     .header-logo {
@@ -534,13 +559,15 @@ require_once __DIR__ . '/applicant_sidebar.php';
         height: 140px;
         border-radius: 50%;
         object-fit: cover;
-        box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4), inset 0 2px 10px rgba(255, 255, 255, 0.1);
-        transition: all 0.3s ease;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15), 0 0 0 4px rgba(59, 130, 246, 0.1), inset 0 2px 10px rgba(255, 255, 255, 0.3);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 3px solid rgba(59, 130, 246, 0.2);
     }
 
     .municipal-logo:hover {
-        transform: scale(1.05);
-        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), inset 0 2px 10px rgba(255, 255, 255, 0.2);
+        transform: scale(1.08) rotate(2deg);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2), 0 0 0 6px rgba(59, 130, 246, 0.15), inset 0 2px 10px rgba(255, 255, 255, 0.4);
+        border-color: rgba(59, 130, 246, 0.4);
     }
 
     .fallback-logo {
@@ -555,13 +582,18 @@ require_once __DIR__ . '/applicant_sidebar.php';
     }
 
     .official-title {
-        font-size: 1.8rem;
-        font-weight: 700;
-        color: #0056b3;
+        font-size: 2rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
         text-align: center;
-        margin: 0 0 15px 0;
+        margin: 0 0 20px 0;
         text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 1.5px;
+        line-height: 1.3;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
 
     .form-info {
@@ -589,18 +621,31 @@ require_once __DIR__ . '/applicant_sidebar.php';
 
     /* Instructions */
     .instructions {
-        background: #fff3cd;
-        border: 1px solid #ffeaa7;
-        border-radius: 8px;
-        padding: 15px;
-        margin-bottom: 30px;
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        border: 2px solid #fbbf24;
+        border-left: 5px solid #f59e0b;
+        border-radius: 12px;
+        padding: 20px 25px;
+        margin-bottom: 35px;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+        position: relative;
+    }
+
+    .instructions::before {
+        content: '⚠️';
+        position: absolute;
+        left: 20px;
+        top: 20px;
+        font-size: 24px;
     }
 
     .instruction-item {
-        margin: 0 0 10px 0;
+        margin: 0 0 12px 0;
+        margin-left: 35px;
         font-size: 14px;
-        color: #856404;
-        line-height: 1.5;
+        color: #92400e;
+        line-height: 1.7;
+        font-weight: 500;
     }
 
     .instruction-item:last-child {
@@ -608,68 +653,119 @@ require_once __DIR__ . '/applicant_sidebar.php';
     }
 
     .form-section {
-        border: 2px solid #e2e8f0;
-        padding: 25px;
-        margin-bottom: 25px;
-        border-radius: 12px;
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        box-shadow: 0 4px 12px rgba(0, 86, 179, 0.05);
-        transition: all 0.3s ease;
+        border: 1px solid rgba(59, 130, 246, 0.15);
+        padding: 35px;
+        margin-bottom: 30px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+        box-shadow: 0 4px 20px rgba(0, 86, 179, 0.06), 0 1px 3px rgba(0, 0, 0, 0.05);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         color: #070707ff;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .form-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: linear-gradient(180deg, #3b82f6 0%, #1e40af 100%);
+        transform: scaleY(0);
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .form-section:hover {
-        box-shadow: 0 6px 20px rgba(0, 86, 179, 0.1);
-        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0, 86, 179, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08);
+        transform: translateY(-3px);
+        border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .form-section:hover::before {
+        transform: scaleY(1);
     }
 
     .form-section h2 {
         color: #0c0c0cff;
         border-bottom: 3px solid #3b82f6;
-        padding-bottom: 10px;
-        margin-bottom: 25px;
-        font-size: 1.4rem;
+        padding-bottom: 15px;
+        margin-bottom: 30px;
+        font-size: 1.6rem;
         text-transform: uppercase;
-        letter-spacing: 1px;
-        font-weight: 700;
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        letter-spacing: 1.5px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #1e293b 0%, #3b82f6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        position: relative;
+        padding-left: 15px;
+    }
+
+    .form-section h2::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 5px;
+        height: 30px;
+        background: linear-gradient(180deg, #3b82f6 0%, #1e40af 100%);
+        border-radius: 3px;
     }
 
     .form-section h3 {
         color: #0a0b0bff;
-        border-bottom: 2px solid #3b82f6;
-        padding-bottom: 8px;
-        margin-top: 30px;
-        margin-bottom: 20px;
-        font-size: 1.2rem;
-        font-weight: 600;
+        border-bottom: 2px solid rgba(59, 130, 246, 0.3);
+        padding-bottom: 12px;
+        margin-top: 35px;
+        margin-bottom: 25px;
+        font-size: 1.3rem;
+        font-weight: 700;
         position: relative;
+        padding-left: 20px;
     }
 
     .form-section h3::before {
         content: '';
         position: absolute;
-        left: -10px;
+        left: 0;
         top: 50%;
         transform: translateY(-50%);
-        width: 4px;
-        height: 20px;
+        width: 5px;
+        height: 25px;
         background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-        border-radius: 2px;
-        color: #0b0b0bff;
+        border-radius: 3px;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
     }
 
     .form-section h4 {
         color: #0c0c0cff;
-        margin-top: 25px;
-        margin-bottom: 15px;
-        font-size: 1.1rem;
-        font-weight: 600;
-        padding-left: 15px;
-        border-left: 3px solid #3b82f6;
-        background: linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%);
-        padding: 10px 15px;
-        border-radius: 0 8px 8px 0;
+        margin-top: 30px;
+        margin-bottom: 18px;
+        font-size: 1.15rem;
+        font-weight: 700;
+        padding: 12px 20px;
+        border-left: 4px solid #3b82f6;
+        background: linear-gradient(90deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.03) 100%);
+        border-radius: 0 10px 10px 0;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+        position: relative;
+    }
+
+    .form-section h4::after {
+        content: '';
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 6px;
+        height: 6px;
+        background: #3b82f6;
+        border-radius: 50%;
+        opacity: 0.5;
     }
 
     .form-row {
@@ -686,9 +782,11 @@ require_once __DIR__ . '/applicant_sidebar.php';
 
     .form-group label {
         display: block;
-        font-weight: bold;
-        margin-bottom: 5px;
-        color: #050505ff;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #1e293b;
+        font-size: 14px;
+        letter-spacing: 0.3px;
     }
 
     .business-permit-form input[type="text"],
@@ -696,48 +794,69 @@ require_once __DIR__ . '/applicant_sidebar.php';
     .business-permit-form input[type="date"],
     .business-permit-form input[type="number"],
     .business-permit-form textarea {
-        color: #080808ff;
+        color: #1e293b;
         width: 100%;
-        padding: 12px 16px;
+        padding: 14px 18px;
         border: 2px solid #e2e8f0;
-        border-radius: 8px;
+        border-radius: 10px;
         box-sizing: border-box;
-        font-size: 14px;
-        transition: all 0.3s ease;
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 15px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        background: #ffffff;
+        font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
 
     .business-permit-form input:focus,
     .business-permit-form textarea:focus {
         border-color: #3b82f6;
         outline: none;
-        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(59, 130, 246, 0.15);
         background: #ffffff;
-        transform: translateY(-1px);
+        transform: translateY(-2px);
     }
 
     .business-permit-form input:hover,
     .business-permit-form textarea:hover {
-        border-color: #94a3b8;
+        border-color: #cbd5e1;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
     }
 
     .radio-options {
         display: flex;
-        gap: 15px;
+        gap: 20px;
         flex-wrap: wrap;
-        margin-top: 5px;
+        margin-top: 10px;
     }
 
     .radio-options input[type="radio"] {
-        margin-right: 5px;
+        margin-right: 8px;
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: #3b82f6;
     }
 
     .radio-options label {
-        font-weight: normal;
-        display: inline-block;
-        margin-right: 15px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
         cursor: pointer;
+        padding: 8px 16px;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        color: #475569;
+    }
+
+    .radio-options label:hover {
+        background: rgba(59, 130, 246, 0.08);
+        color: #1e40af;
+    }
+
+    .radio-options input[type="radio"]:checked + label {
+        color: #1e40af;
+        font-weight: 600;
+        background: rgba(59, 130, 246, 0.1);
     }
 
     /* Business Type Table */
@@ -749,24 +868,36 @@ require_once __DIR__ . '/applicant_sidebar.php';
         width: 100%;
         border-collapse: collapse;
         background: white;
-        border-radius: 8px;
+        border-radius: 12px;
         overflow: hidden;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-top: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
+        margin-top: 15px;
+        border: 1px solid rgba(59, 130, 246, 0.1);
     }
 
     .business-type-table th,
     .business-type-table td {
-        padding: 12px;
+        padding: 16px;
         text-align: left;
-        border: 1px solid #ddd;
+        border: 1px solid #e2e8f0;
     }
 
     .business-type-table th {
-        background-color: #f8f9fa;
-        font-weight: bold;
-        color: #333;
-        font-size: 12px;
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        font-weight: 700;
+        color: #1e293b;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #3b82f6;
+    }
+
+    .business-type-table tbody tr {
+        transition: all 0.2s ease;
+    }
+
+    .business-type-table tbody tr:hover {
+        background: rgba(59, 130, 246, 0.03);
     }
 
     .checkbox-group {
@@ -795,72 +926,112 @@ require_once __DIR__ . '/applicant_sidebar.php';
         width: 100%;
         border-collapse: collapse;
         background: white;
-        border-radius: 8px;
+        border-radius: 12px;
         overflow: hidden;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
+        border: 1px solid rgba(59, 130, 246, 0.1);
     }
 
     .official-table th,
     .official-table td {
-        padding: 12px;
+        padding: 14px;
         text-align: left;
-        border: 1px solid #ddd;
+        border: 1px solid #e2e8f0;
     }
 
     .official-table th {
-        background-color: #f8f9fa;
-        font-weight: bold;
-        color: #333;
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        font-weight: 700;
+        color: #1e293b;
         font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #3b82f6;
+    }
+
+    .official-table tbody tr {
+        transition: all 0.2s ease;
+    }
+
+    .official-table tbody tr:hover {
+        background: rgba(59, 130, 246, 0.03);
     }
 
     .official-table td input {
         width: 100%;
-        border: none;
-        padding: 8px;
+        border: 1px solid transparent;
+        padding: 10px;
         background: transparent;
+        border-radius: 6px;
+        transition: all 0.2s ease;
     }
 
     .official-table td input:focus {
-        background: #f8f9fa;
-        border: 1px solid #0056b3;
+        background: #ffffff;
+        border: 2px solid #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        outline: none;
     }
 
     .declaration {
         font-style: italic;
-        color: #666;
-        margin: 20px 0;
-        padding: 15px;
-        background: #f8f9fa;
-        border-left: 4px solid #0056b3;
-        border-radius: 4px;
-        line-height: 1.6;
+        color: #475569;
+        margin: 25px 0;
+        padding: 20px 25px;
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border-left: 5px solid #3b82f6;
+        border-radius: 10px;
+        line-height: 1.8;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        font-weight: 500;
+        position: relative;
+    }
+
+    .declaration::before {
+        content: '"';
+        position: absolute;
+        left: 15px;
+        top: 10px;
+        font-size: 48px;
+        color: rgba(59, 130, 246, 0.2);
+        font-family: Georgia, serif;
+        line-height: 1;
     }
 
     /* Document Upload Section */
     .document-upload-section {
-        margin: 20px 0;
+        margin: 25px 0;
     }
 
     .document-item {
-        margin-bottom: 20px;
-        padding: 15px;
-        background: #f8f9fa;
-        border-radius: 8px;
-        border: 1px solid #e9ecef;
+        margin-bottom: 25px;
+        padding: 20px;
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        border-radius: 12px;
+        border: 2px solid #e2e8f0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    }
+
+    .document-item:hover {
+        border-color: rgba(59, 130, 246, 0.3);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+        transform: translateY(-2px);
     }
 
     .document-item label {
-        font-weight: bold;
-        color: #333;
-        margin-bottom: 10px;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 12px;
         display: block;
+        font-size: 15px;
     }
 
     .file-upload-wrapper {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
+        flex-wrap: wrap;
     }
 
     .file-input {
@@ -873,36 +1044,55 @@ require_once __DIR__ . '/applicant_sidebar.php';
     }
 
     .file-label {
-        display: inline-block;
-        padding: 10px 20px;
-        background-color: #0056b3;
+        display: inline-flex;
+        align-items: center;
+        padding: 12px 24px;
+        background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
         color: #fff;
-        border-radius: 6px;
+        border-radius: 10px;
         cursor: pointer;
         font-weight: 600;
-        transition: background-color 0.2s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         margin: 0;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        border: none;
     }
 
     .file-label:hover {
-        background-color: #004494;
+        background: linear-gradient(135deg, #2563eb 0%, #1e3a8a 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    }
+
+    .file-label:active {
+        transform: translateY(0);
     }
 
     .file-label i {
-        margin-right: 8px;
+        margin-right: 10px;
+        font-size: 16px;
     }
 
     .file-name {
         flex-grow: 1;
-        padding: 10px;
-        border: 1px solid #ced4da;
-        border-radius: 6px;
-        background-color: #fff;
-        color: #5a6a7b;
+        min-width: 200px;
+        padding: 12px 16px;
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        background-color: #ffffff;
+        color: #64748b;
         font-style: italic;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        transition: all 0.3s ease;
+    }
+
+    .file-name:not(:empty) {
+        color: #1e293b;
+        font-style: normal;
+        border-color: rgba(59, 130, 246, 0.3);
+        background: rgba(59, 130, 246, 0.03);
     }
 
     .declaration-section {
@@ -919,21 +1109,21 @@ require_once __DIR__ . '/applicant_sidebar.php';
     }
 
     .btn-primary {
-        background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         color: white;
         border: none;
-        padding: 16px 32px;
+        padding: 18px 40px;
         border-radius: 12px;
         cursor: pointer;
-        font-size: 16px;
+        font-size: 17px;
         font-weight: 700;
         display: inline-flex;
         align-items: center;
         gap: 12px;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35), 0 2px 8px rgba(16, 185, 129, 0.2);
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 1px;
         position: relative;
         overflow: hidden;
     }
@@ -945,8 +1135,8 @@ require_once __DIR__ . '/applicant_sidebar.php';
         left: -100%;
         width: 100%;
         height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-        transition: left 0.5s;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+        transition: left 0.6s;
     }
 
     .btn-primary:hover::before {
@@ -954,41 +1144,80 @@ require_once __DIR__ . '/applicant_sidebar.php';
     }
 
     .btn-primary:hover {
-        background: linear-gradient(135deg, #047857 0%, #059669 100%);
-        transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        transform: translateY(-4px);
+        box-shadow: 0 10px 30px rgba(16, 185, 129, 0.45), 0 4px 12px rgba(16, 185, 129, 0.3);
     }
 
     .btn-primary:active {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+    }
+
+    .btn-primary:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+        transform: none;
     }
 
     .notes {
         font-style: italic;
-        color: #666;
-        margin-bottom: 15px;
+        color: #64748b;
+        margin-bottom: 20px;
         font-size: 14px;
+        padding: 12px 18px;
+        background: rgba(59, 130, 246, 0.05);
+        border-left: 3px solid #3b82f6;
+        border-radius: 6px;
+        line-height: 1.6;
+    }
+
+    /* Back Button Enhancement */
+    .header .btn {
+        background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3);
+        transition: all 0.3s ease;
+        border: none;
+    }
+
+    .header .btn:hover {
+        background: linear-gradient(135deg, #475569 0%, #334155 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(100, 116, 139, 0.4);
     }
 
     /* Responsive Design */
     @media (max-width: 768px) {
         .form-container {
-            padding: 20px;
+            padding: 25px 20px;
+            border-radius: 16px;
         }
 
         .official-header {
             flex-direction: column;
-        text-align: center;
+            text-align: center;
+            padding: 25px 20px;
+        }
+
+        .official-title {
+            font-size: 1.5rem;
         }
 
         .form-info {
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
+        }
+
+        .form-section {
+            padding: 25px 20px;
         }
 
         .form-row {
             flex-direction: column;
+            gap: 15px;
         }
 
         .form-group {
@@ -997,7 +1226,7 @@ require_once __DIR__ . '/applicant_sidebar.php';
 
         .radio-options {
             flex-direction: column;
-            gap: 8px;
+            gap: 12px;
         }
 
         .business-activity-table,
@@ -1009,7 +1238,44 @@ require_once __DIR__ . '/applicant_sidebar.php';
         .business-activity-table td,
         .business-type-table th,
         .business-type-table td {
-            padding: 8px;
+            padding: 10px 8px;
+        }
+
+        .file-upload-wrapper {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .file-label {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .file-name {
+            min-width: 100%;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .form-container {
+            padding: 20px 15px;
+        }
+
+        .official-header {
+            padding: 20px 15px;
+        }
+
+        .official-title {
+            font-size: 1.3rem;
+        }
+
+        .form-section {
+            padding: 20px 15px;
+        }
+
+        .btn-primary {
+            width: 100%;
+            justify-content: center;
         }
     }
 </style>
@@ -1124,10 +1390,36 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!isValid) {
             e.preventDefault();
-            alert('Please fill in all required fields correctly.');
+            // Create a more elegant error notification
+            const errorMsg = document.createElement('div');
+            errorMsg.className = 'error-notification';
+            errorMsg.innerHTML = '<i class="fas fa-exclamation-circle"></i> Please fill in all required fields correctly.';
+            errorMsg.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                color: white;
+                padding: 16px 24px;
+                border-radius: 12px;
+                box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                font-weight: 600;
+                animation: slideIn 0.3s ease-out;
+            `;
+            document.body.appendChild(errorMsg);
+            
+            setTimeout(() => {
+                errorMsg.style.animation = 'slideOut 0.3s ease-out';
+                setTimeout(() => errorMsg.remove(), 300);
+            }, 4000);
+            
             if (firstErrorField) {
                 firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                firstErrorField.focus();
+                setTimeout(() => firstErrorField.focus(), 500);
             }
         }
     });
@@ -1211,15 +1503,51 @@ document.addEventListener('DOMContentLoaded', function() {
 const style = document.createElement('style');
 style.textContent = `
     .business-permit-form input.error,
-    .business-permit-form select.error {
-        border-color: #dc3545 !important;
-        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+    .business-permit-form select.error,
+    .business-permit-form textarea.error {
+        border-color: #ef4444 !important;
+        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15), 0 2px 8px rgba(239, 68, 68, 0.2) !important;
+        animation: shake 0.4s ease-in-out;
     }
     
     .business-permit-form input.error:focus,
-    .business-permit-form select.error:focus {
-        border-color: #dc3545 !important;
-        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+    .business-permit-form select.error:focus,
+    .business-permit-form textarea.error:focus {
+        border-color: #dc2626 !important;
+        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2), 0 4px 12px rgba(239, 68, 68, 0.25) !important;
+    }
+
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-8px); }
+        75% { transform: translateX(8px); }
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideOut {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+    }
+
+    .file-input.error + .file-label {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3) !important;
     }
 `;
 document.head.appendChild(style);
