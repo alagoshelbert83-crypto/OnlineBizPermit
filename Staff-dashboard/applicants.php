@@ -4,18 +4,23 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 
-$current_page = 'applicants';
-require_once './staff_header.php'; // This already handles session, db, and auth
-require_once __DIR__ . '/../config_mail.php'; // Keep for mail config
-require_once './email_functions.php'; // Keep for mail functions
-
-$flash_message = '';
-if (isset($_SESSION['flash_message'])) {
-    $message_data = $_SESSION['flash_message'];
-    $flash_message = '<div class="message ' . htmlspecialchars($message_data['type']) . '">' . htmlspecialchars($message_data['text']) . '</div>';
-    unset($_SESSION['flash_message']);
+// Include database and session handling FIRST (before any output)
+require_once __DIR__ . '/db.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
+// Security check: Ensure only logged-in staff or admins can access
+if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['staff', 'admin'])) {
+    header("Location: login.php");
+    exit;
+}
+
+// Include mail config and functions
+require_once __DIR__ . '/../config_mail.php';
+require_once __DIR__ . '/email_functions.php';
+
+// Handle POST requests BEFORE including header (which outputs HTML)
 if (isset($_POST['update_status'])) {
     error_log("Update status form submitted"); // Add log
     $id = $_POST['id'];
@@ -82,6 +87,17 @@ if (isset($_POST['update_status'])) {
 
     header("Location: applicants.php");
     exit;
+}
+
+// Now include the header (which outputs HTML) - after POST processing is done
+$current_page = 'applicants';
+require_once './staff_header.php';
+
+$flash_message = '';
+if (isset($_SESSION['flash_message'])) {
+    $message_data = $_SESSION['flash_message'];
+    $flash_message = '<div class="message ' . htmlspecialchars($message_data['type']) . '">' . htmlspecialchars($message_data['text']) . '</div>';
+    unset($_SESSION['flash_message']);
 }
 
 $filter = $_GET['filter'] ?? '';
