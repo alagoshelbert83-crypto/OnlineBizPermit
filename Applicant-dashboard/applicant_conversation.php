@@ -812,7 +812,7 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('chat_id', chatId);
             formData.append('message', message);
             formData.append('sender_role', 'user');
-            formData.append('sender_id', '<?= $current_user_id ?? '' ?>'); // Add sender_id for the API
+            formData.append('sender_id', <?= json_encode((string)($current_user_id ?? '')) ?>); // Add sender_id for the API
             if (fileInput.files[0]) {
                 formData.append('chat_file', fileInput.files[0]);
             }
