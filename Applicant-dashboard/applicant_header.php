@@ -16,22 +16,51 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'user') {
 $current_user_id = $_SESSION['user_id'];
 
 // Fetch Current User Info (be defensive: some deployments may lack optional columns)
+// CRITICAL: Ensure we're not in a transaction and rollback if any query fails
 try {
+    // If we're in a transaction, rollback first (shouldn't happen, but be safe)
+    if ($conn->inTransaction()) {
+        $conn->rollBack();
+        error_log('WARNING: Rolled back transaction before user info query in applicant_header.php');
+    }
+    
     $stmt = $conn->prepare("SELECT name, email, profile_picture_path FROM users WHERE id = ?");
     $stmt->execute([$current_user_id]);
     $user_info = $stmt->fetch(PDO::FETCH_ASSOC);
     $current_user_name = $user_info['name'] ?? 'Applicant';
     $current_user_picture = $user_info['profile_picture_path'] ?? null;
 } catch(PDOException $e) {
+    // CRITICAL: Rollback if we're in a failed transaction
+    if ($conn->inTransaction()) {
+        try {
+            $conn->rollBack();
+        } catch (Exception $rollback_e) {
+            error_log('Failed to rollback after user info query error: ' . $rollback_e->getMessage());
+        }
+    }
+    
     error_log("Error fetching user info (profile_picture_path may be missing): " . $e->getMessage());
     // Fallback: try without profile_picture_path
     try {
+        // Ensure we're not in a transaction for fallback query
+        if ($conn->inTransaction()) {
+            $conn->rollBack();
+        }
+        
         $stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
         $stmt->execute([$current_user_id]);
         $user_info = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
         $current_user_name = $user_info['name'] ?? 'Applicant';
         $current_user_picture = null;
     } catch (PDOException $e2) {
+        // CRITICAL: Rollback if fallback query also fails
+        if ($conn->inTransaction()) {
+            try {
+                $conn->rollBack();
+            } catch (Exception $rollback_e2) {
+                error_log('Failed to rollback after fallback query error: ' . $rollback_e2->getMessage());
+            }
+        }
         error_log("Error fetching user info fallback: " . $e2->getMessage());
         $current_user_name = 'Applicant';
         $current_user_picture = null;
@@ -41,11 +70,25 @@ try {
 // --- Fetch unread notification count for the applicant ---
 $unread_notifications_count = 0;
 try {
+    // CRITICAL: Ensure we're not in a transaction
+    if ($conn->inTransaction()) {
+        $conn->rollBack();
+        error_log('WARNING: Rolled back transaction before notification count query in applicant_header.php');
+    }
+    
     $count_stmt = $conn->prepare("SELECT COUNT(*) as unread_count FROM notifications WHERE user_id = ? AND is_read = 0");
     $count_stmt->execute([$current_user_id]);
     $count_result = $count_stmt->fetch(PDO::FETCH_ASSOC);
     $unread_notifications_count = $count_result['unread_count'] ?? 0;
 } catch(PDOException $e) {
+    // CRITICAL: Rollback if we're in a failed transaction
+    if ($conn->inTransaction()) {
+        try {
+            $conn->rollBack();
+        } catch (Exception $rollback_e) {
+            error_log('Failed to rollback after notification count query error: ' . $rollback_e->getMessage());
+        }
+    }
     error_log("Error fetching notification count: " . $e->getMessage());
     $unread_notifications_count = 0;
 }
