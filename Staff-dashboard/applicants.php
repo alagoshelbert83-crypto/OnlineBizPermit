@@ -344,31 +344,45 @@ require_once './staff_sidebar.php';
 <style>
 /* Styles for the new status update form in the table */
 .status-update-form {
-    display: flex;
+    display: flex !important;
     align-items: center;
     gap: 8px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
 }
 .status-update-form select {
-    padding: 8px;
-    border: 1px solid var(--border-color);
+    padding: 8px 10px;
+    border: 1px solid #ced4da;
     border-radius: 6px;
     font-size: 0.85rem;
+    flex: 1;
+    min-width: 120px;
+    background: white;
+    color: #1e293b;
 }
 .btn-update-status {
-    background: var(--accent-color);
-    color: white;
-    border: none;
-    padding: 8px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 600;
+    background: #198754 !important;
+    color: white !important;
+    border: none !important;
+    padding: 8px 16px !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    font-weight: 600 !important;
     transition: background-color 0.2s ease;
-    display: inline-flex;
-    align-items: center;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     gap: 6px;
+    white-space: nowrap;
+    min-width: fit-content;
+    flex-shrink: 0;
 }
 .btn-update-status:hover { 
-    background: var(--primary-color); 
+    background: #157347 !important; 
+}
+.btn-update-status:active { 
+    background: #0f5132 !important; 
 }
 .btn-update-status i {
     font-size: 0.9rem;
