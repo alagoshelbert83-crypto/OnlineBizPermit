@@ -19,9 +19,11 @@ define('APP_BASE_URL', 'https://onlinebizpermit.vercel.app');
 define('MAIL_SMTP_DEBUG', 0);
 
 // --- Brevo SMTP Server Settings ---
-define('MAIL_SMTP_HOST', 'smtp-relay.brevo.com');
-define('MAIL_SMTP_PORT', 587);
-define('MAIL_SMTP_SECURE', 'tls');
+// Check environment variables first (Vercel uses SMTP_HOST, SMTP_PORT, etc.)
+// Fallback to MAIL_SMTP_* if not found, then to defaults
+define('MAIL_SMTP_HOST', getenv('SMTP_HOST') ?: getenv('MAIL_SMTP_HOST') ?: 'smtp-relay.brevo.com');
+define('MAIL_SMTP_PORT', (int)(getenv('SMTP_PORT') ?: getenv('MAIL_SMTP_PORT') ?: 587));
+define('MAIL_SMTP_SECURE', getenv('SMTP_SECURE') ?: getenv('MAIL_SMTP_SECURE') ?: 'tls');
 
 // --- SMTP Authentication ---
 define('MAIL_SMTP_AUTH', true);
@@ -29,8 +31,10 @@ define('MAIL_SMTP_AUTH', true);
 // IMPORTANT:
 // Use your Brevo **account login email** (the one you sign in with),
 // and your **SMTP key** from Brevo → SMTP & API.
-define('MAIL_SMTP_USERNAME', '9a9125001@smtp-brevo.com'); // example: helbert@onlinebizpermit.com
-define('MAIL_SMTP_PASSWORD', getenv('MAIL_SMTP_PASSWORD') ?: 'YOUR_SMTP_PASSWORD_HERE'); // Use environment variable for security
+// Check Vercel environment variables first (SMTP_USER, SMTP_PASS)
+// Then check MAIL_SMTP_* variables, then fallback to defaults
+define('MAIL_SMTP_USERNAME', getenv('SMTP_USER') ?: getenv('MAIL_SMTP_USERNAME') ?: '9a9125001@smtp-brevo.com');
+define('MAIL_SMTP_PASSWORD', getenv('SMTP_PASS') ?: getenv('MAIL_SMTP_PASSWORD') ?: 'YOUR_SMTP_PASSWORD_HERE');
 
 // --- Sender Information ---
 define('MAIL_FROM_EMAIL', 'alagoshelbert83@gmail.com'); // verified Brevo sender
