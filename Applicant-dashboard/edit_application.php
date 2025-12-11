@@ -34,7 +34,8 @@ if (isset($_GET['id'])) {
         'fire_safety_certificate' => 'Fire Safety Certificate',
         'sanitary_permit' => 'Sanitary Permit',
         'health_inspection' => 'Health Inspection Certificate',
-        'building_permit' => 'Building Permit'
+        'building_permit' => 'Building Permit',
+        'other' => 'Other Document'
     ];
 
     // Fetch existing documents for this application
@@ -222,17 +223,34 @@ require_once __DIR__ . '/applicant_sidebar.php';
                             <?php foreach ($documents as $doc): ?>
                                 <?php
                                 $doc_type = trim($doc['document_type'] ?? '');
-                                // Handle null, empty, or 'Other' document_type
-                                if (empty($doc_type) || strtolower($doc_type) === 'other' || $doc_type === null) {
-                                    // Try to infer from filename or default to 'other'
-                                    $doc_type = 'other';
+                                // Handle null, empty, or 'Other' document_type - infer from filename if possible
+                                if (empty($doc_type) || $doc_type === null || $doc_type === '') {
+                                    // Try to infer from filename
+                                    $filename_lower = strtolower($doc['document_name'] ?? '');
+                                    if (strpos($filename_lower, 'dti') !== false || strpos($filename_lower, 'registration') !== false) {
+                                        $doc_type = 'dti_registration';
+                                    } elseif (strpos($filename_lower, 'bir') !== false) {
+                                        $doc_type = 'bir_registration';
+                                    } elseif (strpos($filename_lower, 'barangay') !== false || strpos($filename_lower, 'clearance') !== false) {
+                                        $doc_type = 'barangay_clearance';
+                                    } elseif (strpos($filename_lower, 'fire') !== false || strpos($filename_lower, 'safety') !== false) {
+                                        $doc_type = 'fire_safety_certificate';
+                                    } elseif (strpos($filename_lower, 'sanitary') !== false) {
+                                        $doc_type = 'sanitary_permit';
+                                    } elseif (strpos($filename_lower, 'health') !== false || strpos($filename_lower, 'inspection') !== false) {
+                                        $doc_type = 'health_inspection';
+                                    } elseif (strpos($filename_lower, 'building') !== false) {
+                                        $doc_type = 'building_permit';
+                                    } else {
+                                        $doc_type = 'other';
+                                    }
                                 }
                                 // Normalize the doc_type key (lowercase, no spaces)
-                                $doc_type_key = strtolower(str_replace(' ', '_', $doc_type));
+                                $doc_type_key = strtolower(str_replace([' ', '-'], '_', $doc_type));
                                 $doc_label = isset($document_type_labels[$doc_type_key]) ? $document_type_labels[$doc_type_key] : ucfirst(str_replace('_', ' ', $doc_type));
                                 $file_extension = strtolower(pathinfo($doc['document_name'], PATHINFO_EXTENSION));
-                                // Use absolute path from root
-                                $file_path = '/uploads/' . htmlspecialchars($doc['file_path']);
+                                // Use secure file viewer PHP script instead of direct file access
+                                $file_path = '../view_file.php?file=' . urlencode($doc['file_path']);
                                 ?>
                                 <div class="document-item">
                                     <div class="doc-preview">

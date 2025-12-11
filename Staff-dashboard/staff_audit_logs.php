@@ -365,7 +365,7 @@ require_once './staff_sidebar.php';
     min-width: 50px;
     min-height: 50px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background: linear-gradient(135deg, #10b981, #059669);
     display: flex;
     align-items: center;
     justify-content: center;
