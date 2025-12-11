@@ -71,6 +71,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // ----------------------------------------------------------------------
     // 3. DATABASE INSERTION
     // ----------------------------------------------------------------------
+
+    // Ensure connection is in a clean state before starting transaction
+    // This prevents issues with aborted transactions from previous operations
+    if ($conn->inTransaction()) {
+        try {
+            $conn->rollback();
+        } catch (Exception $e) {
+            error_log('Error rolling back existing transaction: ' . $e->getMessage());
+        }
+    }
+
     $conn->beginTransaction();
     try {
         // Prepare the comprehensive application data as JSON
