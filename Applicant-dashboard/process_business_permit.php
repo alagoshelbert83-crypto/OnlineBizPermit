@@ -15,6 +15,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $current_user_id = $_SESSION['user_id'];
     $current_user_name = $_SESSION['name'] ?? 'User';
     
+    // CRITICAL: Write session data BEFORE starting transaction
+    // This prevents session handler from interfering with our transaction
+    // We'll close the session and not reopen it - we already have the data we need
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
+    
     echo "<div class='main'>";
     echo "<div class='form-container'>";
     echo "<h1>Application Submission Report</h1>";
@@ -120,6 +127,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 
     try {
+        // CRITICAL: Ensure session is written and closed before transaction
+        // This prevents session handler from interfering with transaction
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+        
         // Now we can safely begin the transaction
         $conn->beginTransaction();
         // Prepare the comprehensive application data as JSON
@@ -210,6 +223,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         // Commit the transaction
         $conn->commit();
+        
+        // CRITICAL: Reopen session AFTER successful commit
+        // This allows session data to be saved after transaction completes
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
 
         // Create Staff Notification (outside transaction as it's best-effort)
         $notification_message = "New comprehensive application (#{$app_id}) for '{$business_name}' has been submitted.";
@@ -295,6 +314,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
         }
         
+        // CRITICAL: Reopen session AFTER rollback
+        // This allows session data to be saved even after transaction failure
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
         // Log the full error for debugging
         error_log('Application submission error: ' . $e->getMessage());
         error_log('SQL State: ' . $e->getCode());
@@ -331,10 +356,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $user_message = "Database Error: " . htmlspecialchars($error_message);
         }
         
-        echo "<h2>❌ Error!</h2>";
-        echo "<p>" . htmlspecialchars($user_message) . "</p>";
-        echo "<p>Please check that all required fields are filled correctly and try again.</p>";
-        echo "<a href='submit_application.php' class='btn'>Try Again</a>";
+        echo "<h2 style='color: #dc2626; margin-bottom: 15px;'>❌ Error!</h2>";
+        echo "<p style='color: #1e293b; margin-bottom: 10px;'>" . htmlspecialchars($user_message) . "</p>";
+        echo "<p style='color: #64748b; margin-bottom: 20px;'>Please check that all required fields are filled correctly and try again.</p>";
+        echo "<a href='submit_application.php' class='btn' style='background-color: #4a69bd; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: 600; border: none; cursor: pointer; transition: background-color 0.2s ease;'>Try Again</a>";
     } catch (Exception $e) {
         // Rollback transaction on any other error
         if ($conn && $conn->inTransaction()) {
@@ -352,12 +377,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
         }
         
+        // CRITICAL: Reopen session AFTER rollback
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
         // Log the error
         error_log('Application submission error: ' . $e->getMessage());
         
-        echo "<h2>❌ Error!</h2>";
-        echo "<p>" . htmlspecialchars($e->getMessage()) . "</p>";
-        echo "<a href='submit_application.php' class='btn'>Try Again</a>";
+        echo "<h2 style='color: #dc2626; margin-bottom: 15px;'>❌ Error!</h2>";
+        echo "<p style='color: #1e293b; margin-bottom: 20px;'>" . htmlspecialchars($e->getMessage()) . "</p>";
+        echo "<a href='submit_application.php' class='btn' style='background-color: #4a69bd; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: 600; border: none; cursor: pointer; transition: background-color 0.2s ease;'>Try Again</a>";
     }
     
     echo "</div></div>";
