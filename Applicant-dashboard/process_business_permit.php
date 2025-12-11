@@ -241,7 +241,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     }
                     
                     // Insert document record into DB (PDO)
-                    $doc_stmt = $conn->prepare("INSERT INTO documents (application_id, document_name, file_path) VALUES (?, ?, ?)");
+                    $doc_stmt = $conn->prepare("INSERT INTO documents (application_id, document_name, file_path, upload_date) VALUES (?, ?, ?, NOW())");
                     if (!$doc_stmt) {
                         $doc_errorInfo = $conn->errorInfo();
                         throw new PDOException('Failed to prepare document INSERT statement: ' . ($doc_errorInfo[2] ?? 'Unknown error'), (int)($doc_errorInfo[0] ?? 0));
@@ -251,7 +251,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         $doc_errorInfo = $doc_stmt->errorInfo();
                         throw new PDOException('Failed to execute document INSERT: ' . ($doc_errorInfo[2] ?? 'Unknown error'), (int)$doc_errorInfo[0]);
                     }
-                } elseif ($_FILES['documents']['error'][$key] !== UPLOAD_ERR_NO_FILE) {
+                } elseif (isset($_FILES['documents']['error'][$key]) && $_FILES['documents']['error'][$key] !== UPLOAD_ERR_NO_FILE) {
                     throw new Exception('An error occurred during file upload. Code: ' . $_FILES['documents']['error'][$key]);
                 }
             }

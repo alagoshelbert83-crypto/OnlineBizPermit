@@ -11,7 +11,7 @@ echo "<h1>Database Migration Runner</h1>";
 echo "<pre>";
 
 // Check if migration file exists
-$migration_file = 'db/migrations/2025-12-10_create_audit_logs_table.sql';
+$migration_file = 'db/migrations/2025-12-11_alter_documents_table.sql';
 
 if (!file_exists($migration_file)) {
     echo "❌ Migration file not found: $migration_file\n";
@@ -29,8 +29,12 @@ if (empty($sql)) {
 echo "📄 Found migration file: $migration_file\n";
 echo "🔄 Executing migration...\n\n";
 
-// Split SQL into individual statements (by semicolon)
-$statements = array_filter(array_map('trim', explode(';', $sql)));
+// Split SQL into individual statements.
+// This is more robust than a simple explode(';') as it handles semicolons inside functions or strings.
+// It splits by semicolons that are at the end of a line or followed by whitespace and a new line.
+$statements = preg_split('/;\s*(\r\n|\n|\r|$)/', $sql, -1, PREG_SPLIT_NO_EMPTY);
+$statements = array_filter(array_map('trim', $statements));
+
 
 $success_count = 0;
 $error_count = 0;
@@ -55,7 +59,7 @@ echo "❌ Failed statements: $error_count\n";
 
 if ($error_count === 0) {
     echo "\n🎉 Migration completed successfully!\n";
-    echo "📋 The audit_logs table has been created and is ready to use.\n";
+    echo "📋 The database schema has been updated.\n";
 } else {
     echo "\n⚠️  Migration completed with errors. Please check the output above.\n";
 }

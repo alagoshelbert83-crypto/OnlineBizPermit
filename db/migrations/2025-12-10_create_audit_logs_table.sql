@@ -25,7 +25,3 @@ BEGIN
     DELETE FROM audit_logs WHERE created_at < CURRENT_TIMESTAMP - INTERVAL '6 months';
 END;
 $$ LANGUAGE plpgsql;
-
--- Grant permissions
-GRANT SELECT, INSERT ON audit_logs TO web_user;
-GRANT USAGE ON SEQUENCE audit_logs_id_seq TO web_user;
