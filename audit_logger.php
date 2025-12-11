@@ -50,7 +50,24 @@ class AuditLogger {
         }
 
         // Get client information
-        $ip_address = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['HTTP_X_REAL_IP'] ?? $_SERVER['REMOTE_ADDR'] ?? null;
+        // X-Forwarded-For can contain multiple IPs (client, proxy1, proxy2)
+        // Extract the first IP (original client) and validate it
+        $ip_address = null;
+        if (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $forwarded_ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+            $ip_address = trim($forwarded_ips[0]); // Get first IP (original client)
+        } elseif (isset($_SERVER['HTTP_X_REAL_IP'])) {
+            $ip_address = trim($_SERVER['HTTP_X_REAL_IP']);
+        } elseif (isset($_SERVER['REMOTE_ADDR'])) {
+            $ip_address = $_SERVER['REMOTE_ADDR'];
+        }
+        
+        // Validate IP address format (IPv4 or IPv6)
+        if ($ip_address && !filter_var($ip_address, FILTER_VALIDATE_IP)) {
+            error_log("AuditLogger: Invalid IP address format: {$ip_address}");
+            $ip_address = null; // Set to null if invalid
+        }
+        
         $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? null;
         $session_id = session_id();
 
