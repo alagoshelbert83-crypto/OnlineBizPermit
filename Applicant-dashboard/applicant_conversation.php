@@ -591,7 +591,7 @@ if ($chat_id > 0) {
         <header class="header">
             <div class="header-left">
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <a href="applicant_dashboard.php" class="btn" style="padding: 8px 12px;"><i class="fas fa-arrow-left"></i> Back</a>
+                    <a href="applicant_dashboard.php" class="btn" style="padding: 8px 12px; color: #fff; background: var(--primary); display: inline-flex; align-items: center; gap: 8px; text-decoration: none;"><i class="fas fa-arrow-left"></i> Back</a>
                     <div>
                         <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
                             <i class="fas fa-headset" style="color: var(--accent-color);"></i>

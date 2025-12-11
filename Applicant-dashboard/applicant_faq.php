@@ -27,7 +27,7 @@ require_once __DIR__ . '/applicant_sidebar.php';
         <header class="header">
             <div class="header-left">
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <a href="applicant_dashboard.php" class="btn" style="padding: 8px 12px;"><i class="fas fa-arrow-left"></i> Back</a>
+                    <a href="applicant_dashboard.php" class="btn" style="padding: 8px 12px; color: #fff; background: var(--primary); display: inline-flex; align-items: center; gap: 8px; text-decoration: none;"><i class="fas fa-arrow-left"></i> Back</a>
                     <div>
                         <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
                             <i class="fas fa-question-circle" style="color: var(--accent-color);"></i>
@@ -108,7 +108,7 @@ require_once __DIR__ . '/applicant_sidebar.php';
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Expose current user name to client-side so guest chats can provide a name when unauthenticated
-    const CURRENT_USER_NAME = <?= json_encode($current_user_name ?? '') ?>;
+    const CURRENT_USER_NAME = <?= json_encode(isset($current_user_name) ? $current_user_name : '') ?>;
     const chatWindow = document.getElementById('chatWindow');
     const quickReplies = document.getElementById('quickReplies');
     const chatForm = document.getElementById('chatForm');
@@ -154,38 +154,48 @@ document.addEventListener('DOMContentLoaded', function() {
             addMessage('bot', 'I am creating a live chat request for you now. Please wait a moment...');
             const typing = showTyping();
             
-                try {
+            try {
                 // Use API to create chat session
                 // Include guest_name for unauthenticated users (server will accept it)
                 const bodyParams = new URLSearchParams();
                 bodyParams.append('action', 'create_live_chat');
                 // If we have a current user name from PHP, include it; otherwise send empty and server will require guest_name
-                bodyParams.append('guest_name', CURRENT_USER_NAME || '');
+                let userName = '';
+                if (typeof CURRENT_USER_NAME !== 'undefined' && CURRENT_USER_NAME !== null && typeof CURRENT_USER_NAME === 'string' && CURRENT_USER_NAME.trim() !== '') {
+                    userName = CURRENT_USER_NAME.trim();
+                }
+                bodyParams.append('guest_name', userName);
+                
                 const response = await fetch('chatbot_api.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: bodyParams.toString()
                 });
 
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
                 const data = await response.json();
                 typing.remove();
 
-                if (data.success && data.chat_id) {
+                if (data && data.success && data.chat_id) {
                     addMessage('bot', 'Chat request created! Redirecting you to the live chat room...');
                     setTimeout(() => {
                         window.location.href = `applicant_conversation.php?id=${data.chat_id}`;
                     }, 1500);
                 } else {
                     // Display the specific error from the server if available
-                    const errorMessage = data.error || 'I was unable to create a live chat session. Please try again or contact support directly.';
+                    const errorMessage = (data && data.error) ? data.error : 'I was unable to create a live chat session. Please try again or contact support directly.';
                     addMessage('bot', 'Sorry, ' + errorMessage);
                     // Directly show the welcome menu instead of re-calling handleAction to avoid cascading errors
                     await showWelcomeMessage();
                 }
             } catch (error) {
                 typing.remove();
+                const errorMsg = error.message || 'Unknown error';
                 addMessage('bot', 'Sorry, something went wrong while trying to connect to live chat. Please check your connection and try again.');
-                console.error('Error creating live chat:', error);
+                console.error('Error creating live chat:', errorMsg);
                 // Directly show the welcome menu instead of re-calling handleAction
                 await showWelcomeMessage();
             }

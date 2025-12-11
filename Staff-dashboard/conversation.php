@@ -617,7 +617,17 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!chatWindow) return;
 
     const chatForm = document.getElementById('chatForm'), userInput = document.getElementById('userInput');
-    const chatId = document.getElementById('chatId').value, chatStatusSpan = document.getElementById('chatStatus'), chatStatusText = document.getElementById('chatStatusText');
+    const chatIdElement = document.getElementById('chatId');
+    if (!chatIdElement) {
+        console.error('Chat ID element not found');
+        return;
+    }
+    const chatId = chatIdElement.value;
+    if (!chatId || chatId === '0') {
+        console.error('No valid chat ID provided');
+        return;
+    }
+    const chatStatusSpan = document.getElementById('chatStatus'), chatStatusText = document.getElementById('chatStatusText');
     const fileInput = document.getElementById('fileInput'), filePreview = document.getElementById('filePreview');
     let lastMessageId = <?= $last_message_id ?>; // Start polling from the last message loaded by PHP
     let typingTimeout;
@@ -699,6 +709,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function fetchMessages() {
+        if (!chatId || chatId === '0') {
+            console.error('Cannot fetch messages: no valid chat ID');
+            return;
+        }
         try {
             // Note: The API endpoint is in the Applicant-dashboard folder.
             const response = await fetch(`../Applicant-dashboard/chatbot_api.php?action=get_messages&chat_id=${chatId}&last_id=${lastMessageId}`);
@@ -722,6 +736,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function updateTypingStatus(isTyping) {
+        if (!chatId || chatId === '0') {
+            return; // Don't update typing status if no valid chat ID
+        }
         const formData = new FormData();
         formData.append('action', 'update_typing');
         formData.append('chat_id', chatId);
@@ -776,7 +793,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const formData = new FormData();
         formData.append('action', 'send_message');
-        formData.append('chat_id', chatId);
+        const currentChatId = document.getElementById('chatId')?.value || chatId;
+        if (!currentChatId || currentChatId === '0') {
+            addMessage('bot', 'Error: No chat ID available. Please refresh the page and try again.');
+            isSending = false;
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+            userInput.disabled = false;
+            return;
+        }
+        formData.append('chat_id', currentChatId);
         formData.append('message', message);
         formData.append('sender_role', 'staff');
         formData.append('sender_id', '<?= $staff_id ?>'); // Add sender_id for the API
