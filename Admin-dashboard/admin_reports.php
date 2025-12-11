@@ -7,26 +7,26 @@ $current_page = 'reports';
 require_once __DIR__ . '/admin_header.php';
 
 // This page should be accessible only by admins
-// Verify user role - check both session and database to ensure user is admin
+// Always verify user role from database to ensure accuracy
 $is_admin = false;
-if (isset($current_user_role)) {
-    $role_lower = trim(strtolower($current_user_role));
-    $is_admin = ($role_lower === 'admin');
-} else {
-    // Double-check from database if session role is not set
-    try {
-        $role_check_stmt = $conn->prepare("SELECT role FROM users WHERE id = ?");
-        $role_check_stmt->execute([$current_user_id]);
-        $role_data = $role_check_stmt->fetch(PDO::FETCH_ASSOC);
-        $db_role = trim(strtolower($role_data['role'] ?? ''));
-        $is_admin = ($db_role === 'admin');
-        // Update session role if it was missing
-        if (!isset($current_user_role)) {
-            $_SESSION['role'] = $role_data['role'] ?? '';
-            $current_user_role = $_SESSION['role'];
-        }
-    } catch (PDOException $e) {
-        error_log("Error checking user role: " . $e->getMessage());
+try {
+    $role_check_stmt = $conn->prepare("SELECT role FROM users WHERE id = ?");
+    $role_check_stmt->execute([$current_user_id]);
+    $role_data = $role_check_stmt->fetch(PDO::FETCH_ASSOC);
+    $db_role = trim(strtolower($role_data['role'] ?? ''));
+    $is_admin = ($db_role === 'admin');
+    
+    // Update session role if it doesn't match database
+    if (!isset($current_user_role) || trim(strtolower($current_user_role)) !== $db_role) {
+        $_SESSION['role'] = $role_data['role'] ?? '';
+        $current_user_role = $_SESSION['role'];
+    }
+} catch (PDOException $e) {
+    error_log("Error checking user role: " . $e->getMessage());
+    // Fallback to session role if database check fails
+    if (isset($current_user_role)) {
+        $role_lower = trim(strtolower($current_user_role));
+        $is_admin = ($role_lower === 'admin');
     }
 }
 
