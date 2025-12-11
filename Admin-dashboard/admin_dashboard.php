@@ -128,6 +128,9 @@ require_once __DIR__ . '/admin_sidebar.php';
                 <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
                     <i class="fas fa-tachometer-alt" style="color: var(--accent-color);"></i>
                     Admin Dashboard
+                    <span id="update-indicator" style="font-size: 0.6rem; color: #28a745; opacity: 0; transition: opacity 0.3s; margin-left: 10px;">
+                      <i class="fas fa-circle"></i> Live
+                    </span>
                 </h1>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
                     Welcome back, <strong><?= htmlspecialchars($current_user_name) ?></strong>! Here's your system overview.
@@ -268,79 +271,256 @@ require_once __DIR__ . '/admin_sidebar.php';
     Chart.defaults.color = 'rgba(255, 255, 255, 0.7)';
     Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.2)';
 
-    document.addEventListener('DOMContentLoaded', function() {
-        // Combined Chart for Users and Applications
-        const combinedChartCanvas = document.getElementById('combinedChart');
-        if (combinedChartCanvas) {
-            new Chart(combinedChartCanvas, {
-                type: 'line',
-                data: {
-                    labels: <?= $months ?>,
-                    datasets: [
-                        {
-                            label: 'New Users',
-                            data: <?= $userValues ?>,
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                            borderColor: 'rgba(59, 130, 246, 1)',
-                            borderWidth: 2,
-                            fill: true,
-                            tension: 0.4,
-                            pointRadius: 4,
-                            pointHoverRadius: 6,
-                        },
-                        {
-                            label: 'New Applications',
-                            data: <?= $appValues ?>,
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                            borderColor: 'rgba(16, 185, 129, 1)',
-                            borderWidth: 2,
-                            fill: true,
-                            tension: 0.4,
-                            pointRadius: 4,
-                            pointHoverRadius: 6,
-                        }
-                    ]
+    // Real-time Dashboard Updates for Admin
+    let combinedChart = null;
+    let updateInterval = null;
+    const UPDATE_INTERVAL_MS = 5000; // Update every 5 seconds
+
+    // Initialize chart
+    function initCombinedChart(months, userData, appData) {
+      const combinedChartCanvas = document.getElementById('combinedChart');
+      if (!combinedChartCanvas) return;
+
+      if (combinedChart) {
+        combinedChart.destroy();
+      }
+
+      combinedChart = new Chart(combinedChartCanvas, {
+        type: 'line',
+        data: {
+            labels: months,
+            datasets: [
+                {
+                    label: 'New Users',
+                    data: userData,
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { 
-                        legend: { 
-                            display: true,
-                            position: 'top',
-                            labels: {
-                                usePointStyle: true,
-                                padding: 15,
-                                font: { size: 12, weight: '500' }
-                            }
-                        },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false,
-                        }
-                    },
-                    scales: { 
-                        y: { 
-                            beginAtZero: true, 
-                            ticks: { precision: 0 },
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.05)'
-                            }
-                        },
-                        x: {
-                            grid: {
-                                display: false
-                            }
-                        }
-                    },
-                    interaction: {
-                        mode: 'nearest',
-                        axis: 'x',
-                        intersect: false
+                {
+                    label: 'New Applications',
+                    data: appData,
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderColor: 'rgba(16, 185, 129, 1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { 
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 15,
+                        font: { size: 12, weight: '500' }
+                    }
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                }
+            },
+            scales: { 
+                y: { 
+                    beginAtZero: true, 
+                    ticks: { precision: 0 },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
                     }
                 }
-            });
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
+            }
         }
+      });
+    }
+
+    // Update statistics cards
+    function updateStats(stats) {
+      const statSelectors = {
+        'total_applications': '.stat-card:has(.stat-icon:has(.fa-file-alt)) .stat-info span',
+        'pending_applications': '.stat-card.interactive:has(.stat-icon:has(.fa-clock)) .stat-info span',
+        'approved_applications': '.stat-card:has(.stat-icon:has(.fa-check-circle)) .stat-info span',
+        'new_applications_this_month': '.stat-card:has(.stat-icon:has(.fa-file-plus)) .stat-info span',
+        'total_users': '.stat-card:has(.stat-icon:has(.fa-users)) .stat-info span',
+        'pending_users': '.stat-card.interactive:has(.stat-icon:has(.fa-user-clock)) .stat-info span'
+      };
+
+      // Update each stat card by finding them more reliably
+      const statCards = document.querySelectorAll('.stat-card .stat-info span');
+      statCards.forEach((card, index) => {
+        const parentCard = card.closest('.stat-card');
+        const icon = parentCard.querySelector('.stat-icon i');
+        if (!icon) return;
+
+        let value = null;
+        if (icon.classList.contains('fa-file-alt')) {
+          value = stats.total_applications;
+        } else if (icon.classList.contains('fa-clock')) {
+          value = stats.pending_applications;
+        } else if (icon.classList.contains('fa-check-circle')) {
+          value = stats.approved_applications;
+        } else if (icon.classList.contains('fa-file-plus')) {
+          value = stats.new_applications_this_month;
+        } else if (icon.classList.contains('fa-users')) {
+          value = stats.total_users;
+        } else if (icon.classList.contains('fa-user-clock')) {
+          value = stats.pending_users;
+        }
+
+        if (value !== null) {
+          const currentValue = parseInt(card.textContent.replace(/,/g, '')) || 0;
+          if (currentValue !== value) {
+            animateValue(card, currentValue, value);
+          }
+        }
+      });
+    }
+
+    // Animate number changes
+    function animateValue(element, start, end) {
+      if (!element || start === end) return;
+      const duration = 500;
+      const range = end - start;
+      const increment = range / (duration / 16);
+      let current = start;
+
+      const timer = setInterval(() => {
+        current += increment;
+        if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+          element.textContent = formatNumber(end);
+          clearInterval(timer);
+        } else {
+          element.textContent = formatNumber(Math.floor(current));
+        }
+      }, 16);
+    }
+
+    // Format number with commas
+    function formatNumber(num) {
+      return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    // Update recent activity list
+    function updateRecentActivity(users) {
+      const activityList = document.getElementById('activity-list');
+      if (!activityList) return;
+
+      if (users.length === 0) {
+        activityList.innerHTML = `
+          <li class="activity-item empty">
+            <i class="fas fa-moon activity-icon"></i>
+            <div class="activity-description">No recent user registrations.</div>
+          </li>
+        `;
+        return;
+      }
+
+      activityList.innerHTML = users.map(user => `
+        <li class="activity-item" data-id="user-${user.id}">
+          <i class="fas fa-user-plus activity-icon icon-user"></i>
+          <div class="activity-description">
+            <strong>${escapeHtml(user.name)}</strong>
+            <small>${escapeHtml(user.email)}</small>
+          </div>
+          <div class="activity-time">${escapeHtml(user.time_ago)}</div>
+        </li>
+      `).join('');
+    }
+
+    // Escape HTML to prevent XSS
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Fetch and update dashboard data
+    async function updateDashboard() {
+      try {
+        const response = await fetch('api_dashboard.php?t=' + Date.now());
+        const result = await response.json();
+
+        if (result.success && result.data) {
+          const data = result.data;
+
+          // Update statistics
+          if (data.stats) {
+            updateStats(data.stats);
+          }
+
+          // Update recent activity
+          if (data.recent_users) {
+            updateRecentActivity(data.recent_users);
+          }
+
+          // Update chart
+          if (data.chart && data.chart.months && data.chart.user_data && data.chart.app_data) {
+            if (!combinedChart) {
+              initCombinedChart(data.chart.months, data.chart.user_data, data.chart.app_data);
+            } else {
+              combinedChart.data.labels = data.chart.months;
+              combinedChart.data.datasets[0].data = data.chart.user_data;
+              combinedChart.data.datasets[1].data = data.chart.app_data;
+              combinedChart.update('none'); // 'none' mode for smooth updates
+            }
+          }
+
+          // Show update indicator
+          showUpdateIndicator();
+        }
+      } catch (error) {
+        console.error('Error updating dashboard:', error);
+      }
+    }
+
+    // Show subtle update indicator
+    function showUpdateIndicator() {
+      const indicator = document.getElementById('update-indicator');
+      if (indicator) {
+        indicator.style.opacity = '1';
+        setTimeout(() => {
+          indicator.style.opacity = '0';
+        }, 1000);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      // Initialize chart with initial data
+      initCombinedChart(<?= $months ?>, <?= $userValues ?>, <?= $appValues ?>);
+
+      // Start real-time updates
+      updateInterval = setInterval(updateDashboard, UPDATE_INTERVAL_MS);
+
+      // Update immediately on load
+      updateDashboard();
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+      if (updateInterval) {
+        clearInterval(updateInterval);
+      }
     });
 
     // --- Real-time Activity Log ---

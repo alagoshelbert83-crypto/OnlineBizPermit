@@ -172,6 +172,9 @@ require_once './staff_sidebar.php';
                 <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
                     <i class="fas fa-tachometer-alt" style="color: var(--accent-color);"></i>
                     Welcome, <?= htmlspecialchars($userName) ?>!
+                    <span id="update-indicator" style="font-size: 0.6rem; color: #28a745; opacity: 0; transition: opacity 0.3s; margin-left: 10px;">
+                      <i class="fas fa-circle"></i> Live
+                    </span>
                 </h1>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
                     Here's an overview of your dashboard and pending tasks
@@ -242,14 +245,24 @@ require_once './staff_sidebar.php';
 
     </div>
   <script>
-    // Monthly Trend Bar Chart
-    new Chart(document.getElementById('monthlyTrendChart'), {
+    // Real-time Dashboard Updates
+    let monthlyChart = null;
+    let updateInterval = null;
+    const UPDATE_INTERVAL_MS = 5000; // Update every 5 seconds
+
+    // Initialize chart
+    function initChart(labels, data) {
+      const ctx = document.getElementById('monthlyTrendChart');
+      if (monthlyChart) {
+        monthlyChart.destroy();
+      }
+      monthlyChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: <?= json_encode($monthly_labels) ?>,
+            labels: labels,
             datasets: [{
                 label: 'Applications',
-                data: <?= json_encode($monthly_counts) ?>,
+                data: data,
                 backgroundColor: 'rgba(74, 105, 189, 0.1)',
                 borderColor: '#4a69bd',
                 borderWidth: 2,
@@ -263,6 +276,145 @@ require_once './staff_sidebar.php';
             scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
             plugins: { legend: { display: false } }
         }
+      });
+    }
+
+    // Update KPI cards
+    function updateKPIs(kpis) {
+      const kpiElements = {
+        'total_applications': document.querySelector('.kpi-card.total .details h3'),
+        'approved_count': document.querySelector('.kpi-card.approved .details h3'),
+        'pending_count': document.querySelector('.kpi-card.pending .details h3'),
+        'rejected_count': document.querySelector('.kpi-card.rejected .details h3')
+      };
+
+      if (kpiElements['total_applications']) {
+        animateValue(kpiElements['total_applications'], parseInt(kpiElements['total_applications'].textContent) || 0, kpis.total_applications);
+      }
+      if (kpiElements['approved_count']) {
+        animateValue(kpiElements['approved_count'], parseInt(kpiElements['approved_count'].textContent) || 0, kpis.approved_count);
+      }
+      if (kpiElements['pending_count']) {
+        animateValue(kpiElements['pending_count'], parseInt(kpiElements['pending_count'].textContent) || 0, kpis.pending_count);
+      }
+      if (kpiElements['rejected_count']) {
+        animateValue(kpiElements['rejected_count'], parseInt(kpiElements['rejected_count'].textContent) || 0, kpis.rejected_count);
+      }
+    }
+
+    // Animate number changes
+    function animateValue(element, start, end) {
+      if (start === end) return;
+      const duration = 500;
+      const range = end - start;
+      const increment = range / (duration / 16);
+      let current = start;
+
+      const timer = setInterval(() => {
+        current += increment;
+        if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+          element.textContent = end;
+          clearInterval(timer);
+        } else {
+          element.textContent = Math.floor(current);
+        }
+      }, 16);
+    }
+
+    // Update recent applications list
+    function updateRecentApplications(applications) {
+      const container = document.querySelector('.activity-list');
+      if (!container) return;
+
+      if (applications.length === 0) {
+        container.innerHTML = '<p>No recent applications.</p>';
+        return;
+      }
+
+      container.innerHTML = applications.map(app => `
+        <div class="activity-item">
+          <div class="activity-icon"><i class="fas fa-file-alt"></i></div>
+          <div class="activity-details">
+            <p>${escapeHtml(app.business_name)}</p>
+            <span><span class="status-badge status-${app.status.toLowerCase().replace(' ', '-')}">${escapeHtml(app.status.charAt(0).toUpperCase() + app.status.slice(1))}</span> &bull; ${app.formatted_date}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Escape HTML to prevent XSS
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Fetch and update dashboard data
+    async function updateDashboard() {
+      try {
+        const response = await fetch('api_dashboard.php?t=' + Date.now());
+        const result = await response.json();
+
+        if (result.success && result.data) {
+          const data = result.data;
+
+          // Update KPIs
+          if (data.kpis) {
+            updateKPIs(data.kpis);
+          }
+
+          // Update recent applications
+          if (data.recent_applications) {
+            updateRecentApplications(data.recent_applications);
+          }
+
+          // Update chart
+          if (data.chart && data.chart.labels && data.chart.data) {
+            if (!monthlyChart) {
+              initChart(data.chart.labels, data.chart.data);
+            } else {
+              monthlyChart.data.labels = data.chart.labels;
+              monthlyChart.data.datasets[0].data = data.chart.data;
+              monthlyChart.update('none'); // 'none' mode for smooth updates
+            }
+          }
+
+          // Show update indicator
+          showUpdateIndicator();
+        }
+      } catch (error) {
+        console.error('Error updating dashboard:', error);
+      }
+    }
+
+    // Show subtle update indicator
+    function showUpdateIndicator() {
+      const indicator = document.getElementById('update-indicator');
+      if (indicator) {
+        indicator.style.opacity = '1';
+        setTimeout(() => {
+          indicator.style.opacity = '0';
+        }, 1000);
+      }
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      // Initialize chart with initial data
+      initChart(<?= json_encode($monthly_labels) ?>, <?= json_encode($monthly_counts) ?>);
+
+      // Start real-time updates
+      updateInterval = setInterval(updateDashboard, UPDATE_INTERVAL_MS);
+
+      // Update immediately on load
+      updateDashboard();
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+      if (updateInterval) {
+        clearInterval(updateInterval);
+      }
     });
   </script>
 
