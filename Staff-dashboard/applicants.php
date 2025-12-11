@@ -57,19 +57,47 @@ if (isset($_POST['update_status'])) {
 
         // Only send notification if a user is linked to the application
         if ($application_data && !empty($application_data['email'])) {
-            // Send notification email
-            $subject = "Application Status Updated";
-            $message_body = "Dear " . htmlspecialchars($application_data['name']) . ",\n\n";
-            $message_body .= "Your application for " . htmlspecialchars($application_data['business_name']) . " has been updated to: " . htmlspecialchars(ucfirst($status)) . ".\n\n";
-            $message_body .= "Please check your account for more details.\n\n";
-            $message_body .= "Sincerely,\nOnlineBizPermit Team";
+            // Build application view link
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $absolute_link = "{$protocol}://{$host}/onlinebizpermit/Applicant-dashboard/view_my_application.php?id={$id}";
+            
+            // Status color mapping
+            $status_colors = [
+                'pending' => '#f59e0b',
+                'approved' => '#10b981',
+                'rejected' => '#ef4444',
+                'complete' => '#10b981'
+            ];
+            $status_color = $status_colors[strtolower($status)] ?? '#64748b';
+            
+            // Send notification email with HTML formatting
+            $subject = "Application Status Updated - " . htmlspecialchars($application_data['business_name']);
+            $message_body_html = "
+            <div style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
+                <div style='max-width: 600px; margin: 20px auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px; background-color: #ffffff;'>
+                    <h2 style='color: #4a69bd; margin-top: 0;'>Application Status Updated</h2>
+                    <p>Dear " . htmlspecialchars($application_data['name']) . ",</p>
+                    <p>Your application for <strong>" . htmlspecialchars($application_data['business_name']) . "</strong> has been updated.</p>
+                    <div style='background-color: #f8f9fa; border-left: 4px solid {$status_color}; padding: 15px; margin: 20px 0; border-radius: 4px;'>
+                        <p style='margin: 0;'><strong>New Status:</strong> <span style='color: {$status_color}; font-weight: bold; text-transform: uppercase;'>" . htmlspecialchars(ucfirst($status)) . "</span></p>
+                    </div>
+                    <p>You can view your application and check for any additional details or required actions by clicking the button below:</p>
+                    <p style='text-align: center; margin: 30px 0;'>
+                        <a href='" . htmlspecialchars($absolute_link) . "' style='background-color: #4a69bd; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;'>View My Application</a>
+                    </p>
+                    <hr style='border: none; border-top: 1px solid #eee; margin: 20px 0;'>
+                    <p style='font-size: 0.9em; color: #777; margin-bottom: 0;'>Thank you for using our service.<br><strong>The OnlineBizPermit Team</strong></p>
+                </div>
+            </div>";
 
             try {
-                sendApplicationEmail($application_data['email'], $application_data['name'], $subject, $message_body);
-                $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Status updated and notification email sent!'];
+                sendApplicationEmail($application_data['email'], $application_data['name'], $subject, $message_body_html);
+                $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Status updated and notification email sent to ' . htmlspecialchars($application_data['email']) . '!'];
+                error_log("Status update email sent successfully to {$application_data['email']} for application ID {$id}");
             } catch (Exception $e) {
                 $_SESSION['flash_message'] = ['type' => 'warning', 'text' => 'Status updated, but email sending failed: ' . $e->getMessage()];
-                error_log("Email sending failed for app ID {$id}: " . $e->getMessage());
+                error_log("Email sending failed for app ID {$id} to {$application_data['email']}: " . $e->getMessage());
             }
         } else {
             // If no user is linked, just confirm the status update
