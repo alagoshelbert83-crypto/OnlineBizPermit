@@ -38,6 +38,13 @@ function sendApplicationEmail(string $to_email, string $to_name, string $subject
         $mail->Password   = MAIL_SMTP_PASSWORD;
         $mail->SMTPSecure = MAIL_SMTP_SECURE;
         $mail->Port       = MAIL_SMTP_PORT;
+        
+        // Connection timeout settings
+        $mail->Timeout = 10; // 10 seconds timeout
+        $mail->SMTPKeepAlive = false;
+        
+        // Suppress output to prevent "headers already sent" errors
+        $mail->SMTPDebug = 0; // Set to 0 to suppress debug output
 
         // --- SENDER & RECIPIENT ---
         $mail->setFrom(MAIL_FROM_EMAIL, MAIL_FROM_NAME);
@@ -64,7 +71,8 @@ function sendApplicationEmail(string $to_email, string $to_name, string $subject
         return true;
     } catch (Exception $e) {
         error_log("Email sending failed to {$to_email}: " . $e->getMessage());
-        echo "Email sending failed: " . $e->getMessage();
+        // Don't echo here - it causes "headers already sent" errors
+        // Just log and return false, let the caller handle the error message
         return false;
     }
 }

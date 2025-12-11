@@ -91,13 +91,15 @@ if (isset($_POST['update_status'])) {
                 </div>
             </div>";
 
-            try {
-                sendApplicationEmail($application_data['email'], $application_data['name'], $subject, $message_body_html);
+            // Try to send email - don't let email failures break the status update
+            $email_sent = @sendApplicationEmail($application_data['email'], $application_data['name'], $subject, $message_body_html);
+            if ($email_sent) {
                 $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Status updated and notification email sent to ' . htmlspecialchars($application_data['email']) . '!'];
                 error_log("Status update email sent successfully to {$application_data['email']} for application ID {$id}");
-            } catch (Exception $e) {
-                $_SESSION['flash_message'] = ['type' => 'warning', 'text' => 'Status updated, but email sending failed: ' . $e->getMessage()];
-                error_log("Email sending failed for app ID {$id} to {$application_data['email']}: " . $e->getMessage());
+            } else {
+                // Email failed but status was updated - show warning but don't break the flow
+                $_SESSION['flash_message'] = ['type' => 'warning', 'text' => 'Status updated successfully, but email notification could not be sent. Please check SMTP configuration.'];
+                error_log("Email sending failed for app ID {$id} to {$application_data['email']} - SMTP connection issue");
             }
         } else {
             // If no user is linked, just confirm the status update
