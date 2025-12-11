@@ -356,7 +356,20 @@ require_once __DIR__ . '/applicant_sidebar.php';
                             
                             // Normalize the doc_type key (lowercase, no spaces)
                             $doc_type_key = strtolower(str_replace([' ', '-'], '_', $doc_type));
-                            $doc_label = isset($document_type_labels[$doc_type_key]) ? $document_type_labels[$doc_type_key] : ucfirst(str_replace('_', ' ', $doc_type));
+                            
+                            // If type is 'other' or couldn't be determined, show the filename as the label
+                            // Otherwise show the proper document type label
+                            if ($doc_type_key === 'other' || empty($doc_type_key)) {
+                                // Use the document name (without extension) as the label
+                                $doc_label = pathinfo($doc['document_name'], PATHINFO_FILENAME);
+                                // If it's too long, truncate it
+                                if (strlen($doc_label) > 40) {
+                                    $doc_label = substr($doc_label, 0, 37) . '...';
+                                }
+                            } else {
+                                $doc_label = isset($document_type_labels[$doc_type_key]) ? $document_type_labels[$doc_type_key] : ucfirst(str_replace('_', ' ', $doc_type));
+                            }
+                            
                             $file_extension = strtolower(pathinfo($doc['document_name'], PATHINFO_EXTENSION));
                             
                             // Use secure file viewer PHP script instead of direct file access
@@ -364,17 +377,24 @@ require_once __DIR__ . '/applicant_sidebar.php';
                             $file_path = '../view_file.php?file=' . urlencode($doc['file_path']);
                             // For image preview, use the same path
                             $image_preview_path = $file_path;
+                            
+                            // Check if file exists (for display purposes)
+                            $upload_dir = __DIR__ . '/../uploads/';
+                            $physical_file_path = $upload_dir . basename($doc['file_path']);
+                            $file_exists = file_exists($physical_file_path);
                             ?>
-                            <div class="document-item">
+                            <div class="document-item <?= !$file_exists ? 'has-missing-file' : '' ?>">
                                 <div class="doc-preview">
                                     <?php if (in_array($file_extension, ['jpg', 'jpeg', 'png', 'gif'])): ?>
                                         <a href="<?= $file_path ?>" target="_blank" title="View <?= htmlspecialchars($doc_label) ?>">
-                                            <img src="<?= $image_preview_path ?>" 
-                                                 alt="<?= htmlspecialchars($doc_label) ?>"
-                                                 style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;"
-                                                 loading="lazy"
-                                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                            <div class="image-error-placeholder" style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center; flex-direction: column; background: #f1f5f9; border-radius: 8px; padding: 10px;">
+                                            <?php if ($file_exists): ?>
+                                                <img src="<?= $image_preview_path ?>" 
+                                                     alt="<?= htmlspecialchars($doc_label) ?>"
+                                                     style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;"
+                                                     loading="lazy"
+                                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                            <?php endif; ?>
+                                            <div class="image-error-placeholder" style="display: <?= $file_exists ? 'none' : 'flex' ?>; width: 100%; height: 100%; align-items: center; justify-content: center; flex-direction: column; background: #f1f5f9; border-radius: 8px; padding: 10px;">
                                                 <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #dc2626; margin-bottom: 8px;"></i>
                                                 <span style="font-size: 0.75rem; color: #64748b; text-align: center;">File Not Found</span>
                                                 <span style="font-size: 0.7rem; color: #94a3b8; text-align: center; margin-top: 4px;">Please re-upload</span>
