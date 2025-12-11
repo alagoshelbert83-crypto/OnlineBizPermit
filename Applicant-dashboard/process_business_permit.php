@@ -15,9 +15,33 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $current_user_id = $_SESSION['user_id'];
     $current_user_name = $_SESSION['name'] ?? 'User';
     
+    // CRITICAL: Clean up connection state after header queries
+    // Header makes database queries that might leave connection in bad state
+    try {
+        // If we're in a transaction (shouldn't happen, but check anyway)
+        if ($conn && $conn->inTransaction()) {
+            $conn->rollBack();
+            error_log('WARNING: Rolled back transaction left by applicant_header.php');
+        }
+        
+        // Test connection is clean
+        $test = $conn->query("SELECT 1");
+        if (!$test) {
+            throw new Exception("Connection test failed after header");
+        }
+    } catch (Exception $e) {
+        error_log('Connection cleanup after header failed: ' . $e->getMessage());
+        // Try to reconnect
+        try {
+            $conn = null;
+            require_once __DIR__ . '/db.php';
+        } catch (Exception $reconnect_e) {
+            error_log('Failed to reconnect: ' . $reconnect_e->getMessage());
+        }
+    }
+    
     // CRITICAL: Write session data BEFORE starting transaction
     // This prevents session handler from interfering with our transaction
-    // We'll close the session and not reopen it - we already have the data we need
     if (session_status() === PHP_SESSION_ACTIVE) {
         session_write_close();
     }
@@ -153,12 +177,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             throw new PDOException('Failed to prepare INSERT statement: ' . ($errorInfo[2] ?? 'Unknown error'), (int)($errorInfo[0] ?? 0));
         }
 
+        // Log the data being inserted for debugging
+        error_log('Attempting to insert application: user_id=' . $current_user_id . ', business_name=' . $business_name);
+        
         $execute_result = $stmt->execute([$current_user_id, $business_name, $business_address, $type_of_business, $form_details_json]);
         
         if (!$execute_result) {
             $errorInfo = $stmt->errorInfo();
-            throw new PDOException('Failed to execute INSERT: ' . ($errorInfo[2] ?? 'Unknown error'), (int)$errorInfo[0]);
+            $errorMsg = 'Failed to execute INSERT: ' . ($errorInfo[2] ?? 'Unknown error');
+            error_log('=== INSERT EXECUTE FAILED ===');
+            error_log('Error Message: ' . $errorMsg);
+            error_log('SQL State: ' . ($errorInfo[0] ?? 'N/A'));
+            error_log('Error Info: ' . print_r($errorInfo, true));
+            error_log('User ID: ' . $current_user_id);
+            error_log('Business Name: ' . $business_name);
+            error_log('===========================');
+            throw new PDOException($errorMsg, (int)($errorInfo[0] ?? 0));
         }
+        
+        error_log('Application INSERT successful');
 
         // Get last insert id (PDO returns string)
         $app_id = (int)$conn->lastInsertId();
