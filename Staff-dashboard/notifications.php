@@ -62,15 +62,67 @@ require_once './staff_sidebar.php';
 
     /* Notifications */
     .notifications-container { max-width: 800px; margin: 0 auto; }
-    .notification-card { background: var(--card-bg-color); border-radius: var(--border-radius); box-shadow: var(--shadow); margin-bottom: 15px; display: flex; align-items: center; padding: 20px; transition: all 0.3s ease; }
-    .notification-card.unread { background: #e9eef9; border-left: 4px solid var(--primary-color); }
-    .notification-icon { font-size: 1.8rem; color: var(--primary-color); margin-right: 20px; }
+    .notification-card { 
+        background: var(--card-bg-color); 
+        border-radius: var(--border-radius); 
+        box-shadow: var(--shadow); 
+        margin-bottom: 15px; 
+        display: flex; 
+        align-items: center; 
+        padding: 20px; 
+        transition: all 0.3s ease;
+        cursor: pointer;
+        position: relative;
+    }
+    .notification-card.unread { 
+        background: #e9eef9; 
+        border-left: 4px solid var(--primary-color); 
+    }
+    .notification-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    }
+    .notification-card.unread:hover {
+        background: #dde4f0;
+    }
+    .notification-icon { font-size: 1.8rem; color: var(--primary-color); margin-right: 20px; flex-shrink: 0; }
     .notification-content { flex-grow: 1; }
-    .notification-content p { margin: 0; font-weight: 500; }
+    .notification-content p { margin: 0; font-weight: 500; color: var(--text-color); }
     .notification-content .time { font-size: 0.85rem; color: var(--text-secondary-color); margin-top: 4px; }
-    .notification-actions { display: flex; gap: 10px; }
-    .btn-action { background: none; border: 1px solid var(--border-color); color: var(--text-secondary-color); width: 36px; height: 36px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
-    .btn-action:hover { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+    .notification-actions { 
+        display: flex; 
+        gap: 10px; 
+        flex-shrink: 0;
+    }
+    .btn-action { 
+        background: none; 
+        border: 1px solid var(--border-color); 
+        color: var(--text-secondary-color); 
+        width: 36px; 
+        height: 36px; 
+        border-radius: 8px; 
+        display: inline-flex; 
+        align-items: center; 
+        justify-content: center; 
+        transition: all 0.2s ease;
+        text-decoration: none;
+        z-index: 10;
+        position: relative;
+    }
+    .btn-action:hover { 
+        background: var(--primary-color); 
+        color: #fff; 
+        border-color: var(--primary-color);
+        transform: scale(1.1);
+    }
+    .notification-link {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+    }
   </style>
 
     <!-- Main Content -->
@@ -93,18 +145,29 @@ require_once './staff_sidebar.php';
           <div class="notification-card"><p>You have no notifications.</p></div>
         <?php else: ?>
           <?php foreach ($notifications as $notification): ?>
-            <div class="notification-card <?= !$notification['is_read'] ? 'unread' : '' ?>">
+            <div class="notification-card <?= !$notification['is_read'] ? 'unread' : '' ?>" 
+                 data-notification-id="<?= $notification['id'] ?>"
+                 data-is-read="<?= $notification['is_read'] ? '1' : '0' ?>"
+                 data-link="<?= !empty($notification['link']) ? htmlspecialchars($notification['link']) : '' ?>">
               <div class="notification-icon"><i class="fas fa-info-circle"></i></div>
               <div class="notification-content">
                 <p><?= htmlspecialchars($notification['message']) ?></p>
                 <div class="time"><?= date('M d, Y, g:i a', strtotime($notification['created_at'])) ?></div>
               </div>
               <div class="notification-actions">
-                <a href="?action=toggle_read&id=<?= $notification['id'] ?>" class="btn-action" title="<?= $notification['is_read'] ? 'Mark as Unread' : 'Mark as Read' ?>">
+                <a href="?action=toggle_read&id=<?= $notification['id'] ?>" 
+                   class="btn-action" 
+                   title="<?= $notification['is_read'] ? 'Mark as Unread' : 'Mark as Read' ?>"
+                   onclick="event.stopPropagation();">
                   <i class="fas <?= $notification['is_read'] ? 'fa-envelope-open' : 'fa-envelope' ?>"></i>
                 </a>
                 <?php if (!empty($notification['link'])): ?>
-                  <a href="<?= htmlspecialchars($notification['link']) ?>" class="btn-action" title="View Details"><i class="fas fa-arrow-right"></i></a>
+                  <a href="<?= htmlspecialchars($notification['link']) ?>" 
+                     class="btn-action" 
+                     title="View Details"
+                     onclick="event.stopPropagation();">
+                    <i class="fas fa-arrow-right"></i>
+                  </a>
                 <?php endif; ?>
               </div>
             </div>
@@ -112,5 +175,47 @@ require_once './staff_sidebar.php';
         <?php endif; ?>
       </div>
     </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const notificationCards = document.querySelectorAll('.notification-card');
+    
+    notificationCards.forEach(card => {
+        card.addEventListener('click', function(e) {
+            // Don't trigger if clicking on action buttons
+            if (e.target.closest('.btn-action')) {
+                return;
+            }
+            
+            const notificationId = this.dataset.notificationId;
+            const isRead = this.dataset.isRead === '1';
+            const link = this.dataset.link;
+            
+            // Mark as read if unread
+            if (!isRead) {
+                // Update UI immediately for better UX
+                this.classList.remove('unread');
+                this.dataset.isRead = '1';
+                
+                // Update the envelope icon
+                const envelopeIcon = this.querySelector('.fa-envelope');
+                if (envelopeIcon) {
+                    envelopeIcon.classList.remove('fa-envelope');
+                    envelopeIcon.classList.add('fa-envelope-open');
+                }
+                
+                // Mark as read in database (async, don't wait)
+                fetch(`?action=toggle_read&id=${notificationId}`)
+                    .catch(err => console.error('Failed to mark notification as read:', err));
+            }
+            
+            // Navigate to link if available
+            if (link) {
+                window.location.href = link;
+            }
+        });
+    });
+});
+</script>
 
 <?php require_once './staff_footer.php'; ?>

@@ -102,6 +102,135 @@ try {
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="applicant_style.css"> <!-- Main applicant styles -->
+  <style>
+    /* Global Responsive Styles for Applicant Dashboard */
+    @media (max-width: 768px) {
+        /* Header adjustments */
+        .header {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 1rem;
+            padding: 1rem 0;
+        }
+        .header-left, .header-right {
+            width: 100%;
+            flex-direction: column;
+            align-items: flex-start !important;
+        }
+        
+        /* Table responsive */
+        .table-container {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        table {
+            min-width: 600px;
+        }
+        table th, table td {
+            padding: 0.75rem 0.5rem;
+            font-size: 0.85rem;
+        }
+        table td[data-label]::before {
+            content: attr(data-label) ": ";
+            font-weight: 600;
+            display: inline-block;
+            min-width: 120px;
+        }
+        
+        /* Form responsive */
+        .form-container {
+            margin: 10px;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        /* Card/Grid responsive */
+        .stats-container, .stat-grid, .kpi-grid, .dashboard-grid {
+            grid-template-columns: 1fr !important;
+            gap: 1rem;
+        }
+        
+        /* Chart responsive */
+        .chart-container, .chart-wrapper {
+            height: 300px !important;
+        }
+        
+        /* Button groups */
+        .action-buttons {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .btn {
+            width: 100%;
+            justify-content: center;
+        }
+        
+        /* Alert responsive */
+        .renewal-alerts {
+            flex-direction: column;
+        }
+        .alert {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        /* Chat section */
+        .chat-section {
+            margin: 1rem 0;
+        }
+        .chat-item {
+            flex-direction: column;
+            gap: 1rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .main {
+            padding: 10px !important;
+        }
+        .header h1 {
+            font-size: 1.5rem !important;
+        }
+        table th, table td {
+            padding: 0.5rem 0.25rem;
+            font-size: 0.8rem;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+        }
+        /* Stack table cells on very small screens */
+        table, thead, tbody, th, td, tr {
+            display: block;
+        }
+        thead tr {
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+        }
+        tr {
+            border: 1px solid #ccc;
+            margin-bottom: 1rem;
+            padding: 0.5rem;
+        }
+        td {
+            border: none;
+            position: relative;
+            padding-left: 50% !important;
+        }
+        td::before {
+            content: attr(data-label) ": ";
+            position: absolute;
+            left: 6px;
+            width: 45%;
+            padding-right: 10px;
+            white-space: nowrap;
+            font-weight: 600;
+        }
+    }
+  </style>
 </head>
 <body>
   <div class="wrapper">

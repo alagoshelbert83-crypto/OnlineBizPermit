@@ -57,4 +57,119 @@ if (isset($conn)) {
     .sidebar:not(:hover) .notification-count { top: 5px; right: 5px; }
     .sidebar-divider { border: none; height: 1px; background-color: #334155; margin: 20px 0; }
     .main { margin-left: 80px; transition: margin-left 0.3s ease; }
+    
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: -100%;
+            width: 280px;
+            height: 100vh;
+            z-index: 1001;
+            transition: left 0.3s ease;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+        }
+        .sidebar.active,
+        .sidebar.active-mobile {
+            left: 0;
+        }
+        .main {
+            margin-left: 0;
+            padding: 15px;
+        }
+        .sidebar:hover {
+            width: 280px;
+        }
+        .sidebar .sidebar-header span,
+        .sidebar .btn-nav span {
+            opacity: 1;
+        }
+        .sidebar .sidebar-header {
+            justify-content: flex-start;
+            padding-left: 10px;
+        }
+        .sidebar .btn-nav {
+            justify-content: flex-start;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .sidebar {
+            width: 260px;
+        }
+        .btn-nav {
+            padding: 12px 15px;
+        }
+        .sidebar-header span {
+            font-size: 1.1rem;
+        }
+    }
 </style>
+
+<!-- Mobile Menu Toggle -->
+<div id="mobile-menu-overlay" class="mobile-overlay" style="display: none;"></div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('mobile-menu-overlay');
+
+    // Create mobile toggle button
+    const toggleBtn = document.createElement('button');
+    toggleBtn.id = 'mobile-menu-toggle';
+    toggleBtn.innerHTML = '<i class="fas fa-bars"></i>';
+    toggleBtn.style.cssText = `
+        display: none;
+        position: fixed;
+        top: 15px;
+        left: 15px;
+        z-index: 1002;
+        background: #1e293b;
+        color: #e2e8f0;
+        border: none;
+        border-radius: 6px;
+        padding: 10px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    `;
+    document.body.appendChild(toggleBtn);
+
+    // Mobile overlay styles
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+        display: none;
+    `;
+
+    function toggleSidebar() {
+        sidebar.classList.toggle('active');
+        sidebar.classList.toggle('active-mobile');
+        overlay.style.display = sidebar.classList.contains('active') || sidebar.classList.contains('active-mobile') ? 'block' : 'none';
+    }
+
+    toggleBtn.addEventListener('click', toggleSidebar);
+    overlay.addEventListener('click', toggleSidebar);
+
+    // Show/hide toggle button based on screen size
+    function checkScreenSize() {
+        if (window.innerWidth <= 768) {
+            toggleBtn.style.display = 'block';
+            sidebar.classList.remove('active', 'active-mobile');
+            overlay.style.display = 'none';
+        } else {
+            toggleBtn.style.display = 'none';
+            sidebar.classList.remove('active', 'active-mobile');
+            overlay.style.display = 'none';
+        }
+    }
+
+    window.addEventListener('resize', checkScreenSize);
+    checkScreenSize();
+});
+</script>

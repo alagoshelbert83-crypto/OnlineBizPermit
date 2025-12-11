@@ -50,6 +50,109 @@ try {
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="admin_style.css">
+  <style>
+    /* Global Responsive Styles for Admin Dashboard */
+    @media (max-width: 768px) {
+        /* Header adjustments */
+        .header {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 1rem;
+            padding: 1rem 0;
+        }
+        .header-left, .header-right {
+            width: 100%;
+            flex-direction: column;
+            align-items: flex-start !important;
+        }
+        
+        /* Table responsive */
+        .table-container {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        table {
+            min-width: 600px;
+        }
+        table th, table td {
+            padding: 0.75rem 0.5rem;
+            font-size: 0.85rem;
+        }
+        
+        /* Form responsive */
+        .form-container {
+            margin: 10px;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        /* Card/Grid responsive */
+        .stat-grid, .kpi-grid, .dashboard-grid, .data-grid {
+            grid-template-columns: 1fr !important;
+            gap: 1rem;
+        }
+        
+        /* Chart responsive */
+        .chart-container, .chart-wrapper {
+            height: 300px !important;
+        }
+        
+        /* Button groups */
+        .action-buttons {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .btn {
+            width: 100%;
+            justify-content: center;
+        }
+        
+        /* Modal responsive */
+        .modal-content {
+            width: 95% !important;
+            margin: 5% auto;
+            padding: 1.5rem;
+        }
+        
+        /* Filter controls */
+        .filter-controls {
+            flex-direction: column;
+            width: 100%;
+        }
+        .search-form {
+            width: 100%;
+        }
+        
+        /* Pagination */
+        .pagination {
+            flex-wrap: wrap;
+            gap: 0.25rem;
+        }
+        .pagination a {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.85rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .main {
+            padding: 10px !important;
+        }
+        .header h1 {
+            font-size: 1.5rem !important;
+        }
+        table th, table td {
+            padding: 0.5rem 0.25rem;
+            font-size: 0.8rem;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+        }
+    }
+  </style>
 </head>
 <body>
   <div class="wrapper">
