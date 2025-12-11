@@ -35,35 +35,69 @@ if (!is_dir($upload_dir)) {
 
 // Check if file exists
 if (!file_exists($file_path)) {
-    // Log detailed information for debugging
-    error_log("File not found details:");
-    error_log("  Original request: " . $original_request);
-    error_log("  Processed filename: " . $file);
-    error_log("  Expected path: " . $file_path);
-    error_log("  Upload dir exists: " . (is_dir($upload_dir) ? 'Yes' : 'No'));
-    error_log("  Upload dir path: " . $upload_dir);
+    // Try URL decoding in case the filename was double-encoded
+    $decoded_file = urldecode($file);
+    $decoded_path = $upload_dir . $decoded_file;
     
-    // Try to list files in uploads directory for debugging (first 10 files)
-    if (is_dir($upload_dir)) {
-        $files_in_dir = array_slice(scandir($upload_dir), 0, 12);
-        error_log("  Files in uploads directory: " . implode(', ', $files_in_dir));
+    if ($decoded_file !== $file && file_exists($decoded_path)) {
+        $file_path = $decoded_path;
+        $file = $decoded_file;
+    } else {
+        // Try to find files with similar names (in case of minor variations)
+        $found_file = null;
+        if (is_dir($upload_dir)) {
+            $pattern = preg_quote(pathinfo($file, PATHINFO_FILENAME), '/') . '.*' . preg_quote('.' . pathinfo($file, PATHINFO_EXTENSION), '/');
+            $files = glob($upload_dir . $pattern);
+            if (!empty($files)) {
+                $found_file = basename($files[0]);
+                $file_path = $files[0];
+                error_log("File not found as '$file', but found similar: '$found_file'");
+            }
+        }
+        
+        // If still not found, log detailed information for debugging
+        if (!$found_file) {
+            error_log("File not found details:");
+            error_log("  Original request: " . $original_request);
+            error_log("  Processed filename: " . $file);
+            error_log("  Expected path: " . $file_path);
+            error_log("  Upload dir exists: " . (is_dir($upload_dir) ? 'Yes' : 'No'));
+            error_log("  Upload dir path: " . $upload_dir);
+            
+            // Try to list files in uploads directory for debugging (first 10 files)
+            if (is_dir($upload_dir)) {
+                $files_in_dir = array_slice(scandir($upload_dir), 0, 12);
+                error_log("  Files in uploads directory: " . implode(', ', $files_in_dir));
+            }
+            
+            // Return a transparent 1x1 PNG for images to prevent broken image icons
+            $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif'])) {
+                http_response_code(200);
+                header('Content-Type: image/png');
+                header('Cache-Control: no-cache, no-store, must-revalidate');
+                // Output a transparent 1x1 PNG
+                echo base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
+                exit;
+            }
+            
+            http_response_code(404);
+            header('Content-Type: text/html; charset=utf-8');
+            ?>
+            <!DOCTYPE html>
+            <html>
+            <head><title>File Not Found</title></head>
+            <body>
+                <h1>File Not Found</h1>
+                <p>The requested file could not be found on the server.</p>
+                <p><small>Requested file: <?= htmlspecialchars($file) ?></small></p>
+                <p><small>If this file was recently uploaded, it may not have been saved properly. Please contact support or re-upload the document.</small></p>
+            </body>
+            </html>
+            <?php
+            exit;
+        }
     }
-    
-    http_response_code(404);
-    header('Content-Type: text/html; charset=utf-8');
-    ?>
-    <!DOCTYPE html>
-    <html>
-    <head><title>File Not Found</title></head>
-    <body>
-        <h1>File Not Found</h1>
-        <p>The requested file could not be found on the server.</p>
-        <p><small>Requested file: <?= htmlspecialchars($file) ?></small></p>
-        <p><small>If this file was recently uploaded, it may not have been saved properly. Please contact support.</small></p>
-    </body>
-    </html>
-    <?php
-    exit;
 }
 
 // Security check: ensure file is within uploads directory (compatible with PHP < 8.0)

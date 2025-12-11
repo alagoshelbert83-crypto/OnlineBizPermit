@@ -711,9 +711,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (document.querySelector('.msg.typing')) return; // Already showing
         const wrapper = document.createElement('div');
         wrapper.className = 'msg typing';
+        const avatarColor = '<?= substr(md5($chat_session['applicant_name'] ?? 'user'), 0, 6) ?>';
+        const avatarInitial = '<?= strtoupper(substr($chat_session['applicant_name'] ?? 'A', 0, 1)) ?>';
         wrapper.innerHTML = `
-            <div class="avatar user-avatar" style="background-color: #${'<?= substr(md5($chat_session['applicant_name'] ?? 'user'), 0, 6) ?>'}">
-                <?= strtoupper(substr($chat_session['applicant_name'] ?? 'A', 0, 1)) ?>
+            <div class="avatar user-avatar" style="background-color: #${avatarColor}">
+                ${avatarInitial}
             </div>
             <div class="bubble">
                 <div class="typing-dot"></div>
@@ -861,7 +863,10 @@ document.addEventListener('DOMContentLoaded', function() {
             userInput.disabled = false;
             userInput.focus();
         }
-    });
+        };
+        
+        chatForm.addEventListener('submit', submitHandler);
+    }
 
     // Set up the initial submit handler
     setupSubmitHandler();
