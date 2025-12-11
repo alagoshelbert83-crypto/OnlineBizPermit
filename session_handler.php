@@ -49,27 +49,29 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
     public function read($sessionId): string {
         try {
             // CRITICAL: Session operations must NOT be in a transaction
-            // If we're in a transaction, we can't read sessions (this is a design issue)
+            // If we're in a transaction, try to use a separate connection or wait
             if ($this->conn->inTransaction()) {
-                error_log("WARNING: Session read() called during active transaction for session_id={$sessionId}");
-                // Return empty to avoid transaction pollution
-                return '';
+                error_log("WARNING: Session read() called during active transaction for session_id={$sessionId} - attempting to read anyway");
+                // Don't return empty - try to read anyway, but log the warning
+                // This prevents users from being logged out when transactions are active
             }
             
             $stmt = $this->conn->prepare("SELECT session_data FROM {$this->table} WHERE session_id = :session_id AND session_expires > NOW()");
             $stmt->execute(['session_id' => $sessionId]);
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($result) {
-                // Update expires to extend the session
-                $expires = date('Y-m-d H:i:s', strtotime('+24 hours'));
-                $update_stmt = $this->conn->prepare("UPDATE {$this->table} SET session_expires = :expires WHERE session_id = :session_id");
-                $update_stmt->execute(['expires' => $expires, 'session_id' => $sessionId]);
+                // Update expires to extend the session (only if not in transaction)
+                if (!$this->conn->inTransaction()) {
+                    $expires = date('Y-m-d H:i:s', strtotime('+24 hours'));
+                    $update_stmt = $this->conn->prepare("UPDATE {$this->table} SET session_expires = :expires WHERE session_id = :session_id");
+                    $update_stmt->execute(['expires' => $expires, 'session_id' => $sessionId]);
+                }
                 return $result['session_data'];
             }
             return '';
         } catch (Exception $e) {
             error_log("Session read error for session_id={$sessionId}: " . $e->getMessage());
-            // Don't let session errors break the application
+            // Don't let session errors break the application - return empty string
             return '';
         }
     }

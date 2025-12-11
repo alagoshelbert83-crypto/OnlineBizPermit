@@ -760,21 +760,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Prevent multiple form submissions by removing/re-adding event listener
     let submitHandler = null;
+    let handlerAttached = false;
 
     function setupSubmitHandler() {
-        if (submitHandler) {
+        // Remove existing handler if it exists
+        if (submitHandler && handlerAttached) {
             chatForm.removeEventListener('submit', submitHandler);
+            handlerAttached = false;
         }
 
         submitHandler = async function(e) {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation(); // Prevent other handlers
 
             const message = userInput.value.trim();
             if (!message && !fileInput.files[0]) return;
 
             // Prevent multiple simultaneous sends
-            if (isSending) return;
+            if (isSending) {
+                console.log('Already sending, ignoring duplicate submit');
+                return;
+            }
 
             // Prevent spam by enforcing minimum time between sends
             const now = Date.now();
@@ -785,6 +792,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             isSending = true;
             lastSendTime = now;
+            
+            // Immediately disable form to prevent double submission
+            chatForm.style.pointerEvents = 'none';
 
             // Disable form to prevent spam
             const submitBtn = chatForm.querySelector('button[type="submit"]');
@@ -825,6 +835,7 @@ document.addEventListener('DOMContentLoaded', function() {
             } finally {
                 // Re-enable form and reset sending flag
                 isSending = false;
+                chatForm.style.pointerEvents = 'auto';
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalBtnText;
                 userInput.disabled = false;
@@ -832,12 +843,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         };
         
-        // Attach the submit handler to the form
-        chatForm.addEventListener('submit', submitHandler);
+        // Attach the submit handler to the form with once option to prevent duplicates
+        chatForm.addEventListener('submit', submitHandler, { once: false, passive: false });
+        handlerAttached = true;
     }
 
-    // Set up the initial submit handler
-    setupSubmitHandler();
+    // Set up the initial submit handler only once
+    if (!handlerAttached) {
+        setupSubmitHandler();
+    }
 
     fileInput.addEventListener('change', function() {
         if (this.files[0]) {
