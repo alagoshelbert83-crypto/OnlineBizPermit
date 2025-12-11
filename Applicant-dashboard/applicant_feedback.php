@@ -105,7 +105,23 @@ require_once __DIR__ . '/applicant_sidebar.php';
         outline: none;
         box-shadow: 0 0 0 3px rgba(74, 105, 189, 0.2);
     }
-    .btn { display: inline-block; width: auto; margin-top: 10px; }
+    .feedback-container .btn { 
+        margin-top: 10px; 
+        padding: 12px 24px;
+        background: var(--primary, #4a69bd);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 1rem;
+        transition: all 0.2s ease;
+    }
+    .feedback-container .btn:hover {
+        background: var(--primary-light, #5a7acd);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
 </style>
 
 <?php

@@ -1,5 +1,39 @@
 <?php
+// Start output buffering to prevent any accidental output before headers
+ob_start();
 
+// Enable error reporting for debugging (disable in production)
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Don't display errors, but log them
+ini_set('log_errors', 1);
+
+// Set proper error handler to prevent fatal errors from causing 502
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    error_log("PHP Error [$errno]: $errstr in $errfile on line $errline");
+    // Don't output anything that could break JSON response
+    return false;
+});
+
+// Catch fatal errors
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error !== NULL && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        ob_clean(); // Clear any output
+        http_response_code(500);
+        header('Content-Type: application/json');
+        echo json_encode([
+            'error' => 'Internal server error',
+            'reply' => 'Sorry, something went wrong. Please try again.',
+            'choices' => null
+        ]);
+        error_log("Fatal error: {$error['message']} in {$error['file']} on line {$error['line']}");
+        ob_end_flush();
+        exit;
+    }
+});
+
+// Clear any output that might have been generated before headers
+ob_clean();
 header('Content-Type: application/json');
 
 // Basic security check
@@ -19,8 +53,20 @@ if ($is_live_chat_action) {
     // Connect to DB ONLY for live chat actions to improve resilience.
     $db_path = __DIR__ . '/db.php';
     if (file_exists($db_path)) {
-require_once $db_path;
+        try {
+            require_once $db_path;
+            // Verify database connection is available
+            if (!isset($conn) || !$conn) {
+                throw new Exception('Database connection not established');
+            }
+        } catch (Exception $e) {
+            error_log('Database connection error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Database connection failed. Please try again later.']);
+            exit;
+        }
     } else {
+        error_log('Database file not found: ' . $db_path);
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Database configuration is missing.']);
         exit;
@@ -39,8 +85,13 @@ require_once $db_path;
     }
 
     // Start session AFTER database connection is established (required for custom session handler)
-    if (session_status() == PHP_SESSION_NONE) {
-        session_start();
+    try {
+        if (session_status() == PHP_SESSION_NONE) {
+            @session_start(); // Suppress warnings if session already started
+        }
+    } catch (Exception $e) {
+        error_log('Session start error: ' . $e->getMessage());
+        // Continue without session if it fails
     }
     // Determine authentication state: allow guest creation of chats if a guest name is provided.
     $is_authenticated = isset($_SESSION['user_id']);
@@ -86,12 +137,16 @@ require_once $db_path;
             $notify_stmt->execute([':message' => $notification_message, ':link' => $notification_link]);
 
             $conn->commit();
-            echo json_encode(['success' => true, 'chat_id' => (int)$chat_id]);
+            ob_clean(); // Clear any output before JSON
+        echo json_encode(['success' => true, 'chat_id' => (int)$chat_id]);
+        ob_end_flush();
         } catch (Exception $e) {
-            if ($conn->inTransaction()) { $conn->rollBack(); }
+            if (isset($conn) && $conn->inTransaction()) { $conn->rollBack(); }
+            ob_clean(); // Clear any output
             http_response_code(500);
             error_log('chat create error: ' . $e->getMessage());
             echo json_encode(['success' => false, 'error' => 'Failed to create chat session.']);
+            ob_end_flush();
         }
         exit;
     }
@@ -168,11 +223,15 @@ require_once $db_path;
                 }
             }
 
+            ob_clean(); // Clear any output before JSON
             echo json_encode(['success' => true]);
+            ob_end_flush();
         } catch (PDOException $e) {
             error_log('send_message error: ' . $e->getMessage());
+            ob_clean(); // Clear any output
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Failed to send message. Please try again.']);
+            ob_end_flush();
         }
         exit;
     }
@@ -351,10 +410,26 @@ if ($is_faq_bot_action) {
     // Load FAQ data ONLY when it's a FAQ bot action.
     $faq_data_path = __DIR__ . DIRECTORY_SEPARATOR . 'faq-data.php';
     if (file_exists($faq_data_path)) {
-        require_once $faq_data_path;
+        try {
+            require_once $faq_data_path;
+        } catch (Exception $e) {
+            error_log('FAQ data file error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode([
+                'error' => 'FAQ system unavailable',
+                'reply' => 'Sorry, I could not process your request. Please try again.',
+                'choices' => null
+            ]);
+            exit;
+        }
     } else {
+        error_log('FAQ data file not found: ' . $faq_data_path);
         http_response_code(500);
-        echo json_encode(['error' => 'FAQ data file not found.']);
+        echo json_encode([
+            'error' => 'FAQ data file not found',
+            'reply' => 'Sorry, I could not process your request. Please try again.',
+            'choices' => null
+        ]);
         exit;
     }
 
@@ -455,9 +530,12 @@ if ($is_faq_bot_action) {
         // The usleep function can be disabled on some free hosting providers, causing errors.
         // usleep(300000); // 0.3 seconds
 
+        ob_clean(); // Clear any output before JSON
         echo json_encode($botResponse);
+        ob_end_flush();
     } catch (Exception $e) {
         // Error handling
+        ob_clean(); // Clear any output
         http_response_code(500);
         echo json_encode([
             'error' => 'Processing error: ' . $e->getMessage(), // More informative for debugging
@@ -467,15 +545,18 @@ if ($is_faq_bot_action) {
             ],
             'id' => 'error'
         ]);
+        ob_end_flush();
     }
     exit;
 }
 
 // If no valid action was found
+ob_clean(); // Clear any output
 http_response_code(400);
 echo json_encode([
     'error' => 'Invalid action',
     'reply' => 'Sorry, something went wrong. Please try again.',
     'choices' => null
 ]);
+ob_end_flush();
 exit;

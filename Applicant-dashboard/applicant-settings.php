@@ -435,7 +435,11 @@ input:checked + .slider:before {
     background-color: var(--danger);
     color: white;
     width: 100%;
+    display: flex;
     justify-content: center;
+    align-items: center;
+    border: none;
+    padding: 0.75rem 1.5rem;
 }
 .btn-danger:hover {
     background-color: #dc2626;

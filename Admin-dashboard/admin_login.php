@@ -166,6 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             align-items: center;
             justify-content: center;
             gap: 8px;
+            position: relative;
         }
         #loginIcon {
             transition: transform 0.3s ease;
@@ -178,11 +179,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             align-items: center;
             justify-content: center;
         }
+        #loginBtn:disabled {
+            justify-content: center;
+            align-items: center;
+        }
         #loginBtn:disabled #loginSpinner {
             display: flex;
         }
         #loginBtn:disabled #loginBtnText {
-            opacity: 0;
+            display: none;
+        }
+        #loginBtn:disabled #loginSpinner {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #loginBtn:disabled #loginSpinner::after {
+            content: 'Signing in...';
+            color: #fff;
+            font-weight: 600;
         }
         .login-progress {
             position: absolute;
@@ -281,9 +296,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (form && btn) {
                         form.addEventListener('submit', function(e){
                             btn.disabled = true;
-                            if (btnText) btnText.textContent = 'Signing in...';
-                            if (spinner) spinner.style.display = 'flex';
+                            if (spinner) {
+                                spinner.style.display = 'flex';
+                                spinner.style.alignItems = 'center';
+                                spinner.style.justifyContent = 'center';
+                                spinner.style.gap = '8px';
+                            }
                             if (progress) progress.style.display = 'block';
+                            
+                            // Ensure button content is centered
+                            btn.style.justifyContent = 'center';
+                            btn.style.alignItems = 'center';
                             
                             // Add pulsing effect
                             btn.style.animation = 'pulse 2s ease-in-out infinite';

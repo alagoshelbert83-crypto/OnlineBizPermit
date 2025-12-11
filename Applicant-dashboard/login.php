@@ -248,9 +248,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                                 if (form && btn) {
                                                     form.addEventListener('submit', function(e){
                                                         btn.disabled = true;
-                                                        if (txt) txt.textContent = 'Signing in...';
-                                                        if (spinner) spinner.style.display = 'flex';
+                                                        if (spinner) {
+                                                            spinner.style.display = 'flex';
+                                                            spinner.style.alignItems = 'center';
+                                                            spinner.style.justifyContent = 'center';
+                                                            spinner.style.gap = '8px';
+                                                        }
                                                         if (progress) progress.style.display = 'block';
+                                                        
+                                                        // Ensure button content is centered
+                                                        btn.style.justifyContent = 'center';
+                                                        btn.style.alignItems = 'center';
                                                         
                                                         // Add pulsing effect
                                                         btn.style.animation = 'pulse 2s ease-in-out infinite';
@@ -298,11 +306,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                                 align-items: center;
                                                 justify-content: center;
                                             }
+                                            #appLoginBtn:disabled {
+                                                justify-content: center;
+                                                align-items: center;
+                                            }
                                             #appLoginBtn:disabled #appLoginSpinner {
                                                 display: flex;
                                             }
                                             #appLoginBtn:disabled #appLoginBtnText {
-                                                opacity: 0;
+                                                display: none;
+                                            }
+                                            #appLoginBtn:disabled #appLoginSpinner {
+                                                display: flex;
+                                                align-items: center;
+                                                gap: 8px;
+                                            }
+                                            #appLoginBtn:disabled #appLoginSpinner::after {
+                                                content: 'Signing in...';
+                                                color: #fff;
+                                                font-weight: 600;
                                             }
                                             #appLoginBtn:disabled .login-progress {
                                                 display: block;
