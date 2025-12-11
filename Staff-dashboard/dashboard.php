@@ -69,7 +69,19 @@ $monthly_counts = array_values($counts_by_month);
     .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
     .kpi-card { background: var(--card-bg-color); padding: 25px; border-radius: var(--border-radius); box-shadow: var(--shadow); display: flex; align-items: center; gap: 20px; transition: transform 0.2s; }
     .kpi-card:hover { transform: translateY(-5px); }
-    .kpi-card .icon { font-size: 2.5rem; padding: 15px; border-radius: 50%; color: #fff; }
+    .kpi-card .icon { 
+        font-size: 2.5rem; 
+        width: 80px; 
+        height: 80px; 
+        min-width: 80px; 
+        min-height: 80px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        border-radius: 50%; 
+        color: #fff; 
+        flex-shrink: 0;
+    }
     .kpi-card .details h3 { font-size: 2rem; font-weight: 700; }
     .kpi-card .details p { font-size: 0.9rem; color: var(--text-secondary-color); font-weight: 600; text-transform: uppercase; }
     .kpi-card.total .icon { background: #6f42c1; }
@@ -126,7 +138,7 @@ $monthly_counts = array_values($counts_by_month);
         .main-header h1 { font-size: 24px; }
         .kpi-grid { grid-template-columns: 1fr; gap: 15px; }
         .kpi-card { padding: 20px; }
-        .kpi-card .icon { font-size: 2rem; }
+        .kpi-card .icon { font-size: 2rem; width: 70px; height: 70px; min-width: 70px; min-height: 70px; }
         .kpi-card .details h3 { font-size: 1.8rem; }
         .dashboard-grid { gap: 15px; }
         .main-chart-container, .recent-activity-container { padding: 15px; height: 350px; }
@@ -140,7 +152,7 @@ $monthly_counts = array_values($counts_by_month);
         .main { padding: 10px; }
         .main-header h1 { font-size: 20px; }
         .kpi-card { padding: 15px; }
-        .kpi-card .icon { font-size: 1.8rem; padding: 12px; }
+        .kpi-card .icon { font-size: 1.8rem; width: 60px; height: 60px; min-width: 60px; min-height: 60px; }
         .kpi-card .details h3 { font-size: 1.6rem; }
         .main-chart-container, .recent-activity-container { height: 300px; padding: 12px; }
         .activity-list .activity-item { flex-direction: column; align-items: flex-start; gap: 8px; }

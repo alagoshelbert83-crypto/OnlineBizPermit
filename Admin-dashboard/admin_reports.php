@@ -7,8 +7,46 @@ $current_page = 'reports';
 require_once __DIR__ . '/admin_header.php';
 
 // This page should be accessible only by admins
-if ($current_user_role !== 'admin') {
-    echo "<div class='main'><div class='message error'>You do not have permission to access this page.</div></div>";
+// Verify user role - check both session and database to ensure user is admin
+$is_admin = false;
+if (isset($current_user_role)) {
+    $role_lower = trim(strtolower($current_user_role));
+    $is_admin = ($role_lower === 'admin');
+} else {
+    // Double-check from database if session role is not set
+    try {
+        $role_check_stmt = $conn->prepare("SELECT role FROM users WHERE id = ?");
+        $role_check_stmt->execute([$current_user_id]);
+        $role_data = $role_check_stmt->fetch(PDO::FETCH_ASSOC);
+        $db_role = trim(strtolower($role_data['role'] ?? ''));
+        $is_admin = ($db_role === 'admin');
+        // Update session role if it was missing
+        if (!isset($current_user_role)) {
+            $_SESSION['role'] = $role_data['role'] ?? '';
+            $current_user_role = $_SESSION['role'];
+        }
+    } catch (PDOException $e) {
+        error_log("Error checking user role: " . $e->getMessage());
+    }
+}
+
+if (!$is_admin) {
+    // Include sidebar for proper layout before showing error
+    require_once __DIR__ . '/admin_sidebar.php';
+    ?>
+    <div class="main">
+        <header class="header">
+            <div class="header-left">
+                <h1>Access Denied</h1>
+            </div>
+        </header>
+        <div class="message error" style="margin: 20px; padding: 20px; border-left: 4px solid #ef4444;">
+            <i class="fas fa-exclamation-triangle" style="margin-right: 10px;"></i>
+            <strong>You do not have permission to access this page.</strong><br>
+            <p style="margin-top: 10px; margin-bottom: 0;">Only administrators can access the Reports page. If you believe this is an error, please contact your system administrator.</p>
+        </div>
+    </div>
+    <?php
     require_once __DIR__ . '/admin_footer.php';
     exit;
 }

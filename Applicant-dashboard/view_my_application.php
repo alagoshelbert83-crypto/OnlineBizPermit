@@ -280,26 +280,40 @@ require_once __DIR__ . '/applicant_sidebar.php';
                     <?php else: ?>
                         <?php foreach ($documents as $doc): ?>
                             <?php
-                            $doc_type = $doc['document_type'] ?? 'Other';
-                            $doc_label = $document_type_labels[$doc_type] ?? ucfirst(str_replace('_', ' ', $doc_type));
+                            $doc_type = $doc['document_type'] ?? null;
+                            // Handle null or empty document_type
+                            if (empty($doc_type) || $doc_type === 'Other') {
+                                // Try to infer from filename or default
+                                $doc_type = 'other';
+                            }
+                            $doc_label = isset($document_type_labels[$doc_type]) ? $document_type_labels[$doc_type] : ucfirst(str_replace('_', ' ', $doc_type));
                             $file_extension = strtolower(pathinfo($doc['document_name'], PATHINFO_EXTENSION));
-                            $file_path = '../uploads/' . htmlspecialchars($doc['file_path']);
+                            // Use absolute path from root instead of relative path
+                            $file_path = '/uploads/' . htmlspecialchars($doc['file_path']);
                             ?>
                             <div class="document-item">
                                 <div class="doc-preview">
                                     <?php if (in_array($file_extension, ['jpg', 'jpeg', 'png', 'gif'])): ?>
-                                        <a href="<?= $file_path ?>" target="_blank"><img src="<?= $file_path ?>" alt="<?= htmlspecialchars($doc_label) ?>"></a>
+                                        <a href="<?= $file_path ?>" target="_blank" title="View <?= htmlspecialchars($doc_label) ?>">
+                                            <img src="<?= $file_path ?>" 
+                                                 alt="<?= htmlspecialchars($doc_label) ?>"
+                                                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'%3E%3Crect fill=\'%23f8fafc\' width=\'100\' height=\'100\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%2364748b\' font-family=\'sans-serif\' font-size=\'14\'%3EImage%3C/text%3E%3C/svg%3E';">
+                                        </a>
                                     <?php elseif ($file_extension === 'pdf'): ?>
-                                        <a href="<?= $file_path ?>" target="_blank"><i class="fas fa-file-pdf"></i></a>
+                                        <a href="<?= $file_path ?>" target="_blank" title="View PDF: <?= htmlspecialchars($doc_label) ?>">
+                                            <i class="fas fa-file-pdf"></i>
+                                        </a>
                                     <?php else: ?>
-                                        <a href="<?= $file_path ?>" target="_blank"><i class="fas fa-file-alt"></i></a>
+                                        <a href="<?= $file_path ?>" target="_blank" title="View Document: <?= htmlspecialchars($doc_label) ?>">
+                                            <i class="fas fa-file-alt"></i>
+                                        </a>
                                     <?php endif; ?>
                                 </div>
                                 <div class="doc-info">
                                     <p class="doc-type-label"><strong><?= htmlspecialchars($doc_label) ?></strong></p>
                                     <p class="doc-filename" title="<?= htmlspecialchars($doc['document_name']) ?>"><?= htmlspecialchars($doc['document_name']) ?></p>
                                 </div>
-                                <a href="<?= $file_path ?>" class="btn btn-secondary" target="_blank">
+                                <a href="<?= $file_path ?>" class="btn btn-secondary" target="_blank" title="Open <?= htmlspecialchars($doc_label) ?>">
                                     <i class="fas fa-eye"></i> View
                                 </a>
                             </div>
@@ -576,8 +590,8 @@ p {
 /* --- Document List Styles --- */
 .document-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
 }
 .document-item {
     border: 1px solid #e2e8f0;
@@ -604,7 +618,24 @@ p {
     background: #f8fafc;
     border-radius: 8px;
 }
-.document-item .doc-preview img { max-height: 100%; max-width: 100%; object-fit: cover; border-radius: 4px; }
+.document-item .doc-preview img { 
+    max-height: 100%; 
+    max-width: 100%; 
+    object-fit: cover; 
+    border-radius: 4px; 
+    display: block;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+.document-item .doc-preview img:hover {
+    transform: scale(1.05);
+}
+.document-item .doc-preview a {
+    display: block;
+    width: 100%;
+    height: 100%;
+    text-decoration: none;
+}
 .document-item .doc-preview i { font-size: 2.5rem; color: #64748b; }
 .document-item .doc-info { flex: 1; min-width: 200px; }
 .document-item .doc-type-label { font-weight: 600; font-size: 0.95rem; color: #1e293b; margin-bottom: 5px; display: block; }
