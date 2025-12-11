@@ -2,6 +2,7 @@
 
 :root {
     /* Applicant Dashboard - Professional Blue Theme */
+    --primary: #1e40af;
     --primary-color: #1e40af;
     --primary-light: #3b82f6;
     --primary-dark: #1e3a8a;
@@ -202,6 +203,21 @@ body {
 .header p { color: var(--text-muted); }
 .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; background: var(--primary); color: #fff; transition: all 0.2s ease; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
 .btn:hover { background: var(--primary-light); }
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    color: #fff;
+    border: none;
+    box-shadow: 0 2px 4px rgba(30, 64, 175, 0.2);
+}
+.btn-primary:hover {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
+    box-shadow: 0 4px 8px rgba(30, 64, 175, 0.3);
+    transform: translateY(-1px);
+}
+.btn-primary:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(30, 64, 175, 0.2);
+}
 
 /* Tables and Forms */
 .action-btn {
@@ -377,7 +393,7 @@ tr:last-child td { border-bottom: none; }
     padding-bottom: 15px;
     border-bottom: 1px solid var(--border-color);
 }
-.table-header h3 { margin: 0 0 5px 0; color: #fff; }
+.table-header h3 { margin: 0 0 5px 0; color: var(--text-primary); }
 .table-header p { margin: 0; color: var(--text-muted); font-size: 14px; }
 
 /* Application Name in Table */
@@ -483,7 +499,7 @@ tr:last-child td { border-bottom: none; }
 }
 .section-header h3 {
     margin: 0 0 5px 0;
-    color: #fff;
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -507,15 +523,19 @@ tr:last-child td { border-bottom: none; }
     border-radius: 8px;
     border: 1px solid var(--border-color);
     transition: all 0.2s ease;
+    gap: 15px;
 }
 .chat-item:hover {
     border-color: var(--primary);
     transform: translateY(-1px);
+    box-shadow: var(--shadow);
 }
 .chat-info {
     display: flex;
     flex-direction: column;
     gap: 5px;
+    flex: 1;
+    min-width: 0;
 }
 .chat-status .status-badge {
     font-size: 11px;
@@ -525,9 +545,22 @@ tr:last-child td { border-bottom: none; }
     font-size: 12px;
     color: var(--text-muted);
 }
-.chat-actions .btn {
+.chat-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+.chat-actions .btn,
+.chat-actions .btn-primary {
     padding: 8px 16px;
     font-size: 14px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: auto;
+    display: inline-flex;
+    visibility: visible;
+    opacity: 1;
 }
 
 /* Responsive */

@@ -343,6 +343,11 @@ require_once './admin_sidebar.php';
 
 <style>
 /* Additional styles for audit logs page */
+:root {
+    --card-bg: #ffffff;
+    --bg-color: #f8fafc;
+}
+
 .filters-card {
     background: var(--card-bg);
     padding: 20px;
@@ -512,18 +517,24 @@ require_once './admin_sidebar.php';
     font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
+    display: inline-block;
+    visibility: visible;
+    opacity: 1;
+    background: rgba(108, 117, 125, 0.1);
+    color: #6c757d;
 }
 
-.role-admin { background: rgba(220, 53, 69, 0.1); color: #dc3545; }
-.role-staff { background: rgba(40, 167, 69, 0.1); color: #28a745; }
-.role-applicant { background: rgba(74, 105, 189, 0.1); color: #4a69bd; }
-.role-guest { background: rgba(108, 117, 125, 0.1); color: #6c757d; }
+.role-admin { background: rgba(220, 53, 69, 0.1) !important; color: #dc3545 !important; }
+.role-staff { background: rgba(40, 167, 69, 0.1) !important; color: #28a745 !important; }
+.role-applicant { background: rgba(74, 105, 189, 0.1) !important; color: #4a69bd !important; }
+.role-user { background: rgba(74, 105, 189, 0.1) !important; color: #4a69bd !important; }
+.role-guest { background: rgba(108, 117, 125, 0.1) !important; color: #6c757d !important; }
 
-.action-login { background: rgba(40, 167, 69, 0.1); color: #28a745; }
-.action-logout { background: rgba(108, 117, 125, 0.1); color: #6c757d; }
-.action-failed-login { background: rgba(220, 53, 69, 0.1); color: #dc3545; }
-.action-view-application { background: rgba(74, 105, 189, 0.1); color: #4a69bd; }
-.action-send-chat-message { background: rgba(23, 162, 184, 0.1); color: #17a2b8; }
+.action-login { background: rgba(40, 167, 69, 0.1) !important; color: #28a745 !important; }
+.action-logout { background: rgba(108, 117, 125, 0.1) !important; color: #6c757d !important; }
+.action-failed-login { background: rgba(220, 53, 69, 0.1) !important; color: #dc3545 !important; }
+.action-view-application { background: rgba(74, 105, 189, 0.1) !important; color: #4a69bd !important; }
+.action-send-chat-message { background: rgba(23, 162, 184, 0.1) !important; color: #17a2b8 !important; }
 
 .description {
     max-width: 300px;
@@ -579,16 +590,22 @@ require_once './admin_sidebar.php';
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.5);
+    visibility: visible;
+    opacity: 1;
 }
 
 .modal-content {
-    background: var(--card-bg);
+    background: var(--card-bg, #ffffff);
     margin: 5% auto;
     padding: 0;
     border-radius: var(--border-radius);
     width: 90%;
     max-width: 600px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    visibility: visible;
+    opacity: 1;
+    display: block;
+    position: relative;
 }
 
 .modal-header {
@@ -618,6 +635,28 @@ require_once './admin_sidebar.php';
     padding: 20px;
     max-height: 70vh;
     overflow-y: auto;
+    overflow-x: hidden;
+    visibility: visible;
+    opacity: 1;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
+}
+
+.modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+    background-color: var(--border-color);
+    border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+    background-color: var(--text-muted);
 }
 
 /* Log Details Styles */
@@ -625,28 +664,38 @@ require_once './admin_sidebar.php';
     display: flex;
     flex-direction: column;
     gap: 20px;
+    visibility: visible;
+    opacity: 1;
 }
 
 .detail-section {
-    background: var(--bg-color);
+    background: var(--bg-color, #f8fafc);
     padding: 20px;
     border-radius: var(--border-radius);
     border: 1px solid var(--border-color);
+    visibility: visible;
+    opacity: 1;
+    display: block;
 }
 
 .detail-section h4 {
     margin: 0 0 15px 0;
-    color: var(--text-primary);
+    color: var(--text-primary, #1e293b);
     font-size: 1.1rem;
     display: flex;
     align-items: center;
     gap: 10px;
     padding-bottom: 10px;
     border-bottom: 2px solid var(--border-color);
+    visibility: visible;
+    opacity: 1;
+    font-weight: 600;
 }
 
 .detail-section h4 i {
-    color: var(--primary-color);
+    color: var(--primary-color, #1e293b);
+    visibility: visible;
+    opacity: 1;
 }
 
 .detail-grid {
@@ -659,6 +708,8 @@ require_once './admin_sidebar.php';
     display: flex;
     flex-direction: column;
     gap: 5px;
+    visibility: visible;
+    opacity: 1;
 }
 
 .detail-item.full-width {
@@ -717,14 +768,18 @@ require_once './admin_sidebar.php';
 
 .metadata-key {
     font-weight: 600;
-    color: var(--text-secondary);
+    color: var(--text-secondary, #475569);
     font-size: 0.85rem;
+    visibility: visible;
+    opacity: 1;
 }
 
 .metadata-value {
-    color: var(--text-primary);
+    color: var(--text-primary, #1e293b);
     font-size: 0.95rem;
     word-break: break-word;
+    visibility: visible;
+    opacity: 1;
 }
 
 /* Responsive adjustments for modal */
@@ -826,6 +881,8 @@ function showLogDetails(logId) {
         </div>
     `;
     modal.style.display = 'block';
+    modal.style.visibility = 'visible';
+    modal.style.opacity = '1';
 
     // Fetch log details via AJAX
     fetch(`get_log_details.php?id=${logId}`)

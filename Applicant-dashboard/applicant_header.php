@@ -183,6 +183,15 @@ try {
         .chat-item {
             flex-direction: column;
             gap: 1rem;
+            align-items: flex-start;
+        }
+        .chat-actions {
+            width: 100%;
+        }
+        .chat-actions .btn,
+        .chat-actions .btn-primary {
+            width: 100%;
+            justify-content: center;
         }
     }
     
