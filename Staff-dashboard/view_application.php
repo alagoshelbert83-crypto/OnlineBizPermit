@@ -1,17 +1,18 @@
 <?php
-$current_page = 'applicants'; // Keep 'applicants' active in the sidebar
-$page_title = 'View Application';
-require_once './staff_header.php'; // Handles session, DB, auth, and starts HTML
-require_once './email_functions.php'; // For any email functions needed
-
-// --- Main Logic ---
-$application = null;
-$message = '';
-$email_message = '';
-$applicationId = $_GET['id'] ?? 0;
-$lgu_message = '';
-
+// Handle POST requests BEFORE including header (to allow redirects)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_application'])) {
+    // Include db connection first
+    require_once './db.php';
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // Authentication check
+    if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'staff') {
+        header("Location: login.php");
+        exit;
+    }
+    
     $applicationId = (int)$_POST['application_id'];
     
     try {
@@ -38,15 +39,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_application'])
         $lgu_stmt->execute([$applicationId, $lgu_form_data_json]);
 
         $conn->commit();
-        $message = '<div class="message success">LGU data updated successfully!</div>';
     } catch (PDOException $e) {
         try { $conn->rollBack(); } catch (Exception $_) {}
-        $message = '<div class="message error">Failed to update data: ' . htmlspecialchars($e->getMessage()) . '</div>';
+        error_log("Failed to update application data: " . $e->getMessage());
     }
 
+    // Redirect BEFORE any HTML output
     header("Location: view_application.php?id=" . $applicationId . "&status=updated");
     exit;
 }
+
+// Now include header and continue with normal page rendering
+$current_page = 'applicants'; // Keep 'applicants' active in the sidebar
+$page_title = 'View Application';
+require_once './staff_header.php'; // Handles session, DB, auth, and starts HTML
+require_once './email_functions.php'; // For any email functions needed
+
+// --- Main Logic ---
+$application = null;
+$message = '';
+$email_message = '';
+$applicationId = $_GET['id'] ?? 0;
+$lgu_message = '';
 
 if ($applicationId > 0) {
     $stmt = $conn->prepare("SELECT a.*, u.name as applicant_name, u.email as applicant_email FROM applications a LEFT JOIN users u ON a.user_id = u.id WHERE a.id = ?");
