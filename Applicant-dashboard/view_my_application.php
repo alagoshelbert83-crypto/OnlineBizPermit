@@ -280,13 +280,15 @@ require_once __DIR__ . '/applicant_sidebar.php';
                     <?php else: ?>
                         <?php foreach ($documents as $doc): ?>
                             <?php
-                            $doc_type = $doc['document_type'] ?? null;
-                            // Handle null or empty document_type
-                            if (empty($doc_type) || $doc_type === 'Other') {
-                                // Try to infer from filename or default
+                            $doc_type = trim($doc['document_type'] ?? '');
+                            // Handle null, empty, or 'Other' document_type
+                            if (empty($doc_type) || strtolower($doc_type) === 'other' || $doc_type === null) {
+                                // Try to infer from filename or default to 'other'
                                 $doc_type = 'other';
                             }
-                            $doc_label = isset($document_type_labels[$doc_type]) ? $document_type_labels[$doc_type] : ucfirst(str_replace('_', ' ', $doc_type));
+                            // Normalize the doc_type key (lowercase, no spaces)
+                            $doc_type_key = strtolower(str_replace(' ', '_', $doc_type));
+                            $doc_label = isset($document_type_labels[$doc_type_key]) ? $document_type_labels[$doc_type_key] : ucfirst(str_replace('_', ' ', $doc_type));
                             $file_extension = strtolower(pathinfo($doc['document_name'], PATHINFO_EXTENSION));
                             // Use absolute path from root instead of relative path
                             $file_path = '/uploads/' . htmlspecialchars($doc['file_path']);

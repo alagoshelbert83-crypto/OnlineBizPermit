@@ -3,3 +3,14 @@ php_flag engine off
 <FilesMatch \.ph(p[0-9]?|t|tml)$>
 	Deny from all
 </FilesMatch>
+
+# Force correct MIME types for images
+<FilesMatch "\.(jpg|jpeg|png|gif)$">
+	Header set Content-Type "image/jpeg"
+</FilesMatch>
+<FilesMatch "\.png$">
+	Header set Content-Type "image/png"
+</FilesMatch>
+<FilesMatch "\.gif$">
+	Header set Content-Type "image/gif"
+</FilesMatch>

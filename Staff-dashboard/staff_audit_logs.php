@@ -362,6 +362,8 @@ require_once './staff_sidebar.php';
 .stat-icon {
     width: 50px;
     height: 50px;
+    min-width: 50px;
+    min-height: 50px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
     display: flex;
@@ -369,6 +371,12 @@ require_once './staff_sidebar.php';
     justify-content: center;
     color: white;
     font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.stat-icon i {
+    display: inline-block;
+    visibility: visible;
 }
 
 .stat-content h3 {

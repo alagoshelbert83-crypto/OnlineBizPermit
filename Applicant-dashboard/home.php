@@ -37,9 +37,9 @@ require_once __DIR__ . '/applicant_sidebar.php';
     <header class="header">
         <div class="header-left">
             <div>
-                <h1 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                <h1 style="margin: 0; display: flex; align-items: center; gap: 10px; color: var(--text-primary); visibility: visible;">
                     <i class="fas fa-home" style="color: var(--accent-color);"></i>
-                    Welcome Home
+                    <span style="color: var(--text-primary);">Welcome Home</span>
                 </h1>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; margin-left: 34px;">
                     Welcome, <strong><?= htmlspecialchars($current_user_name ?? 'Applicant') ?></strong>! Here's a quick overview of your account and applications.

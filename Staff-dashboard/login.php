@@ -301,7 +301,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
               </button>
           </div>
         </div>
-        <button type="submit">Log In</button>
+        <button type="submit" id="staffLoginBtn">
+            <span id="staffLoginBtnText">Log In</span>
+            <span id="staffLoginSpinner" style="display:none; margin-left:8px;">
+                <svg width="18" height="18" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" stroke="#fff">
+                    <g fill="none" fill-rule="evenodd">
+                        <g transform="translate(1 1)" stroke-width="2">
+                            <circle stroke-opacity=".5" cx="22" cy="22" r="6"></circle>
+                            <path d="M28 22c0-3.314-2.686-6-6-6">
+                                <animateTransform attributeName="transform" type="rotate" from="0 22 22" to="360 22 22" dur="0.9s" repeatCount="indefinite" />
+                            </path>
+                        </g>
+                    </g>
+                </svg>
+            </span>
+        </button>
       </form>
       <div class="links-container">
         <a href="forgot-password.php">Forgot Password?</a>
@@ -344,6 +358,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         });
       } catch (err) {
         console.warn('Init toggle-password failed:', err);
+      }
+    })();
+
+    // Login spinner handler
+    (function(){
+      const form = document.querySelector('form[method="POST"]');
+      const btn = document.getElementById('staffLoginBtn');
+      const spinner = document.getElementById('staffLoginSpinner');
+      const btnText = document.getElementById('staffLoginBtnText');
+      if (form && btn && spinner && btnText) {
+        form.addEventListener('submit', function(){
+          btn.disabled = true;
+          btnText.textContent = 'Signing in...';
+          spinner.style.display = 'inline-block';
+        });
       }
     })();
   </script>
