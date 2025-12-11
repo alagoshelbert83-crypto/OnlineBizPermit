@@ -570,53 +570,392 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
   <meta charset='UTF-8'>
   <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-  <title>Application Submission Report - OnlineBizPermit</title>
-  <link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap' rel='stylesheet'>
+  <title>Application Submitted Successfully - OnlineBizPermit</title>
+  <link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap' rel='stylesheet'>
   <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css'>
-  <link rel='stylesheet' href='applicant_style.css'>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .success-container {
+      background: #ffffff;
+      border-radius: 24px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 700px;
+      width: 100%;
+      padding: 50px 40px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .success-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 5px;
+      background: linear-gradient(90deg, #10b981, #059669, #10b981);
+      background-size: 200% 100%;
+      animation: shimmer 3s infinite;
+    }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .success-icon {
+      width: 100px;
+      height: 100px;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 30px;
+      animation: scaleIn 0.5s ease-out;
+      box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
+    }
+    @keyframes scaleIn {
+      0% {
+        transform: scale(0);
+        opacity: 0;
+      }
+      50% {
+        transform: scale(1.1);
+      }
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+    .success-icon i {
+      font-size: 50px;
+      color: #ffffff;
+      animation: checkmark 0.6s ease-out 0.3s both;
+    }
+    @keyframes checkmark {
+      0% {
+        transform: scale(0) rotate(45deg);
+        opacity: 0;
+      }
+      50% {
+        transform: scale(1.2) rotate(45deg);
+      }
+      100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+      }
+    }
+    .success-title {
+      font-size: 32px;
+      font-weight: 800;
+      color: #1e293b;
+      margin-bottom: 15px;
+      animation: fadeInUp 0.6s ease-out 0.2s both;
+    }
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .success-message {
+      font-size: 18px;
+      color: #64748b;
+      margin-bottom: 40px;
+      line-height: 1.6;
+      animation: fadeInUp 0.6s ease-out 0.4s both;
+    }
+    .application-details {
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+      border-radius: 16px;
+      padding: 30px;
+      margin-bottom: 40px;
+      text-align: left;
+      animation: fadeInUp 0.6s ease-out 0.6s both;
+    }
+    .detail-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .detail-item:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+    .detail-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #4a69bd 0%, #3b82f6 100%);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 20px;
+      flex-shrink: 0;
+    }
+    .detail-icon i {
+      font-size: 20px;
+      color: #ffffff;
+    }
+    .detail-content {
+      flex: 1;
+    }
+    .detail-label {
+      font-size: 13px;
+      color: #64748b;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 5px;
+    }
+    .detail-value {
+      font-size: 18px;
+      color: #1e293b;
+      font-weight: 700;
+    }
+    .next-steps {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      border-radius: 12px;
+      padding: 25px;
+      margin-bottom: 40px;
+      text-align: left;
+      animation: fadeInUp 0.6s ease-out 0.8s both;
+    }
+    .next-steps h3 {
+      font-size: 20px;
+      color: #92400e;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .next-steps h3 i {
+      font-size: 24px;
+    }
+    .next-steps ul {
+      list-style: none;
+      padding: 0;
+    }
+    .next-steps li {
+      padding: 12px 0;
+      color: #78350f;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .next-steps li::before {
+      content: '✓';
+      width: 24px;
+      height: 24px;
+      background: #f59e0b;
+      color: #ffffff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .action-buttons {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+      animation: fadeInUp 0.6s ease-out 1s both;
+    }
+    .btn {
+      padding: 16px 32px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 16px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.3s ease;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #4a69bd 0%, #3b82f6 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 15px rgba(74, 105, 189, 0.4);
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(74, 105, 189, 0.5);
+    }
+    .btn-secondary {
+      background: #ffffff;
+      color: #4a69bd;
+      border: 2px solid #4a69bd;
+    }
+    .btn-secondary:hover {
+      background: #f8fafc;
+      transform: translateY(-2px);
+    }
+    .error-container {
+      background: #ffffff;
+      border-radius: 24px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 600px;
+      width: 100%;
+      padding: 50px 40px;
+      text-align: center;
+    }
+    .error-icon {
+      width: 100px;
+      height: 100px;
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 30px;
+      box-shadow: 0 10px 30px rgba(239, 68, 68, 0.4);
+    }
+    .error-icon i {
+      font-size: 50px;
+      color: #ffffff;
+    }
+    .error-title {
+      font-size: 32px;
+      font-weight: 800;
+      color: #dc2626;
+      margin-bottom: 15px;
+    }
+    .error-message {
+      font-size: 18px;
+      color: #64748b;
+      margin-bottom: 30px;
+      line-height: 1.6;
+    }
+    @media (max-width: 640px) {
+      .success-container, .error-container {
+        padding: 30px 20px;
+      }
+      .success-title, .error-title {
+        font-size: 24px;
+      }
+      .action-buttons {
+        flex-direction: column;
+      }
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  </style>
 </head>
-<body>
-  <div class='wrapper'>
-    <div class='main'>
-      <div class='form-container'>
-        <h1>Application Submission Report</h1>
-        <p>Thank you for submitting your business permit application for San Miguel, Catanduanes.</p>
-        <hr>";
+<body>";
 
     if ($response['success']) {
-        echo "<h2>✅ Success!</h2>";
-        echo "<p>Your comprehensive business permit application has been successfully submitted.</p>";
-        echo "<p><strong>Application ID:</strong> #{$response['app_id']}</p>";
-        echo "<p><strong>Business Name:</strong> " . htmlspecialchars($response['business_name']) . "</p>";
-        echo "<p><strong>Application Type:</strong> " . htmlspecialchars($response['application_type']) . "</p>";
-        echo "<p><strong>Submission Date:</strong> " . date('F d, Y \a\t H:i') . "</p>";
+        echo "<div class='success-container'>
+          <div class='success-icon'>
+            <i class='fas fa-check'></i>
+          </div>
+          <h1 class='success-title'>Application Submitted Successfully!</h1>
+          <p class='success-message'>Your business permit application has been received and is now being processed.</p>
+          
+          <div class='application-details'>
+            <div class='detail-item'>
+              <div class='detail-icon'>
+                <i class='fas fa-hashtag'></i>
+              </div>
+              <div class='detail-content'>
+                <div class='detail-label'>Application ID</div>
+                <div class='detail-value'>#{$response['app_id']}</div>
+              </div>
+            </div>
+            <div class='detail-item'>
+              <div class='detail-icon'>
+                <i class='fas fa-building'></i>
+              </div>
+              <div class='detail-content'>
+                <div class='detail-label'>Business Name</div>
+                <div class='detail-value'>" . htmlspecialchars($response['business_name']) . "</div>
+              </div>
+            </div>
+            <div class='detail-item'>
+              <div class='detail-icon'>
+                <i class='fas fa-file-alt'></i>
+              </div>
+              <div class='detail-content'>
+                <div class='detail-label'>Application Type</div>
+                <div class='detail-value'>" . htmlspecialchars($response['application_type']) . "</div>
+              </div>
+            </div>
+            <div class='detail-item'>
+              <div class='detail-icon'>
+                <i class='fas fa-calendar-check'></i>
+              </div>
+              <div class='detail-content'>
+                <div class='detail-label'>Submission Date</div>
+                <div class='detail-value'>" . date('F d, Y \a\t H:i') . "</div>
+              </div>
+            </div>
+          </div>
 
-        echo "<div class='next-steps'>";
-        echo "<h3>What happens next?</h3>";
-        echo "<ul>";
-        echo "<li>Your application will be reviewed by our staff</li>";
-        echo "<li>You will receive notifications about the status</li>";
-        echo "<li>You can track your application in your dashboard</li>";
-        echo "</ul>";
-        echo "</div>";
+          <div class='next-steps'>
+            <h3><i class='fas fa-info-circle'></i> What happens next?</h3>
+            <ul>
+              <li>Your application will be reviewed by our staff</li>
+              <li>You will receive email notifications about status updates</li>
+              <li>You can track your application progress in your dashboard</li>
+            </ul>
+          </div>
 
-        echo "<div class='action-buttons'>";
-        echo "<a href='applicant_dashboard.php' class='btn btn-primary'>Go to Dashboard</a>";
-        echo "<a href='view_my_application.php?id={$response['app_id']}' class='btn btn-secondary'>View Application</a>";
-        echo "</div>";
+          <div class='action-buttons'>
+            <a href='applicant_dashboard.php' class='btn btn-primary'>
+              <i class='fas fa-tachometer-alt'></i>
+              Go to Dashboard
+            </a>
+            <a href='view_my_application.php?id={$response['app_id']}' class='btn btn-secondary'>
+              <i class='fas fa-eye'></i>
+              View Application
+            </a>
+          </div>
+        </div>";
     } else {
-        echo "<h2 style='color: #dc2626; margin-bottom: 15px;'>❌ Error!</h2>";
-        echo "<p style='color: #1e293b; margin-bottom: 10px;'>" . htmlspecialchars($response['message']) . "</p>";
+        echo "<div class='error-container'>
+          <div class='error-icon'>
+            <i class='fas fa-times'></i>
+          </div>
+          <h1 class='error-title'>Submission Failed</h1>
+          <p class='error-message'>" . htmlspecialchars($response['message']) . "</p>";
         if (!empty($response['errors'])) {
             echo "<p style='color: #64748b; margin-bottom: 20px;'>Please check that all required fields are filled correctly and try again.</p>";
         }
-        echo "<a href='submit_application.php' class='btn' style='background-color: #4a69bd; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: 600; border: none; cursor: pointer; transition: background-color 0.2s ease;'>Try Again</a>";
+        echo "<a href='submit_application.php' class='btn btn-primary'>
+            <i class='fas fa-redo'></i>
+            Try Again
+          </a>
+        </div>";
     }
 
-    echo "      </div>
-    </div>
-  </div>
-</body>
+    echo "</body>
 </html>";
 
 } else {
