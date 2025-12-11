@@ -8,49 +8,48 @@ require_once __DIR__ . '/db.php';
 
 // Check if the form was submitted using the POST method
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    
-    // Include Header (this will start session and check authentication)
-    require_once __DIR__ . '/applicant_header.php';
-    
+
+    // CRITICAL: Handle authentication and session FIRST, before any database operations
+    // Include database connection
+    require_once __DIR__ . '/db.php';
+
+    // Start session if not already started
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    // Authentication Check: Only allow users with the 'user' role
+    if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'user') {
+        // Redirect to the main login page if not an applicant
+        header("Location: login.php");
+        exit;
+    }
+
     $current_user_id = $_SESSION['user_id'];
     $current_user_name = $_SESSION['name'] ?? 'User';
-    
-    // CRITICAL: Clean up connection state after header queries
-    // Header makes database queries that might leave connection in bad state
-    try {
-        // If we're in a transaction (shouldn't happen, but check anyway)
-        if ($conn && $conn->inTransaction()) {
-            $conn->rollBack();
-            error_log('WARNING: Rolled back transaction left by applicant_header.php');
-        }
-        
-        // Test connection is clean
-        $test = $conn->query("SELECT 1");
-        if (!$test) {
-            throw new Exception("Connection test failed after header");
-        }
-    } catch (Exception $e) {
-        error_log('Connection cleanup after header failed: ' . $e->getMessage());
-        // Try to reconnect
-        try {
-            $conn = null;
-            require_once __DIR__ . '/db.php';
-        } catch (Exception $reconnect_e) {
-            error_log('Failed to reconnect: ' . $reconnect_e->getMessage());
-        }
-    }
-    
-    // CRITICAL: Write session data BEFORE starting transaction
-    // This prevents session handler from interfering with our transaction
-    if (session_status() === PHP_SESSION_ACTIVE) {
-        session_write_close();
-    }
-    
-    echo "<div class='main'>";
-    echo "<div class='form-container'>";
-    echo "<h1>Application Submission Report</h1>";
-    echo "<p>Thank you for submitting your business permit application for San Miguel, Catanduanes.</p>";
-    echo "<hr>";
+
+    // CRITICAL: Close session BEFORE any database operations
+    // This prevents session handler from interfering with transactions
+    session_write_close();
+
+    // Output HTML header
+    echo "<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+  <title>Application Submission Report - OnlineBizPermit</title>
+  <link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap' rel='stylesheet'>
+  <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css'>
+  <link rel='stylesheet' href='applicant_style.css'>
+</head>
+<body>
+  <div class='wrapper'>
+    <div class='main'>
+      <div class='form-container'>
+        <h1>Application Submission Report</h1>
+        <p>Thank you for submitting your business permit application for San Miguel, Catanduanes.</p>
+        <hr>";
     
     // ----------------------------------------------------------------------
     // 1. DATA SANITIZATION (CRITICAL STEP)
@@ -427,10 +426,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         echo "<a href='submit_application.php' class='btn' style='background-color: #4a69bd; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: 600; border: none; cursor: pointer; transition: background-color 0.2s ease;'>Try Again</a>";
     }
     
-    echo "</div></div>";
-    
-    // Include Footer
-    require_once __DIR__ . '/applicant_footer.php';
+    echo "      </div>
+    </div>
+  </div>
+</body>
+</html>";
 
 } else {
     // If someone tries to access process_business_permit.php directly
