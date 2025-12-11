@@ -283,26 +283,57 @@ require_once __DIR__ . '/applicant_sidebar.php';
                         <?php foreach ($documents as $doc): ?>
                             <?php
                             $doc_type = trim($doc['document_type'] ?? '');
+                            $file_path_lower = strtolower($doc['file_path'] ?? '');
+                            $filename_lower = strtolower($doc['document_name'] ?? '');
+                            
                             // Handle null, empty, or 'Other' document_type - infer from file_path or filename
-                            if (empty($doc_type) || $doc_type === null || $doc_type === '' || strtolower($doc_type) === 'other') {
-                                $file_path_lower = strtolower($doc['file_path'] ?? '');
-                                $filename_lower = strtolower($doc['document_name'] ?? '');
-                                $combined_text = $file_path_lower . ' ' . $filename_lower;
-                                
-                                // First, check if file_path contains the exact document_type keys (most reliable)
-                                // File paths are generated as: doc_{app_id}_{document_type}_{uniqid}.ext
-                                $document_type_keys = array_keys($document_type_labels);
+                            // File paths are generated as: doc_{app_id}_{document_type}_{uniqid}.ext
+                            if (empty($doc_type) || $doc_type === null || $doc_type === '' || strtolower($doc_type) === 'other' || strtolower($doc_type) === 'other document') {
+                                // First, try to extract document_type from file_path pattern: doc_{app_id}_{document_type}_{uniqid}
+                                // Example: doc_8_dti_registration_67890abcdef123.png
+                                // Also handle: doc_8_dti_registration_67890abcdef123.456789.png (with decimal in uniqid)
                                 $found_type = false;
-                                foreach ($document_type_keys as $type_key) {
-                                    if ($type_key !== 'other' && strpos($file_path_lower, $type_key) !== false) {
-                                        $doc_type = $type_key;
-                                        $found_type = true;
-                                        break;
+                                if (preg_match('/doc_\d+_([a-z_]+)_[a-z0-9.]+\.(jpg|jpeg|png|gif|pdf)/i', $file_path_lower, $matches)) {
+                                    $extracted_type = trim($matches[1]);
+                                    // Check if extracted type matches any known document type
+                                    $document_type_keys = array_keys($document_type_labels);
+                                    foreach ($document_type_keys as $type_key) {
+                                        if ($type_key !== 'other' && $extracted_type === $type_key) {
+                                            $doc_type = $type_key;
+                                            $found_type = true;
+                                            break;
+                                        }
+                                    }
+                                    // If exact match not found, try partial match (check if type_key is contained in extracted or vice versa)
+                                    if (!$found_type) {
+                                        foreach ($document_type_keys as $type_key) {
+                                            if ($type_key !== 'other') {
+                                                // Check if extracted type contains the key or key contains extracted type
+                                                if (strpos($extracted_type, $type_key) !== false || strpos($type_key, $extracted_type) !== false) {
+                                                    $doc_type = $type_key;
+                                                    $found_type = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                                 
-                                // If not found in file_path, try keyword matching
+                                // If still not found, check if file_path contains the exact document_type keys
                                 if (!$found_type) {
+                                    $document_type_keys = array_keys($document_type_labels);
+                                    foreach ($document_type_keys as $type_key) {
+                                        if ($type_key !== 'other' && strpos($file_path_lower, $type_key) !== false) {
+                                            $doc_type = $type_key;
+                                            $found_type = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                // If not found in file_path, try keyword matching on combined text
+                                if (!$found_type) {
+                                    $combined_text = $file_path_lower . ' ' . $filename_lower;
                                     if (strpos($combined_text, 'dti_registration') !== false || (strpos($combined_text, 'dti') !== false && strpos($combined_text, 'registration') !== false && strpos($combined_text, 'bir') === false)) {
                                         $doc_type = 'dti_registration';
                                     } elseif (strpos($combined_text, 'bir_registration') !== false || strpos($combined_text, 'bir') !== false) {
@@ -322,11 +353,14 @@ require_once __DIR__ . '/applicant_sidebar.php';
                                     }
                                 }
                             }
+                            
                             // Normalize the doc_type key (lowercase, no spaces)
                             $doc_type_key = strtolower(str_replace([' ', '-'], '_', $doc_type));
                             $doc_label = isset($document_type_labels[$doc_type_key]) ? $document_type_labels[$doc_type_key] : ucfirst(str_replace('_', ' ', $doc_type));
                             $file_extension = strtolower(pathinfo($doc['document_name'], PATHINFO_EXTENSION));
+                            
                             // Use secure file viewer PHP script instead of direct file access
+                            // Ensure file_path is properly encoded
                             $file_path = '../view_file.php?file=' . urlencode($doc['file_path']);
                             // For image preview, use the same path
                             $image_preview_path = $file_path;
@@ -334,12 +368,12 @@ require_once __DIR__ . '/applicant_sidebar.php';
                             <div class="document-item">
                                 <div class="doc-preview">
                                     <?php if (in_array($file_extension, ['jpg', 'jpeg', 'png', 'gif'])): ?>
-                                        <a href="<?= $file_path ?>" target="_blank" title="View <?= htmlspecialchars($doc_label) ?>" class="document-image-link" onclick="return checkFileAndShowError(this, event);">
+                                        <a href="<?= $file_path ?>" target="_blank" title="View <?= htmlspecialchars($doc_label) ?>">
                                             <img src="<?= $image_preview_path ?>" 
                                                  alt="<?= htmlspecialchars($doc_label) ?>"
                                                  style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;"
                                                  loading="lazy"
-                                                 onerror="handleImageError(this);">
+                                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                                             <div class="image-error-placeholder" style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center; flex-direction: column; background: #f1f5f9; border-radius: 8px; padding: 10px;">
                                                 <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #dc2626; margin-bottom: 8px;"></i>
                                                 <span style="font-size: 0.75rem; color: #64748b; text-align: center;">File Not Found</span>
@@ -359,9 +393,6 @@ require_once __DIR__ . '/applicant_sidebar.php';
                                 <div class="doc-info">
                                     <p class="doc-type-label"><strong><?= htmlspecialchars($doc_label) ?></strong></p>
                                     <p class="doc-filename" title="<?= htmlspecialchars($doc['document_name']) ?>"><?= htmlspecialchars($doc['document_name']) ?></p>
-                                    <p class="file-missing-warning" style="display: none; color: #dc2626; font-size: 0.8rem; margin-top: 5px; font-style: italic;">
-                                        <i class="fas fa-exclamation-circle"></i> This file is missing. Please edit your application to re-upload it.
-                                    </p>
                                 </div>
                                 <a href="<?= $file_path ?>" class="btn btn-secondary" target="_blank" title="Open <?= htmlspecialchars($doc_label) ?>">
                                     <i class="fas fa-eye"></i> View
