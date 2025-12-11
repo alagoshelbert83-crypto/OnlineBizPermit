@@ -96,6 +96,40 @@ if (!$chat_session) {
     $error_message = 'Chat session not found or access denied.';
 }
 
+// Fetch current user info for sidebar (needed before including sidebar)
+$current_user_name = 'Applicant';
+$current_user_picture = null;
+if ($is_authenticated && $current_user_id) {
+    try {
+        $stmt = $conn->prepare("SELECT name, profile_picture_path FROM users WHERE id = ?");
+        $stmt->execute([$current_user_id]);
+        $user_info = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($user_info) {
+            $current_user_name = $user_info['name'] ?? 'Applicant';
+            $current_user_picture = $user_info['profile_picture_path'] ?? null;
+        }
+    } catch (PDOException $e) {
+        error_log("Error fetching user info in applicant_conversation.php: " . $e->getMessage());
+        // Fallback: try without profile_picture_path
+        try {
+            $stmt = $conn->prepare("SELECT name FROM users WHERE id = ?");
+            $stmt->execute([$current_user_id]);
+            $user_info = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($user_info) {
+                $current_user_name = $user_info['name'] ?? 'Applicant';
+            }
+        } catch (PDOException $e2) {
+            error_log("Error fetching user name fallback: " . $e2->getMessage());
+        }
+    }
+} else if (!$is_authenticated && isset($_SESSION['guest_name'])) {
+    $current_user_name = $_SESSION['guest_name'];
+}
+
+// Set page variables for sidebar
+$page_title = 'Live Chat Support';
+$current_page = 'live_chat';
+
 // --- Fetch existing messages for this chat ---
 $existing_messages = [];
 $last_message_id = 0;
