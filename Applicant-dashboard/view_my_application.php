@@ -334,14 +334,16 @@ require_once __DIR__ . '/applicant_sidebar.php';
                             <div class="document-item">
                                 <div class="doc-preview">
                                     <?php if (in_array($file_extension, ['jpg', 'jpeg', 'png', 'gif'])): ?>
-                                        <a href="<?= $file_path ?>" target="_blank" title="View <?= htmlspecialchars($doc_label) ?>">
+                                        <a href="<?= $file_path ?>" target="_blank" title="View <?= htmlspecialchars($doc_label) ?>" class="document-image-link" onclick="return checkFileAndShowError(this, event);">
                                             <img src="<?= $image_preview_path ?>" 
                                                  alt="<?= htmlspecialchars($doc_label) ?>"
                                                  style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;"
                                                  loading="lazy"
-                                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                            <div style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center; background: #f8fafc; border-radius: 8px;">
-                                                <i class="fas fa-image" style="font-size: 2.5rem; color: #64748b;"></i>
+                                                 onerror="handleImageError(this);">
+                                            <div class="image-error-placeholder" style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center; flex-direction: column; background: #f1f5f9; border-radius: 8px; padding: 10px;">
+                                                <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #dc2626; margin-bottom: 8px;"></i>
+                                                <span style="font-size: 0.75rem; color: #64748b; text-align: center;">File Not Found</span>
+                                                <span style="font-size: 0.7rem; color: #94a3b8; text-align: center; margin-top: 4px;">Please re-upload</span>
                                             </div>
                                         </a>
                                     <?php elseif ($file_extension === 'pdf'): ?>
@@ -357,6 +359,9 @@ require_once __DIR__ . '/applicant_sidebar.php';
                                 <div class="doc-info">
                                     <p class="doc-type-label"><strong><?= htmlspecialchars($doc_label) ?></strong></p>
                                     <p class="doc-filename" title="<?= htmlspecialchars($doc['document_name']) ?>"><?= htmlspecialchars($doc['document_name']) ?></p>
+                                    <p class="file-missing-warning" style="display: none; color: #dc2626; font-size: 0.8rem; margin-top: 5px; font-style: italic;">
+                                        <i class="fas fa-exclamation-circle"></i> This file is missing. Please edit your application to re-upload it.
+                                    </p>
                                 </div>
                                 <a href="<?= $file_path ?>" class="btn btn-secondary" target="_blank" title="Open <?= htmlspecialchars($doc_label) ?>">
                                     <i class="fas fa-eye"></i> View
@@ -730,7 +735,69 @@ p {
         flex-direction: column;
     }
 }
+
+/* Missing file styles */
+.image-error-placeholder {
+    display: none !important;
+}
+.document-item .file-missing-warning {
+    display: none;
+}
+.document-item.has-missing-file .file-missing-warning {
+    display: block;
+}
+.document-item.has-missing-file {
+    border-color: #fee2e2;
+    background: #fef2f2;
+}
 </style>
+
+<script>
+function handleImageError(img) {
+    // Hide the broken image
+    img.style.display = 'none';
+    
+    // Show the error placeholder
+    const placeholder = img.nextElementSibling;
+    if (placeholder && placeholder.classList.contains('image-error-placeholder')) {
+        placeholder.style.display = 'flex';
+    }
+    
+    // Mark the document item as having a missing file
+    const documentItem = img.closest('.document-item');
+    if (documentItem) {
+        documentItem.classList.add('has-missing-file');
+        const warning = documentItem.querySelector('.file-missing-warning');
+        if (warning) {
+            warning.style.display = 'block';
+        }
+    }
+}
+
+function checkFileAndShowError(link, event) {
+    // Check if the link's parent document item has the missing file class
+    const documentItem = link.closest('.document-item');
+    if (documentItem && documentItem.classList.contains('has-missing-file')) {
+        event.preventDefault();
+        alert('This file is missing from the server. Please edit your application to re-upload this document.');
+        return false;
+    }
+    return true;
+}
+
+// Check all images on page load for errors
+document.addEventListener('DOMContentLoaded', function() {
+    const images = document.querySelectorAll('.document-item img');
+    images.forEach(img => {
+        // If image already failed to load, trigger error handler
+        if (!img.complete || img.naturalHeight === 0) {
+            img.addEventListener('error', function() {
+                handleImageError(this);
+            });
+        }
+    });
+});
+</script>
 
 <?php
 // Include Footer

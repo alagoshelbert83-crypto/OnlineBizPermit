@@ -355,7 +355,7 @@ require_once './staff_sidebar.php';
     font-size: 0.85rem;
 }
 .btn-update-status {
-    background: var(--secondary-color);
+    background: var(--accent-color);
     color: white;
     border: none;
     padding: 8px 12px;
@@ -363,8 +363,16 @@ require_once './staff_sidebar.php';
     cursor: pointer;
     font-weight: 600;
     transition: background-color 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
-.btn-update-status:hover { background: var(--primary-color); }
+.btn-update-status:hover { 
+    background: var(--primary-color); 
+}
+.btn-update-status i {
+    font-size: 0.9rem;
+}
 </style>
 
 <?php require_once './staff_footer.php'; ?>
