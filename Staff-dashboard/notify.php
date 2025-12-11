@@ -1,10 +1,9 @@
 <?php
+// Disable error display in production (errors should go to logs)
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
-?>
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
 
-
-<?php
 // Include db.php FIRST to set up session handler
 require './db.php';
 // Start session AFTER db.php includes session_handler.php
