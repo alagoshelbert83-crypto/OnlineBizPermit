@@ -821,6 +821,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 userInput.focus();
             }
         };
+        
+        // Attach the submit handler to the form
+        chatForm.addEventListener('submit', submitHandler);
+    }
 
     // Set up the initial submit handler
     setupSubmitHandler();
