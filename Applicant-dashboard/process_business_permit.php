@@ -69,23 +69,65 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 
     // ----------------------------------------------------------------------
-    // 3. DATABASE INSERTION
+    // 3. DATABASE INSERTION WITH ROBUST ERROR HANDLING
     // ----------------------------------------------------------------------
 
-    // Ensure connection is in a clean state before starting transaction
-    // This prevents issues with aborted transactions from previous operations
-    if ($conn->inTransaction()) {
+    // CRITICAL: Ensure connection is in a completely clean state
+    // db.php already handles cleanup at connection time, but we double-check here for safety
+    $connection_ready = false;
+    $retry_count = 0;
+    $max_retries = 2; // Reduced from 3 since db.php already handles initial cleanup
+    
+    while (!$connection_ready && $retry_count < $max_retries) {
         try {
-            $conn->rollback();
+            // Check if connection exists
+            if (!$conn) {
+                throw new Exception("Database connection is null");
+            }
+            
+            // If we're in a transaction, roll it back (shouldn't happen if db.php worked correctly)
+            if ($conn->inTransaction()) {
+                $conn->rollBack();
+                error_log("WARNING: Rolled back unexpected transaction before application submission (attempt " . ($retry_count + 1) . ")");
+            }
+            
+            // Test the connection with a simple query
+            $test_stmt = $conn->query("SELECT 1");
+            if (!$test_stmt) {
+                throw new Exception("Connection test query failed");
+            }
+            
+            // Connection is ready
+            $connection_ready = true;
+            
         } catch (Exception $e) {
-            error_log('Error rolling back existing transaction: ' . $e->getMessage());
+            $retry_count++;
+            error_log("Connection validation attempt {$retry_count} failed: " . $e->getMessage());
+            
+            if ($retry_count >= $max_retries) {
+                echo "<h2>❌ Database Connection Error!</h2>";
+                echo "<p>We're experiencing technical difficulties connecting to the database.</p>";
+                echo "<p>Please try again in a few moments.</p>";
+                echo "<a href='submit_application.php' class='btn'>Try Again</a>";
+                echo "</div></div>";
+                require_once __DIR__ . '/applicant_footer.php';
+                exit;
+            }
+            
+            // Small delay before retry (don't reconnect - db.php already did that)
+            usleep(50000); // 50ms delay
         }
     }
 
-    $conn->beginTransaction();
     try {
+        // Now we can safely begin the transaction
+        $conn->beginTransaction();
         // Prepare the comprehensive application data as JSON
         $form_details_json = json_encode($application_data);
+        
+        $business_name = $application_data['business_name'];
+        $business_address = $application_data['business_address'] ?? '';
+        $type_of_business = $application_data['type_of_business'] ?? '';
         
         // Insert into applications table
         $stmt = $conn->prepare(
@@ -93,17 +135,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
              VALUES (?, ?, ?, ?, 'pending', ?, NOW())"
         );
 
-        if ($stmt === false) {
-            throw new Exception("Database Error: Could not prepare the main application statement.");
+        if (!$stmt) {
+            throw new PDOException('Failed to prepare INSERT statement: ' . implode(', ', $conn->errorInfo()));
         }
 
-        $business_name = $application_data['business_name'];
-        $business_address = $application_data['business_address'] ?? '';
-        $type_of_business = $application_data['type_of_business'] ?? '';
-
-        if (!$stmt->execute([$current_user_id, $business_name, $business_address, $type_of_business, $form_details_json])) {
-            $err = $stmt->errorInfo();
-            throw new Exception("Database Error: Could not execute the main application statement. " . ($err[2] ?? 'Unknown'));
+        $execute_result = $stmt->execute([$current_user_id, $business_name, $business_address, $type_of_business, $form_details_json]);
+        
+        if (!$execute_result) {
+            $errorInfo = $stmt->errorInfo();
+            throw new PDOException('Failed to execute INSERT: ' . ($errorInfo[2] ?? 'Unknown error'), (int)$errorInfo[0]);
         }
 
         // Get last insert id (PDO returns string)
@@ -151,17 +191,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     }
                     
                     // Insert document record into DB (PDO)
-                    try {
-                        $doc_stmt = $conn->prepare("INSERT INTO documents (application_id, document_name, file_path) VALUES (?, ?, ?)");
-                        if ($doc_stmt === false) {
-                            throw new Exception('Database Error: Could not prepare the document statement.');
-                        }
-                        if (!$doc_stmt->execute([$app_id, $original_name, $unique_filename])) {
-                            $err = $doc_stmt->errorInfo();
-                            throw new Exception('Database Error: Could not save document record. ' . ($err[2] ?? 'Unknown'));
-                        }
-                    } catch (PDOException $e) {
-                        throw new Exception('Database Error while saving document: ' . $e->getMessage());
+                    $doc_stmt = $conn->prepare("INSERT INTO documents (application_id, document_name, file_path) VALUES (?, ?, ?)");
+                    if (!$doc_stmt) {
+                        throw new PDOException('Failed to prepare document INSERT statement: ' . implode(', ', $conn->errorInfo()));
+                    }
+                    $doc_execute_result = $doc_stmt->execute([$app_id, $original_name, $unique_filename]);
+                    if (!$doc_execute_result) {
+                        $doc_errorInfo = $doc_stmt->errorInfo();
+                        throw new PDOException('Failed to execute document INSERT: ' . ($doc_errorInfo[2] ?? 'Unknown error'), (int)$doc_errorInfo[0]);
                     }
                 } elseif ($_FILES['documents']['error'][$key] !== UPLOAD_ERR_NO_FILE) {
                     throw new Exception('An error occurred during file upload. Code: ' . $_FILES['documents']['error'][$key]);
@@ -170,17 +207,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         // Commit the transaction
-        try {
-            $conn->commit();
-        } catch (Exception $commit_e) {
-            // If commit fails, the transaction was aborted - rollback and throw user-friendly error
-            try {
-                $conn->rollback();
-            } catch (Exception $rollback_e) {
-                error_log('Rollback failed after commit error: ' . $rollback_e->getMessage());
-            }
-            throw new Exception('Failed to save application. Please check your data and try again.');
-        }
+        $conn->commit();
 
         // Create Staff Notification (outside transaction as it's best-effort)
         $notification_message = "New comprehensive application (#{$app_id}) for '{$business_name}' has been submitted.";
@@ -245,11 +272,77 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         echo "<a href='view_my_application.php?id={$app_id}' class='btn btn-secondary'>View Application</a>";
         echo "</div>";
         
+    } catch (PDOException $e) {
+        // Rollback transaction on database error - CRITICAL for PostgreSQL
+        // PostgreSQL requires explicit rollback after any error in a transaction
+        $rollback_success = false;
+        if ($conn && $conn->inTransaction()) {
+            try {
+                $conn->rollback();
+                $rollback_success = true;
+            } catch (PDOException $rollback_e) {
+                error_log('Rollback failed: ' . $rollback_e->getMessage());
+                // If rollback fails, the connection is in a bad state
+                // We need to reconnect for future requests
+                try {
+                    $conn = null;
+                    require_once __DIR__ . '/db.php';
+                } catch (Exception $reconnect_e) {
+                    error_log('Failed to reconnect after rollback failure: ' . $reconnect_e->getMessage());
+                }
+            }
+        }
+        
+        // Log the full error for debugging
+        error_log('Application submission error: ' . $e->getMessage());
+        error_log('SQL State: ' . $e->getCode());
+        error_log('Error Info: ' . print_r($e->errorInfo() ?? [], true));
+        error_log('Rollback successful: ' . ($rollback_success ? 'Yes' : 'No'));
+        
+        // Get user-friendly error message
+        $error_message = $e->getMessage();
+        $sql_state = $e->getCode();
+        
+        // Provide more specific error messages for common issues
+        if (strpos($error_message, 'duplicate key') !== false || strpos($error_message, 'unique constraint') !== false) {
+            $user_message = "An application with similar details already exists. Please check your submissions.";
+        } elseif (strpos($error_message, 'foreign key') !== false) {
+            $user_message = "Invalid data reference. Please ensure all required information is correct.";
+        } elseif (strpos($error_message, 'not null') !== false) {
+            $user_message = "Some required fields are missing. Please fill in all required information.";
+        } elseif ($sql_state == '25P02') {
+            $user_message = "A database transaction error occurred. Please try again.";
+        } else {
+            $user_message = "Database Error: " . htmlspecialchars($error_message);
+        }
+        
+        echo "<h2>❌ Error!</h2>";
+        echo "<p>" . htmlspecialchars($user_message) . "</p>";
+        echo "<p>Please check that all required fields are filled correctly and try again.</p>";
+        echo "<a href='submit_application.php' class='btn'>Try Again</a>";
     } catch (Exception $e) {
-        $conn->rollback();
+        // Rollback transaction on any other error
+        if ($conn && $conn->inTransaction()) {
+            try {
+                $conn->rollback();
+            } catch (Exception $rollback_e) {
+                error_log('Rollback failed: ' . $rollback_e->getMessage());
+                // Reconnect if rollback fails
+                try {
+                    $conn = null;
+                    require_once __DIR__ . '/db.php';
+                } catch (Exception $reconnect_e) {
+                    error_log('Failed to reconnect after rollback failure: ' . $reconnect_e->getMessage());
+                }
+            }
+        }
+        
+        // Log the error
+        error_log('Application submission error: ' . $e->getMessage());
+        
         echo "<h2>❌ Error!</h2>";
         echo "<p>" . htmlspecialchars($e->getMessage()) . "</p>";
-        echo "<a href='business_permit_form.php' class='btn'>Try Again</a>";
+        echo "<a href='submit_application.php' class='btn'>Try Again</a>";
     }
     
     echo "</div></div>";

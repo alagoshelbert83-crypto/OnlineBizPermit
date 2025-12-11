@@ -20,13 +20,26 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
 
     public function open($savePath, $sessionName): bool {
         // Create sessions table if it doesn't exist (PostgreSQL syntax)
-        $sql = "CREATE TABLE IF NOT EXISTS {$this->table} (
-            session_id VARCHAR(255) PRIMARY KEY,
-            session_data TEXT,
-            session_expires TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )";
-        $this->conn->exec($sql);
-        return true;
+        // CRITICAL: This must NOT be in a transaction - session operations are independent
+        try {
+            // Ensure we're not in a transaction before creating table
+            if ($this->conn->inTransaction()) {
+                error_log('WARNING: Session handler open() called during active transaction');
+                // Don't rollback - let the calling code handle it
+                return false;
+            }
+            
+            $sql = "CREATE TABLE IF NOT EXISTS {$this->table} (
+                session_id VARCHAR(255) PRIMARY KEY,
+                session_data TEXT,
+                session_expires TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )";
+            $this->conn->exec($sql);
+            return true;
+        } catch (Exception $e) {
+            error_log("Session handler open() error: " . $e->getMessage());
+            return false;
+        }
     }
 
     public function close(): bool {
@@ -35,6 +48,14 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
 
     public function read($sessionId): string {
         try {
+            // CRITICAL: Session operations must NOT be in a transaction
+            // If we're in a transaction, we can't read sessions (this is a design issue)
+            if ($this->conn->inTransaction()) {
+                error_log("WARNING: Session read() called during active transaction for session_id={$sessionId}");
+                // Return empty to avoid transaction pollution
+                return '';
+            }
+            
             $stmt = $this->conn->prepare("SELECT session_data FROM {$this->table} WHERE session_id = :session_id AND session_expires > NOW()");
             $stmt->execute(['session_id' => $sessionId]);
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -48,6 +69,7 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
             return '';
         } catch (Exception $e) {
             error_log("Session read error for session_id={$sessionId}: " . $e->getMessage());
+            // Don't let session errors break the application
             return '';
         }
     }
@@ -56,6 +78,15 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
         // Set session to expire in 24 hours
         $expires = date('Y-m-d H:i:s', strtotime('+24 hours'));
         try {
+            // CRITICAL: Session operations must NOT be in a transaction
+            // If we're in a transaction, we can't write sessions (this would cause transaction pollution)
+            if ($this->conn->inTransaction()) {
+                error_log("WARNING: Session write() called during active transaction for session_id={$sessionId}");
+                // Don't write - this prevents transaction pollution
+                // The session will be written on the next request when there's no transaction
+                return false;
+            }
+            
             $stmt = $this->conn->prepare("INSERT INTO {$this->table} (session_id, session_data, session_expires) VALUES (:session_id, :session_data, :session_expires) ON CONFLICT (session_id) DO UPDATE SET session_data = EXCLUDED.session_data, session_expires = EXCLUDED.session_expires");
             $ok = $stmt->execute([
                 'session_id' => $sessionId,
@@ -69,6 +100,7 @@ class DatabaseSessionHandler implements SessionHandlerInterface {
             return (bool)$ok;
         } catch (Exception $e) {
             error_log("Session write exception for session_id={$sessionId}: " . $e->getMessage());
+            // Don't let session errors break the application
             return false;
         }
     }

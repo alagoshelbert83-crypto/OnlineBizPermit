@@ -1,6 +1,7 @@
 <?php
 /**
  * Database Connection for Applicant Dashboard - PostgreSQL (Neon)
+ * FIXED: Handles transaction cleanup and prevents transaction state pollution
  */
 
 // Allow skipping DB connection during build/deploy by setting SKIP_DB_CONNECT=1
@@ -10,11 +11,6 @@ if (getenv('SKIP_DB_CONNECT') === '1') {
 }
 
 // --- Database Configuration for Neon ---
-// IMPORTANT: Vercel automatically provides POSTGRES_URL when Neon database is connected
-// This connection string includes all connection details
-
-// Try Neon connection string first (provided by Vercel)
-// Neon/Vercel provides DATABASE_POSTGRES_URL or DATABASE_URL
 $postgresUrl = getenv('DATABASE_POSTGRES_URL') ?: getenv('DATABASE_URL') ?: getenv('POSTGRES_URL');
 
 $queryParams = null;
@@ -31,12 +27,11 @@ if ($postgresUrl) {
     $pass = $parsedUrl['pass'] ?? '';
     
     // For SSL connections (Neon requires SSL)
-    // Check if SSL mode is already in the query string
     if (isset($parsedUrl['query'])) {
         parse_str($parsedUrl['query'], $queryParams);
     }
 } else {
-    // Fallback to individual environment variables (Neon provides these too)
+    // Fallback to individual environment variables
     $host = getenv('DATABASE_PGHOST') ?: getenv('DATABASE_POSTGRES_HOST') ?: getenv('DB_HOST') ?: 'localhost';
     $user = getenv('DATABASE_PGUSER') ?: getenv('DATABASE_POSTGRES_USER') ?: getenv('DB_USER') ?: 'postgres';
     $pass = getenv('DATABASE_PGPASSWORD') ?: getenv('DATABASE_POSTGRES_PASSWORD') ?: getenv('DB_PASS') ?: '';
@@ -46,7 +41,7 @@ if ($postgresUrl) {
 
 // --- Establish PostgreSQL Connection ---
 try {
-    // Build DSN - SSL mode goes as a separate parameter, not in query string
+    // Build DSN
     if (isset($queryParams) && isset($queryParams['sslmode'])) {
         $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=" . $queryParams['sslmode'];
     } else {
@@ -57,15 +52,28 @@ try {
     $conn = new PDO($dsn, $user, $pass, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_TIMEOUT => 10
+        PDO::ATTR_TIMEOUT => 10,
+        // CRITICAL: Disable persistent connections to avoid transaction pollution
+        PDO::ATTR_PERSISTENT => false
     ]);
+    
+    // CRITICAL FIX: Clean up any uncommitted transactions from previous failed requests
+    // This prevents "current transaction is aborted" errors
+    if ($conn->inTransaction()) {
+        try {
+            $conn->rollBack();
+            error_log('WARNING: Rolled back uncommitted transaction at connection start');
+        } catch (PDOException $e) {
+            // If rollback fails, the connection is in a bad state - log but don't die
+            error_log('WARNING: Could not rollback existing transaction: ' . $e->getMessage());
+        }
+    }
+    
 } catch(PDOException $e) {
-    // Use a more generic error in production, but log detailed error
     $error_message = "Database connection failed.";
     error_log("Database connection error: " . $e->getMessage());
     error_log("Attempted DSN: " . (isset($dsn) ? $dsn : 'DSN not set'));
     error_log("Host: $host, Port: $port, Database: $dbname, User: $user");
-    // Don't output anything - just log and die silently to prevent header issues
     http_response_code(500);
     if (php_sapi_name() !== 'cli') {
         die($error_message);
@@ -74,16 +82,13 @@ try {
     }
 }
 
-// Include custom session handler for serverless compatibility
 // Set consistent session cookie parameters before sessions start
-// This ensures cookies are available across site paths and uses secure flag when applicable.
 // Check for HTTPS behind proxies (like Render) - check multiple indicators
 $secureFlag = ( (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
     || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
     || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
 );
 // Use empty domain (null) so browser uses current domain automatically - works better on Render
-// Use PHP 7.3+ style options array where available
 if (PHP_VERSION_ID >= 70300) {
     session_set_cookie_params([
         'lifetime' => 0,
@@ -97,13 +102,33 @@ if (PHP_VERSION_ID >= 70300) {
     session_set_cookie_params(0, '/', '', $secureFlag, true);
 }
 
-require_once __DIR__ . '/../session_handler.php';
-
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+// Include custom session handler for serverless compatibility
+try {
+    require_once __DIR__ . '/../session_handler.php';
+} catch (Exception $e) {
+    error_log('Session handler error: ' . $e->getMessage());
+    // If session handler fails, ensure connection is clean
+    if (isset($conn) && $conn && $conn->inTransaction()) {
+        try {
+            $conn->rollBack();
+        } catch (Exception $rollback_e) {
+            error_log('Failed to rollback after session handler error: ' . $rollback_e->getMessage());
+        }
+    }
 }
 
 // Include file upload helper for cloud storage
-require_once __DIR__ . '/../file_upload_helper.php';
+try {
+    require_once __DIR__ . '/../file_upload_helper.php';
+} catch (Exception $e) {
+    error_log('File upload helper error: ' . $e->getMessage());
+    // If file upload helper fails, ensure connection is clean
+    if (isset($conn) && $conn && $conn->inTransaction()) {
+        try {
+            $conn->rollBack();
+        } catch (Exception $rollback_e) {
+            error_log('Failed to rollback after file upload helper error: ' . $rollback_e->getMessage());
+        }
+    }
+}
 ?>
