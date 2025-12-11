@@ -41,12 +41,6 @@ if (isset($_GET['id'])) {
             $docs_stmt = $conn->prepare("SELECT id, application_id, document_name, file_path, document_type, upload_date FROM documents WHERE application_id = ? ORDER BY document_type, upload_date");
             $docs_stmt->execute([$applicationId]);
             $documents = $docs_stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Debug: Log document info
-            error_log("Found " . count($documents) . " documents for application " . $applicationId);
-            foreach ($documents as $doc) {
-                error_log("Document: " . ($doc['document_name'] ?? 'N/A') . " | Type: " . ($doc['document_type'] ?? 'NULL') . " | Path: " . ($doc['file_path'] ?? 'N/A'));
-            }
         } catch (PDOException $e) {
             error_log("Failed to fetch documents for application {$applicationId}: " . $e->getMessage());
             $documents = [];

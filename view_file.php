@@ -32,9 +32,20 @@ if (!is_dir($upload_dir)) {
 // Check if file exists
 if (!file_exists($file_path)) {
     http_response_code(404);
-    header('Content-Type: text/plain');
+    header('Content-Type: text/html; charset=utf-8');
+    ?>
+    <!DOCTYPE html>
+    <html>
+    <head><title>File Not Found</title></head>
+    <body>
+        <h1>File Not Found</h1>
+        <p>The requested file could not be found.</p>
+        <p><small>Requested: <?= htmlspecialchars($file) ?></small></p>
+    </body>
+    </html>
+    <?php
     error_log("File not found: " . $file_path . " (requested file: " . ($_GET['file'] ?? '') . ")");
-    die('File not found: ' . htmlspecialchars($file));
+    exit;
 }
 
 // Security check: ensure file is within uploads directory (compatible with PHP < 8.0)
