@@ -37,9 +37,16 @@ if (isset($_GET['id'])) {
     $documents = [];
     if ($application) {
         try {
-            $docs_stmt = $conn->prepare("SELECT * FROM documents WHERE application_id = ? ORDER BY document_type, upload_date");
+            // Fetch documents with all fields including document_type and file_path
+            $docs_stmt = $conn->prepare("SELECT id, application_id, document_name, file_path, document_type, upload_date FROM documents WHERE application_id = ? ORDER BY document_type, upload_date");
             $docs_stmt->execute([$applicationId]);
             $documents = $docs_stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Debug: Log document info
+            error_log("Found " . count($documents) . " documents for application " . $applicationId);
+            foreach ($documents as $doc) {
+                error_log("Document: " . ($doc['document_name'] ?? 'N/A') . " | Type: " . ($doc['document_type'] ?? 'NULL') . " | Path: " . ($doc['file_path'] ?? 'N/A'));
+            }
         } catch (PDOException $e) {
             error_log("Failed to fetch documents for application {$applicationId}: " . $e->getMessage());
             $documents = [];
@@ -283,25 +290,46 @@ require_once __DIR__ . '/applicant_sidebar.php';
                             <?php
                             $doc_type = trim($doc['document_type'] ?? '');
                             // Handle null, empty, or 'Other' document_type - infer from filename if possible
-                            if (empty($doc_type) || $doc_type === null || $doc_type === '') {
-                                // Try to infer from filename
+                            if (empty($doc_type) || $doc_type === null || $doc_type === '' || strtolower($doc_type) === 'other') {
+                                // Try to infer from filename first
                                 $filename_lower = strtolower($doc['document_name'] ?? '');
-                                if (strpos($filename_lower, 'dti') !== false || strpos($filename_lower, 'registration') !== false) {
+                                $filepath_lower = strtolower($doc['file_path'] ?? '');
+                                $combined_text = $filename_lower . ' ' . $filepath_lower;
+                                
+                                if (strpos($combined_text, 'dti') !== false || (strpos($combined_text, 'registration') !== false && strpos($combined_text, 'bir') === false)) {
                                     $doc_type = 'dti_registration';
-                                } elseif (strpos($filename_lower, 'bir') !== false) {
+                                } elseif (strpos($combined_text, 'bir') !== false) {
                                     $doc_type = 'bir_registration';
-                                } elseif (strpos($filename_lower, 'barangay') !== false || strpos($filename_lower, 'clearance') !== false) {
+                                } elseif (strpos($combined_text, 'barangay') !== false || strpos($combined_text, 'clearance') !== false) {
                                     $doc_type = 'barangay_clearance';
-                                } elseif (strpos($filename_lower, 'fire') !== false || strpos($filename_lower, 'safety') !== false) {
+                                } elseif (strpos($combined_text, 'fire') !== false || strpos($combined_text, 'safety') !== false) {
                                     $doc_type = 'fire_safety_certificate';
-                                } elseif (strpos($filename_lower, 'sanitary') !== false) {
+                                } elseif (strpos($combined_text, 'sanitary') !== false) {
                                     $doc_type = 'sanitary_permit';
-                                } elseif (strpos($filename_lower, 'health') !== false || strpos($filename_lower, 'inspection') !== false) {
+                                } elseif (strpos($combined_text, 'health') !== false || strpos($combined_text, 'inspection') !== false) {
                                     $doc_type = 'health_inspection';
-                                } elseif (strpos($filename_lower, 'building') !== false) {
+                                } elseif (strpos($combined_text, 'building') !== false) {
                                     $doc_type = 'building_permit';
                                 } else {
-                                    $doc_type = 'other';
+                                    // If we can't infer, check if file_path contains the document type hint
+                                    $file_path_lower = strtolower($doc['file_path'] ?? '');
+                                    if (strpos($file_path_lower, 'dti') !== false) {
+                                        $doc_type = 'dti_registration';
+                                    } elseif (strpos($file_path_lower, 'bir') !== false) {
+                                        $doc_type = 'bir_registration';
+                                    } elseif (strpos($file_path_lower, 'barangay') !== false || strpos($file_path_lower, 'clearance') !== false) {
+                                        $doc_type = 'barangay_clearance';
+                                    } elseif (strpos($file_path_lower, 'fire') !== false || strpos($file_path_lower, 'safety') !== false) {
+                                        $doc_type = 'fire_safety_certificate';
+                                    } elseif (strpos($file_path_lower, 'sanitary') !== false) {
+                                        $doc_type = 'sanitary_permit';
+                                    } elseif (strpos($file_path_lower, 'health') !== false || strpos($file_path_lower, 'inspection') !== false) {
+                                        $doc_type = 'health_inspection';
+                                    } elseif (strpos($file_path_lower, 'building') !== false) {
+                                        $doc_type = 'building_permit';
+                                    } else {
+                                        $doc_type = 'other';
+                                    }
                                 }
                             }
                             // Normalize the doc_type key (lowercase, no spaces)

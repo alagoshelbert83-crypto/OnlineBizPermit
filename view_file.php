@@ -11,18 +11,30 @@ $file = $_GET['file'] ?? '';
 
 if (empty($file)) {
     http_response_code(400);
+    header('Content-Type: text/plain');
     die('File parameter is required');
 }
 
-// Security: Only allow files from uploads directory
+// Remove any path prefixes that might be in the database (e.g., "uploads/", "/uploads/")
+$file = str_replace(['uploads/', '/uploads/', '\\uploads\\'], '', $file);
 $file = basename($file); // Remove any directory traversal attempts
 $upload_dir = __DIR__ . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
 $file_path = $upload_dir . $file;
 
-// Check if file exists and is within uploads directory
+// Check if uploads directory exists
+if (!is_dir($upload_dir)) {
+    http_response_code(500);
+    header('Content-Type: text/plain');
+    error_log("Uploads directory does not exist: " . $upload_dir);
+    die('Server configuration error');
+}
+
+// Check if file exists
 if (!file_exists($file_path)) {
     http_response_code(404);
-    die('File not found');
+    header('Content-Type: text/plain');
+    error_log("File not found: " . $file_path . " (requested file: " . ($_GET['file'] ?? '') . ")");
+    die('File not found: ' . htmlspecialchars($file));
 }
 
 // Security check: ensure file is within uploads directory (compatible with PHP < 8.0)
@@ -30,6 +42,8 @@ $real_file_path = realpath($file_path);
 $real_upload_dir = realpath($upload_dir);
 if ($real_file_path === false || $real_upload_dir === false || strpos($real_file_path, $real_upload_dir) !== 0) {
     http_response_code(403);
+    header('Content-Type: text/plain');
+    error_log("Security check failed for file: " . $file_path);
     die('Access denied');
 }
 
