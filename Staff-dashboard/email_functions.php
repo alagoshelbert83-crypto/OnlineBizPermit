@@ -43,8 +43,8 @@ function sendApplicationEmail(string $to_email, string $to_name, string $subject
         $mail->Timeout = 10; // 10 seconds timeout
         $mail->SMTPKeepAlive = false;
         
-        // Suppress output to prevent "headers already sent" errors
-        $mail->SMTPDebug = 0; // Set to 0 to suppress debug output
+        // Enable debug output temporarily (set to 2 for detailed debug, 0 for production)
+        $mail->SMTPDebug = (defined('MAIL_SMTP_DEBUG') ? MAIL_SMTP_DEBUG : 0);
 
         // --- SENDER & RECIPIENT ---
         $mail->setFrom(MAIL_FROM_EMAIL, MAIL_FROM_NAME);

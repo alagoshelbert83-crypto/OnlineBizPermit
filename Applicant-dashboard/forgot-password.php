@@ -1,5 +1,7 @@
 <?php
 require './db.php';
+// Include email functions
+require_once __DIR__ . '/../Staff-dashboard/email_functions.php';
 
 $message = '';
 $error = '';
@@ -15,7 +17,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $showForm = false; // Hide form after submission
         // To prevent user enumeration, we will always show a success message.
         // The database and email operations only run if the user actually exists.
-        $stmt = $conn->prepare("SELECT id FROM users WHERE email=? AND (role = 'staff' OR role = 'admin') LIMIT 1");
+        $stmt = $conn->prepare("SELECT id, name FROM users WHERE email=? AND role = 'applicant' LIMIT 1");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -36,14 +38,66 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                 $conn->commit();
 
-                // --- Email Sending Logic (Simulated) ---
-                // In a real app, you would use a library like PHPMailer to send an email.
-                // You would NOT display the link to the user directly.
-                $resetLink = "http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']) . "/reset-password.php?token=" . $token;
-                $message = "If an account with that email exists, a password reset link has been sent.<br><br><strong>For Demonstration Only:</strong> <a href='$resetLink'>Reset Password Link</a>";
+                // --- Email Sending Logic ---
+                $resetLink = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']) . "/reset-password.php?token=" . $token;
+                
+                $userName = $user['name'] ?? 'User';
+                $emailSubject = "Password Reset Request - OnlineBizPermit";
+                $emailBody = "
+                    <html>
+                    <head>
+                        <style>
+                            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                            .header { background-color: #0d6efd; color: white; padding: 20px; text-align: center; }
+                            .content { padding: 20px; background-color: #f8f9fa; }
+                            .button { display: inline-block; padding: 12px 24px; background-color: #0d6efd; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                            .footer { padding: 20px; text-align: center; font-size: 12px; color: #6c757d; }
+                            .warning { color: #842029; font-size: 14px; margin-top: 20px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class='container'>
+                            <div class='header'>
+                                <h2>Password Reset Request</h2>
+                            </div>
+                            <div class='content'>
+                                <p>Hello " . htmlspecialchars($userName) . ",</p>
+                                <p>We received a request to reset your password for your OnlineBizPermit account.</p>
+                                <p>Click the button below to reset your password:</p>
+                                <p style='text-align: center;'>
+                                    <a href='" . htmlspecialchars($resetLink) . "' class='button'>Reset Password</a>
+                                </p>
+                                <p>Or copy and paste this link into your browser:</p>
+                                <p style='word-break: break-all; color: #0d6efd;'>" . htmlspecialchars($resetLink) . "</p>
+                                <p class='warning'><strong>Important:</strong> This link will expire in 30 minutes. If you didn't request a password reset, please ignore this email.</p>
+                            </div>
+                            <div class='footer'>
+                                <p>This is an automated message from OnlineBizPermit. Please do not reply to this email.</p>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                ";
+
+                // Send the email
+                $emailSent = sendApplicationEmail($email, $userName, $emailSubject, $emailBody);
+                
+                if ($emailSent) {
+                    $message = "If an account with that email exists, a password reset link has been sent to your email address. Please check your inbox (and spam folder).";
+                } else {
+                    // Log error and show helpful message for debugging
+                    $errorDetails = error_get_last();
+                    error_log("Failed to send password reset email to: " . $email);
+                    error_log("SMTP Config - Host: " . (defined('MAIL_SMTP_HOST') ? MAIL_SMTP_HOST : 'NOT SET'));
+                    error_log("SMTP Config - User: " . (defined('MAIL_SMTP_USERNAME') ? MAIL_SMTP_USERNAME : 'NOT SET'));
+                    error_log("SMTP Config - Port: " . (defined('MAIL_SMTP_PORT') ? MAIL_SMTP_PORT : 'NOT SET'));
+                    $message = "If an account with that email exists, a password reset link has been sent. If you don't receive it, please check your spam folder or contact support.";
+                }
 
             } catch (PDOException $exception) {
                 $conn->rollback();
+                error_log("Password reset error: " . $exception->getMessage());
                 // In production, log this error but show the generic message.
                 $message = "An error occurred. Please try again later.";
             }
