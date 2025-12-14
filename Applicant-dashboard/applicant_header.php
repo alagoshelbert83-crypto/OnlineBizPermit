@@ -9,7 +9,16 @@ if (session_status() === PHP_SESSION_NONE) {
 // Authentication Check: Only allow users with the 'user' role
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'user') {
     // Redirect to the main login page if not an applicant
-    header("Location: login.php");
+    // Store the current URL to redirect back after login
+    $current_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+    $_SESSION['redirect_after_login'] = $current_url;
+    
+    // Use absolute path to prevent redirect loops
+    $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $login_url = $protocol . '://' . $host . '/Applicant-dashboard/login.php';
+    
+    header("Location: " . $login_url);
     exit;
 }
 

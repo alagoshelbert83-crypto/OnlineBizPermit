@@ -86,7 +86,7 @@ try {
         // Determine protocol and host for absolute URL in email
         $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https" : "http";
         $host = $_SERVER['HTTP_HOST'];
-        $absolute_link = "{$protocol}://{$host}/onlinebizpermit/Applicant-dashboard/view_my_application.php?id={$application_id}";
+        $absolute_link = "{$protocol}://{$host}/Applicant-dashboard/view_my_application.php?id={$application_id}";
 
         $email_subject = "Your Business Permit for '{$business_name_safe}' is Ready!";
         

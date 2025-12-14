@@ -60,7 +60,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $logger = AuditLogger::getInstance();
                             $logger->logLogin($user['id'], $user['role']);
 
-                            header("Location: home.php");
+                            // Redirect to the page they were trying to access, or home
+                            if (isset($_SESSION['redirect_after_login'])) {
+                                $redirect_url = $_SESSION['redirect_after_login'];
+                                unset($_SESSION['redirect_after_login']);
+                                header("Location: " . $redirect_url);
+                            } else {
+                                header("Location: home.php");
+                            }
                             exit;
                         } else {
                             $error_message = "Your account has been rejected. Please contact support for more information.";

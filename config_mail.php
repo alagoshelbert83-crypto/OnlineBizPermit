@@ -20,13 +20,14 @@ define('APP_BASE_URL', 'https://onlinebizpermit.vercel.app');
 // --- SMTP Debugging ---
 // 0 = off (recommended for production)
 // 2 = detailed debug info (use only for testing)
-define('MAIL_SMTP_DEBUG', 2); // Temporarily enabled for debugging
+define('MAIL_SMTP_DEBUG', 0); // Set to 0 for production, 2 for debugging
 
 // --- Gmail SMTP Server Settings ---
 // Check environment variables first (Vercel uses SMTP_HOST, SMTP_PORT, etc.)
 // Fallback to MAIL_SMTP_* if not found, then to defaults
 define('MAIL_SMTP_HOST', getenv('SMTP_HOST') ?: getenv('MAIL_SMTP_HOST') ?: 'smtp.gmail.com');
-define('MAIL_SMTP_PORT', (int)(getenv('SMTP_PORT') ?: getenv('MAIL_SMTP_PORT') ?: 587));
+// Try port 2525 first (SendGrid alternative, often not blocked), then 587, then 465
+define('MAIL_SMTP_PORT', (int)(getenv('SMTP_PORT') ?: getenv('MAIL_SMTP_PORT') ?: 2525));
 define('MAIL_SMTP_SECURE', getenv('SMTP_SECURE') ?: getenv('MAIL_SMTP_SECURE') ?: 'tls');
 
 // --- SMTP Authentication ---

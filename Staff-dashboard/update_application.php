@@ -5,6 +5,16 @@ error_reporting(E_ALL);
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/staff_header.php'; // Starts session and auth for staff
 
+// Include email functions for sending notifications
+if (file_exists(__DIR__ . '/../config_mail.php')) {
+    require_once __DIR__ . '/../config_mail.php';
+}
+if (file_exists(__DIR__ . '/email_functions.php')) {
+    require_once __DIR__ . '/email_functions.php';
+} elseif (file_exists(__DIR__ . '/../Staff-dashboard/email_functions.php')) {
+    require_once __DIR__ . '/../Staff-dashboard/email_functions.php';
+}
+
 if ($_SERVER["REQUEST_METHOD"] !== "POST" || !isset($_POST['application_id'])) {
     // Redirect if not a POST request or no application ID
     header("Location: applicants.php");
@@ -132,7 +142,68 @@ try {
     }
 
     $conn->commit();
-    $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Application #' . $applicationId . ' has been updated successfully.'];
+    
+    // Send email notification to applicant about the update
+    try {
+        // Get applicant details for email notification
+        // Check if using PDO or MySQLi
+        if ($conn instanceof PDO) {
+            $userStmt = $conn->prepare("SELECT a.user_id, a.business_name, u.name as applicant_name, u.email as applicant_email FROM applications a JOIN users u ON a.user_id = u.id WHERE a.id = ?");
+            $userStmt->execute([$applicationId]);
+            $appData = $userStmt->fetch(PDO::FETCH_ASSOC);
+        } else {
+            // MySQLi fallback
+            $userStmt = $conn->prepare("SELECT a.user_id, a.business_name, u.name as applicant_name, u.email as applicant_email FROM applications a JOIN users u ON a.user_id = u.id WHERE a.id = ?");
+            $userStmt->bind_param("i", $applicationId);
+            $userStmt->execute();
+            $result = $userStmt->get_result();
+            $appData = $result->fetch_assoc();
+            $userStmt->close();
+        }
+        
+        if ($appData && !empty($appData['applicant_email']) && function_exists('sendApplicationEmail')) {
+            // Build absolute link for email
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $absolute_link = "{$protocol}://{$host}/Applicant-dashboard/view_my_application.php?id={$applicationId}";
+            
+            // Prepare email content
+            $email_subject = "Application Updated - " . htmlspecialchars($appData['business_name']);
+            $email_body = "
+            <div style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
+                <div style='max-width: 600px; margin: 20px auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px; background-color: #ffffff;'>
+                    <h2 style='color: #4a69bd; margin-top: 0;'>Application Updated</h2>
+                    <p>Dear " . htmlspecialchars($appData['applicant_name']) . ",</p>
+                    <p>Your application for <strong>" . htmlspecialchars($appData['business_name']) . "</strong> has been updated by our staff.</p>
+                    <div style='background-color: #f8f9fa; border-left: 4px solid #4a69bd; padding: 15px; margin: 20px 0; border-radius: 4px;'>
+                        <p style='margin: 0;'><strong>What's New:</strong> Your application details, documents, or information have been modified. Please review the changes.</p>
+                    </div>
+                    <p>You can view your updated application by clicking the button below:</p>
+                    <p style='text-align: center; margin: 30px 0;'>
+                        <a href='" . htmlspecialchars($absolute_link) . "' style='background-color: #4a69bd; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;'>View My Application</a>
+                    </p>
+                    <hr style='border: none; border-top: 1px solid #eee; margin: 20px 0;'>
+                    <p style='font-size: 0.9em; color: #777; margin-bottom: 0;'>If you have any questions, please contact our support team.<br><strong>The OnlineBizPermit Team</strong></p>
+                </div>
+            </div>";
+            
+            // Send email
+            $email_sent = @sendApplicationEmail($appData['applicant_email'], $appData['applicant_name'], $email_subject, $email_body);
+            if ($email_sent) {
+                error_log("Application update email sent successfully to {$appData['applicant_email']} for application ID {$applicationId}");
+                $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Application #' . $applicationId . ' has been updated successfully. Applicant has been notified via email.'];
+            } else {
+                error_log("Email sending failed for application ID {$applicationId} to {$appData['applicant_email']} - SMTP configuration issue");
+                $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Application #' . $applicationId . ' has been updated successfully. (Email notification could not be sent.)'];
+            }
+        } else {
+            $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Application #' . $applicationId . ' has been updated successfully.'];
+        }
+    } catch (Exception $emailException) {
+        // Log email error but don't break the update process
+        error_log("Email sending error for application ID {$applicationId}: " . $emailException->getMessage());
+        $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Application #' . $applicationId . ' has been updated successfully.'];
+    }
 
 } catch (Exception $e) {
     $conn->rollback();

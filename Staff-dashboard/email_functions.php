@@ -39,9 +39,18 @@ function sendApplicationEmail(string $to_email, string $to_name, string $subject
         $mail->SMTPSecure = MAIL_SMTP_SECURE;
         $mail->Port       = MAIL_SMTP_PORT;
         
-        // Connection timeout settings
-        $mail->Timeout = 10; // 10 seconds timeout
+        // Connection timeout settings (increased for Render/cloud hosting)
+        $mail->Timeout = 60; // 60 seconds timeout for cloud hosting
         $mail->SMTPKeepAlive = false;
+        $mail->SMTPOptions = array(
+            'ssl' => array(
+                'verify_peer' => false,
+                'verify_peer_name' => false,
+                'allow_self_signed' => true
+            )
+        );
+        // Additional connection settings for cloud hosting
+        $mail->SMTPAutoTLS = false; // Disable auto TLS negotiation
         
         // Enable debug output temporarily (set to 2 for detailed debug, 0 for production)
         $mail->SMTPDebug = (defined('MAIL_SMTP_DEBUG') ? MAIL_SMTP_DEBUG : 0);

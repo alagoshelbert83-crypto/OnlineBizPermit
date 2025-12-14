@@ -67,7 +67,7 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                         // Build absolute link for email
                         $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
                         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-                        $absolute_link = "{$protocol}://{$host}/onlinebizpermit/Applicant-dashboard/view_my_application.php?id={$applicationId}";
+                        $absolute_link = "{$protocol}://{$host}/Applicant-dashboard/view_my_application.php?id={$applicationId}";
                         
                         // Status color mapping
                         $status_colors = [

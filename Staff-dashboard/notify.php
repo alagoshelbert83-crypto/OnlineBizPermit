@@ -1,4 +1,111 @@
 <?php
+// Handle POST requests BEFORE including header (to allow redirects)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_notification'])) {
+    // Start output buffering to catch any accidental output
+    ob_start();
+    
+    // Include db connection first
+    require_once './db.php';
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // Authentication check
+    if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'staff') {
+        ob_end_clean(); // Clear any output
+        header("Location: login.php");
+        exit;
+    }
+    
+    // Include mail config and functions
+    require_once __DIR__ . '/../config_mail.php';
+    require_once './email_functions.php';
+    
+    $application_id = (int)$_POST['application_id'];
+    
+    // Get application data
+    $stmt = $conn->prepare("SELECT a.user_id, a.business_name, u.name as applicant_name, u.email as applicant_email FROM applications a JOIN users u ON a.user_id = u.id WHERE a.id = :id");
+    $stmt->execute([':id' => $application_id]);
+    $app_data = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$app_data) {
+        ob_end_clean(); // Clear any output
+        $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Application not found.'];
+        header("Location: applicants.php");
+        exit;
+    }
+    
+    $subject = trim($_POST['subject']);
+    $message_body = trim($_POST['message']);
+
+    if (empty($subject) || empty($message_body)) {
+        ob_end_clean(); // Clear any output
+        $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Subject and message cannot be empty.'];
+        header("Location: notify.php?application_id=" . $application_id);
+        exit;
+    }
+    
+    $conn->beginTransaction();
+    try {
+        // 1. Create an in-app notification
+        $link = "../Applicant-dashboard/view_my_application.php?id={$application_id}";
+        $notification_message = "You have a new message from staff regarding your application for '" . htmlspecialchars($app_data['business_name']) . "'.";
+        
+        $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (:user_id, :message, :link)");
+        $notify_stmt->execute([':user_id' => $app_data['user_id'], ':message' => $notification_message, ':link' => $link]);
+
+        // 2. Send an email notification
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https" : "http";
+        $host = $_SERVER['HTTP_HOST'];
+        $absolute_link = "{$protocol}://{$host}/Applicant-dashboard/view_my_application.php?id={$application_id}";
+
+        $email_body_html = "
+        <div style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
+            <div style='max-width: 600px; margin: 20px auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;'>
+                <h2 style='color: #4a69bd;'>" . htmlspecialchars($subject) . "</h2>
+                <p>Dear " . htmlspecialchars($app_data['applicant_name']) . ",</p>
+                <p>You have received a message from our team regarding your application for <strong>" . htmlspecialchars($app_data['business_name']) . "</strong>.</p>
+                <div style='background-color: #f8f9fa; border-left: 4px solid #4a69bd; padding: 15px; margin: 20px 0;'>
+                    " . nl2br(htmlspecialchars($message_body)) . "
+                </div>
+                <p>You can view your application and respond if necessary by clicking the button below:</p>
+                <p style='text-align: center; margin: 30px 0;'>
+                    <a href='" . htmlspecialchars($absolute_link) . "' style='background-color: #4a69bd; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;'>View My Application</a>
+                </p>
+                <hr style='border: none; border-top: 1px solid #eee; margin: 20px 0;'>
+                <p style='font-size: 0.9em; color: #777;'>Thank you for using our service.<br><strong>The OnlineBizPermit Team</strong></p>
+            </div>
+        </div>";
+
+        // Send email (capture any debug output - nested ob_start is fine)
+        sendApplicationEmail($app_data['applicant_email'], $app_data['applicant_name'], $subject, $email_body_html);
+        
+        $conn->commit();
+
+        // Clear all output buffers before redirect
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+        
+        $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Notification sent successfully to ' . htmlspecialchars($app_data['applicant_name']) . '.'];
+        header("Location: applicants.php");
+        exit;
+
+    } catch (Exception $e) {
+        if ($conn->inTransaction()) { $conn->rollBack(); }
+        error_log("Notification sending failed for application ID {$application_id}: " . $e->getMessage());
+        
+        // Clear all output buffers before redirect
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+        
+        $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Failed to send notification. Please try again.'];
+        header("Location: notify.php?application_id=" . $application_id);
+        exit;
+    }
+}
+
 // Page-specific variables
 $page_title = 'Send Notification';
 $current_page = 'applicants'; // This page is accessed from applicants, so mark it as active
@@ -33,63 +140,10 @@ if (!$app_data) {
     exit;
 }
 
-// --- Handle Form Submission ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_notification'])) {
-    $subject = trim($_POST['subject']);
-    $message_body = trim($_POST['message']);
-
-    if (empty($subject) || empty($message_body)) {
-        $flash_message = '<div class="message error">Subject and message cannot be empty.</div>';
-    } else {
-        $conn->beginTransaction();
-        try {
-            // 1. Create an in-app notification
-            $link = "../Applicant-dashboard/view_my_application.php?id={$application_id}";
-            $notification_message = "You have a new message from staff regarding your application for '" . htmlspecialchars($app_data['business_name']) . "'.";
-            
-            $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (:user_id, :message, :link)");
-            $notify_stmt->execute([':user_id' => $app_data['user_id'], ':message' => $notification_message, ':link' => $link]);
-
-            // 2. Send an email notification
-            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https" : "http";
-            $host = $_SERVER['HTTP_HOST'];
-            $absolute_link = "{$protocol}://{$host}/onlinebizpermit/Applicant-dashboard/view_my_application.php?id={$application_id}";
-
-            $email_body_html = "
-            <div style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
-                <div style='max-width: 600px; margin: 20px auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;'>
-                    <h2 style='color: #4a69bd;'>" . htmlspecialchars($subject) . "</h2>
-                    <p>Dear " . htmlspecialchars($app_data['applicant_name']) . ",</p>
-                    <p>You have received a message from our team regarding your application for <strong>" . htmlspecialchars($app_data['business_name']) . "</strong>.</p>
-                    <div style='background-color: #f8f9fa; border-left: 4px solid #4a69bd; padding: 15px; margin: 20px 0;'>
-                        " . nl2br(htmlspecialchars($message_body)) . "
-                    </div>
-                    <p>You can view your application and respond if necessary by clicking the button below:</p>
-                    <p style='text-align: center; margin: 30px 0;'>
-                        <a href='" . htmlspecialchars($absolute_link) . "' style='background-color: #4a69bd; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;'>View My Application</a>
-                    </p>
-                    <hr style='border: none; border-top: 1px solid #eee; margin: 20px 0;'>
-                    <p style='font-size: 0.9em; color: #777;'>Thank you for using our service.<br><strong>The OnlineBizPermit Team</strong></p>
-                </div>
-            </div>";
-
-            // Capture any debug output from PHPMailer
-            ob_start();
-            sendApplicationEmail($app_data['applicant_email'], $app_data['applicant_name'], $subject, $email_body_html);
-            $debug_output = ob_get_clean(); // Capture and discard debug output
-            
-            $conn->commit();
-
-            $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Notification sent successfully to ' . htmlspecialchars($app_data['applicant_name']) . '.'];
-            header("Location: applicants.php");
-            exit;
-
-        } catch (Exception $e) {
-          if ($conn->inTransaction()) { $conn->rollBack(); }
-            error_log("Notification sending failed for application ID {$application_id}: " . $e->getMessage());
-            $flash_message = '<div class="message error">Failed to send notification. Please try again. Error: ' . $e->getMessage() . '</div>';
-        }
-    }
+// Get flash message if set
+if (isset($_SESSION['flash_message'])) {
+    $flash_message = '<div class="message ' . $_SESSION['flash_message']['type'] . '">' . htmlspecialchars($_SESSION['flash_message']['text']) . '</div>';
+    unset($_SESSION['flash_message']);
 }
 
 ?>

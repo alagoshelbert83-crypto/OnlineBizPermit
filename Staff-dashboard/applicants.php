@@ -60,7 +60,7 @@ if (isset($_POST['update_status'])) {
             // Build application view link
             $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
             $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-            $absolute_link = "{$protocol}://{$host}/onlinebizpermit/Applicant-dashboard/view_my_application.php?id={$id}";
+            $absolute_link = "{$protocol}://{$host}/Applicant-dashboard/view_my_application.php?id={$id}";
             
             // Status color mapping
             $status_colors = [
@@ -92,7 +92,11 @@ if (isset($_POST['update_status'])) {
             </div>";
 
             // Try to send email - don't let email failures break the status update
+            // Capture any debug output from PHPMailer to prevent "headers already sent" errors
+            ob_start();
             $email_sent = @sendApplicationEmail($application_data['email'], $application_data['name'], $subject, $message_body_html);
+            $debug_output = ob_get_clean(); // Capture and discard debug output
+            
             if ($email_sent) {
                 $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Status updated and notification email sent to ' . htmlspecialchars($application_data['email']) . '!'];
                 error_log("Status update email sent successfully to {$application_data['email']} for application ID {$id}");
