@@ -81,6 +81,17 @@ try {
     $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (:user_id, :message, :link)");
     $notify_stmt->execute([':user_id' => $app_data['user_id'], ':message' => $notification_message, ':link' => $link]);
 
+    // Audit log: permit released by staff
+    try {
+        if (file_exists(__DIR__ . '/../audit_logger.php')) {
+            require_once __DIR__ . '/../audit_logger.php';
+            $logger = AuditLogger::getInstance();
+            $logger->log('permit_released', "Permit released for application {$application_id}", ['application_id'=>$application_id], $_SESSION['user_id'] ?? null, $_SESSION['role'] ?? 'staff');
+        }
+    } catch (Exception $e) {
+        error_log('Audit log failed for permit release: ' . $e->getMessage());
+    }
+
     // 4. Send an email notification
     try {
         // Determine protocol and host for absolute URL in email

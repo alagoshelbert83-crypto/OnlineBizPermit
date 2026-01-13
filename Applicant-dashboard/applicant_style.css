@@ -223,6 +223,9 @@ body {
 }
 
 /* Tables and Forms */
+.required { color: var(--error); font-weight: 700; margin-left: 6px; }
+.declaration { display: flex; gap: 12px; align-items: flex-start; }
+.declaration input[type="checkbox"] { transform: scale(1.15); margin-top: 3px; }
 .action-btn {
     padding: 6px 12px;
     font-size: 14px;

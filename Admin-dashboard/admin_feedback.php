@@ -25,14 +25,14 @@ $search_term = trim($_GET['search'] ?? '');
 $feedback_items = [];
 
 // Sorting logic
-$allowed_sort_cols = ['name', 'message', 'created_at'];
+$allowed_sort_cols = ['name', 'message', 'rating', 'created_at'];
 $sort_col = in_array($_GET['sort'] ?? '', $allowed_sort_cols) ? $_GET['sort'] : 'created_at';
 $sort_order = (strtolower($_GET['order'] ?? '') === 'asc') ? 'asc' : 'desc';
 
 // Build SQL query
-$sql = "SELECT f.id, f.message, f.created_at, u.name, u.email 
+$sql = "SELECT f.id, f.rating, f.message, f.created_at, u.name, u.email 
         FROM feedback f
-        JOIN users u ON f.user_id = u.id";
+        JOIN users u ON f.user_id = u.id"
 $params = [];
 $types = "";
 
@@ -80,6 +80,28 @@ require_once __DIR__ . '/admin_sidebar.php';
         </div>
     </header>
 
+    <?php
+    // Aggregate rating summary
+    try {
+        $avgRow = $conn->query("SELECT AVG(rating) as avg_rating, COUNT(*) as total FROM feedback WHERE rating IS NOT NULL")->fetch(PDO::FETCH_ASSOC);
+        $avg_rating = isset($avgRow['avg_rating']) ? round((float)$avgRow['avg_rating'],2) : null;
+        $total_ratings = (int)($avgRow['total'] ?? 0);
+    } catch (Exception $_) { $avg_rating = null; $total_ratings = 0; }
+    ?>
+
+    <div class="rating-summary" style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
+        <?php if ($avg_rating !== null): ?>
+            <div style="font-size:1.2rem;font-weight:700;color:#1e293b;">Average Rating: <span style="color:#f1c40f;"><?= htmlspecialchars(number_format($avg_rating,2)) ?></span> <small style="color:#6b7280;margin-left:6px;">(<?= $total_ratings ?> ratings)</small></div>
+            <div aria-hidden="true">
+                <?php $full = floor($avg_rating); for ($i=1;$i<=5;$i++): ?>
+                    <span style="color: <?= $i <= $full ? '#f1c40f' : '#ddd' ?>; font-size:1.1rem;">★</span>
+                <?php endfor; ?>
+            </div>
+        <?php else: ?>
+            <div style="color:#6b7280;">No ratings submitted yet.</div>
+        <?php endif; ?>
+    </div>
+
     <?php if (!empty($message)) echo $message; ?>
 
     <div class="feedback-list">
@@ -105,7 +127,16 @@ require_once __DIR__ . '/admin_sidebar.php';
                         <span class="timestamp"><i class="fas fa-clock"></i> <?= time_ago($item['created_at']) ?></span>
                     </div>
                     <div class="feedback-body">
-                        <blockquote><?= nl2br(htmlspecialchars($item['message'])) ?></blockquote>
+                        <div class="rating-display" aria-hidden="true">
+                            <?php $r = (int)($item['rating'] ?? 0); for ($i=1;$i<=5;$i++): ?>
+                                <span class="star" style="color: <?= $i <= $r ? '#f1c40f' : '#ddd' ?>; font-size:1.2rem;">★</span>
+                            <?php endfor; ?>
+                        </div>
+                        <?php if (!empty($item['message'])): ?>
+                            <div><a href="#" class="view-comment" onclick="event.preventDefault(); this.nextElementSibling.classList.toggle('hidden');">View comment</a>
+                                <div class="comment hidden" style="margin-top:8px;"><?= nl2br(htmlspecialchars($item['message'])) ?></div>
+                            </div>
+                        <?php endif; ?>
                     </div>
                     <div class="feedback-footer">
                         <a href="mailto:<?= htmlspecialchars($item['email']) ?>?subject=Re: Your Feedback" class="btn btn-sm btn-outline">

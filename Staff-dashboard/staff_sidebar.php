@@ -72,6 +72,10 @@ try {
                 <i class="fas fa-comment-dots"></i>
                 <span>Feedback</span>
             </a>
+            <a href="payment_records.php" class="btn-nav <?= ($current_page === 'payment_records') ? 'active' : '' ?>">
+                <i class="fas fa-receipt"></i>
+                <span>Payment Record</span>
+            </a>
             <a href="staff_audit_logs.php" class="btn-nav <?= ($current_page === 'audit_logs') ? 'active' : '' ?>">
                 <i class="fas fa-history"></i>
                 <span>My Activity</span>

@@ -55,26 +55,27 @@ $conn->begin_transaction();
 try {
     // 1. Update the main application details
     $form_details_json = json_encode($application_data);
+    $business_id = $application_data['business_id'] ?? null;
     $business_name = $application_data['business_name'];
     $business_address = $application_data['business_address'] ?? '';
     $type_of_business = $application_data['type_of_business'] ?? '';
 
     $stmt = $conn->prepare(
         "UPDATE applications 
-         SET business_name = ?, business_address = ?, type_of_business = ?, form_details = ?, updated_at = NOW()
+         SET business_id = ?, business_name = ?, business_address = ?, type_of_business = ?, form_details = ?, updated_at = NOW()
          WHERE id = ?"
     );
-    $stmt->bind_param("ssssi", $business_name, $business_address, $type_of_business, $form_details_json, $applicationId);
+    $stmt->bind_param("sssssi", $business_id, $business_name, $business_address, $type_of_business, $form_details_json, $applicationId);
     if (!$stmt->execute()) {
         error_log("Primary update failed (updated_at may be missing): " . $stmt->error);
         // Attempt fallback without updated_at
         $stmt->close();
         $stmt_fb = $conn->prepare(
             "UPDATE applications 
-             SET business_name = ?, business_address = ?, type_of_business = ?, form_details = ?
+             SET business_id = ?, business_name = ?, business_address = ?, type_of_business = ?, form_details = ?
              WHERE id = ?"
         );
-        $stmt_fb->bind_param("ssssi", $business_name, $business_address, $type_of_business, $form_details_json, $applicationId);
+        $stmt_fb->bind_param("sssssi", $business_id, $business_name, $business_address, $type_of_business, $form_details_json, $applicationId);
         if (!$stmt_fb->execute()) {
             throw new Exception("Database Error (fallback): Could not update application details. " . $stmt_fb->error);
         }

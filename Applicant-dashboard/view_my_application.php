@@ -163,6 +163,10 @@ require_once __DIR__ . '/applicant_sidebar.php';
                             <input type="text" id="business_name" name="business_name" value="<?= htmlspecialchars($application['business_name'] ?? '') ?>" disabled>
                         </div>
                         <div class="form-group" style="flex: 1;">
+                            <label for="business_id">Business ID:</label>
+                            <input type="text" id="business_id" name="business_id" value="<?= htmlspecialchars($application['business_id'] ?? '') ?>" disabled>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
                             <label for="trade_name">Trade Name/Franchise:</label>
                             <input type="text" id="trade_name" name="trade_name" value="<?= htmlspecialchars($form_details['trade_name'] ?? '') ?>" disabled>
                         </div>

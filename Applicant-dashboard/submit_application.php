@@ -47,6 +47,7 @@ require_once __DIR__ . '/applicant_sidebar.php';
             <div class="instructions">
                 <p class="instruction-item">1. Provide accurate information and print legibly to avoid delays. Incomplete application form will be returned to the applicant.</p>
                 <p class="instruction-item">2. Ensure that all documents attached to this form (if any) are complete and properly filled out.</p>
+                <p class="required-note" style="margin-top:12px; font-weight:600; color:var(--text-secondary);">Fields marked <span class="required">*</span> are required.</p>
             </div>
         </header>
 
@@ -64,7 +65,7 @@ require_once __DIR__ . '/applicant_sidebar.php';
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Application Type:</label>
+                            <label>Application Type: <span class="required">*</span></label>
                             <div class="radio-options">
                                 <input type="radio" id="new" name="application_type" value="New" required> 
                                 <label for="new">New</label>
@@ -73,7 +74,7 @@ require_once __DIR__ . '/applicant_sidebar.php';
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>Mode of Payment:</label>
+                            <label>Mode of Payment: <span class="required">*</span></label>
                             <div class="radio-options">
                                 <input type="radio" id="annually" name="mode_of_payment" value="Annually" required> 
                                 <label for="annually">Annually</label>
@@ -87,7 +88,7 @@ require_once __DIR__ . '/applicant_sidebar.php';
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="date_of_application">Date of Application:</label>
+                            <label for="date_of_application">Date of Application: <span class="required">*</span></label>
                             <input type="date" id="date_of_application" name="date_of_application" value="<?= date('Y-m-d') ?>" required>
                         </div>
                         <div class="form-group">
@@ -182,11 +183,11 @@ require_once __DIR__ . '/applicant_sidebar.php';
                     <h4>Name of Taxpayer/Registrant</h4>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="last_name">Last Name:</label>
+                            <label for="last_name">Last Name: <span class="required">*</span></label>
                             <input type="text" id="last_name" name="last_name" placeholder="e.g., Dela Cruz" required>
                         </div>
                         <div class="form-group">
-                            <label for="first_name">First Name:</label>
+                            <label for="first_name">First Name: <span class="required">*</span></label>
                             <input type="text" id="first_name" name="first_name" placeholder="e.g., Juan" required>
                         </div>
                         <div class="form-group">
@@ -197,8 +198,12 @@ require_once __DIR__ . '/applicant_sidebar.php';
 
                     <div class="form-row">
                         <div class="form-group" style="flex: 2;">
-                            <label for="business_name">Business Name:</label>
+                            <label for="business_name">Business Name: <span class="required">*</span></label>
                             <input type="text" id="business_name" name="business_name" placeholder="e.g., Juan's Sari-Sari Store" required>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label for="business_id">Business ID</label>
+                            <input type="text" id="business_id" name="business_id" placeholder="e.g., BR-2025-001">
                         </div>
                         <div class="form-group" style="flex: 1;">
                             <label for="trade_name">Trade Name/Franchise:</label>
@@ -465,10 +470,12 @@ require_once __DIR__ . '/applicant_sidebar.php';
 
                     <!-- Declaration -->
                     <div class="declaration-section">
-                        <p class="declaration">
-                            I DECLARE UNDER PENALTY OF PERJURY that the foregoing information are true based on my personal knowledge and authentic records. Further, I agree to comply with the regulatory requirement and other deficiencies within 30 days from release of the business permit.
-                        </p>
-                </div>
+                        <label class="declaration">
+                            <input type="checkbox" id="declaration" name="declaration" required>
+                            <span>I DECLARE UNDER PENALTY OF PERJURY that the foregoing information are true based on my personal knowledge and authentic records. Further, I agree to comply with the regulatory requirement and other deficiencies within 30 days from release of the business permit.</span>
+                            <span class="required">*</span>
+                        </label>
+                    </div>
                 </section>
             </div>
 
@@ -480,6 +487,17 @@ require_once __DIR__ . '/applicant_sidebar.php';
         </form>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function(){
+        var decl = document.getElementById('declaration');
+        var submitBtn = document.querySelector('.form-actions button[type="submit"]');
+        if (!decl || !submitBtn) return;
+        function updateBtn(){ submitBtn.disabled = !decl.checked; }
+        updateBtn();
+        decl.addEventListener('change', updateBtn);
+    });
+</script>
 
 <!-- Custom Styles for Business Permit Form -->
 <style>

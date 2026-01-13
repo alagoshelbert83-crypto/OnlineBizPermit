@@ -1,5 +1,135 @@
 <?php
 // Handle POST requests BEFORE including header (to allow redirects)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['payment_action'])) {
+    require_once './db.php';
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'staff') { header("Location: login.php"); exit; }
+
+    $payment_id = (int)($_POST['payment_id'] ?? 0);
+    $action = $_POST['payment_action']; // 'verify' or 'reject'
+    $payment_amount = isset($_POST['amount']) && $_POST['amount'] !== '' ? (float)str_replace(',', '', $_POST['amount']) : null;
+    $or_number = $_POST['or_number'] ?? null;
+
+    try {
+        $conn->beginTransaction();
+
+        if ($action === 'verify') {
+            $update = $conn->prepare("UPDATE payments SET status = 'verified', amount = ?, or_number = ?, verified_by = ?, verified_at = NOW() WHERE id = ?");
+            $update->execute([$payment_amount, $or_number, $_SESSION['user_id'], $payment_id]);
+
+            // Notify applicant
+            $app_id_stmt = $conn->prepare("SELECT application_id, uploaded_by FROM payments WHERE id = ?");
+            $app_id_stmt->execute([$payment_id]);
+            $pinfo = $app_id_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            $applicant_user_id = $pinfo['uploaded_by'] ?? null;
+            $applicationId = $pinfo['application_id'] ?? null;
+
+            if ($applicationId && $applicant_user_id) {
+                $msg = "Your payment for application #{$applicationId} has been verified. Thank you.";
+                $link = "../Applicant-dashboard/view_my_application.php?id={$applicationId}";
+                $notify = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
+                $notify->execute([$applicant_user_id, $msg, $link]);
+
+                // Send email if possible
+                try {
+                    $stmt = $conn->prepare("SELECT u.email, u.name FROM users u WHERE id = ?");
+                    $stmt->execute([$applicant_user_id]);
+                    $usr = $stmt->fetch(PDO::FETCH_ASSOC);
+                    if ($usr && !empty($usr['email']) && function_exists('sendApplicationEmail')) {
+                        $subject = "Payment Verified for Application #{$applicationId}";
+                        $body = "<p>Dear " . htmlspecialchars($usr['name']) . ",</p><p>Your payment has been verified. We will proceed with permit release.</p>";
+                        @sendApplicationEmail($usr['email'], $usr['name'], $subject, $body);
+                    }
+                } catch (Exception $e) { error_log('Payment verification email error: ' . $e->getMessage()); }
+
+                // Audit log: payment verified
+                try {
+                    if (file_exists(__DIR__ . '/../audit_logger.php')) {
+                        require_once __DIR__ . '/../audit_logger.php';
+                        $logger = AuditLogger::getInstance();
+                        $logger->log('payment_verified', "Payment ID {$payment_id} verified by staff", ['payment_id'=>$payment_id,'application_id'=>$applicationId,'verified_by'=>$_SESSION['user_id'],'amount'=>$payment_amount,'or_number'=>$or_number], $_SESSION['user_id'], 'staff');
+                    }
+                } catch (Exception $ax) {
+                    error_log('Audit logging failed for payment verify: ' . $ax->getMessage());
+                }
+
+                // Automatically release permit after a verified payment
+                try {
+                    // Attempt to set application to complete and mark permit_released_at
+                    $release_stmt = $conn->prepare("UPDATE applications SET status = 'complete', permit_released_at = NOW(), updated_at = NOW() WHERE id = ?");
+                    $release_stmt->execute([$applicationId]);
+
+                    // Notify applicant about release
+                    $release_msg = "Good news! Your business permit for application #{$applicationId} has been released. You may download it from your dashboard.";
+                    $release_link = "../Applicant-dashboard/view_my_application.php?id={$applicationId}";
+                    $notify_release = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
+                    $notify_release->execute([$applicant_user_id, $release_msg, $release_link]);
+
+                    // Send permit release email
+                    try {
+                        if (!empty($usr['email']) && function_exists('sendApplicationEmail')) {
+                            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? 'https' : 'http';
+                            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                            $absolute_link = "{$protocol}://{$host}/Applicant-dashboard/view_my_application.php?id={$applicationId}";
+                            $email_subject = "Your Business Permit is Ready";
+                            $email_body = "<div style='font-family: Arial, sans-serif;'><p>Dear " . htmlspecialchars($usr['name']) . ",</p><p>Your permit is now ready and available for download: <a href='" . htmlspecialchars($absolute_link) . "'>View Application</a></p></div>";
+                            @sendApplicationEmail($usr['email'], $usr['name'], $email_subject, $email_body);
+                        }
+                    } catch (Exception $ee) {
+                        error_log('Permit release email failed: ' . $ee->getMessage());
+                    }
+                } catch (PDOException $re) {
+                    // If full update fails, try a minimal status update
+                    try {
+                        $fallback = $conn->prepare("UPDATE applications SET status = 'complete' WHERE id = ?");
+                        $fallback->execute([$applicationId]);
+                    } catch (PDOException $re2) {
+                        error_log('Failed to automatically release permit after payment verify: ' . $re2->getMessage());
+                    }
+                }
+            }
+        } elseif ($action === 'reject') {
+            $update = $conn->prepare("UPDATE payments SET status = 'rejected', verified_by = ?, verified_at = NOW() WHERE id = ?");
+            $update->execute([$_SESSION['user_id'], $payment_id]);
+
+            // Notify applicant about rejection
+            $app_id_stmt = $conn->prepare("SELECT application_id, uploaded_by FROM payments WHERE id = ?");
+            $app_id_stmt->execute([$payment_id]);
+            $pinfo = $app_id_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            $applicant_user_id = $pinfo['uploaded_by'] ?? null;
+            $applicationId = $pinfo['application_id'] ?? null;
+            if ($applicationId && $applicant_user_id) {
+                $msg = "Your payment for application #{$applicationId} was rejected. Please contact the office or re-upload the official receipt.";
+                $link = "../Applicant-dashboard/view_my_application.php?id={$applicationId}";
+                $notify = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)");
+                $notify->execute([$applicant_user_id, $msg, $link]);
+
+                // Audit log: payment rejected
+                try {
+                    if (file_exists(__DIR__ . '/../audit_logger.php')) {
+                        require_once __DIR__ . '/../audit_logger.php';
+                        $logger = AuditLogger::getInstance();
+                        $logger->log('payment_rejected', "Payment ID {$payment_id} rejected by staff", ['payment_id'=>$payment_id,'application_id'=>$applicationId,'rejected_by'=>$_SESSION['user_id']], $_SESSION['user_id'], 'staff');
+                    }
+                } catch (Exception $ax) {
+                    error_log('Audit logging failed for payment reject: ' . $ax->getMessage());
+                }
+            }
+        }
+
+        $conn->commit();
+    } catch (Exception $e) {
+        try { $conn->rollBack(); } catch (Exception $_) {}
+        error_log('Payment action failed: ' . $e->getMessage());
+    }
+
+    // Redirect back
+    $redirectId = $_POST['application_id'] ?? $_GET['id'] ?? 0;
+    header("Location: view_application.php?id=" . (int)$redirectId . "&status=payment_updated");
+    exit;
+}
+
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_application'])) {
     // Include db connection first
     require_once './db.php';
@@ -445,14 +575,74 @@ if (isset($_GET['status']) && $_GET['status'] === 'updated') {
                 <p>The LGU Section form has not been filled out for this application yet.</p>
                 <?php endif; ?>
 
+                <!-- Payments Section -->
+                <h3 class="section-divider">Payments</h3>
+                <?php
+                    $payments = [];
+                    try {
+                        $pstmt = $conn->prepare("SELECT p.*, u.name as uploaded_by_name, d.file_path FROM payments p LEFT JOIN users u ON p.uploaded_by = u.id LEFT JOIN documents d ON p.document_id = d.id WHERE p.application_id = ? ORDER BY p.created_at DESC");
+                        $pstmt->execute([$applicationId]);
+                        $payments = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+                    } catch (Exception $pe) {
+                        error_log('Failed to fetch payments: ' . $pe->getMessage());
+                        $payments = [];
+                    }
+                ?>
+                <div class="form-section">
+                    <?php if (empty($payments)): ?>
+                        <p>No payment records found for this application.</p>
+                    <?php else: ?>
+                        <table style="width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr>
+                                    <th>Uploaded</th>
+                                    <th>File</th>
+                                    <th>Amount</th>
+                                    <th>OR #</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($payments as $pay): ?>
+                                    <tr>
+                                        <td><?= htmlspecialchars(date('M d, Y H:i', strtotime($pay['created_at']))) ?></td>
+                                        <td><?php if (!empty($pay['file_path'])): ?><a href="../view_file.php?file=<?= urlencode($pay['file_path']) ?>" target="_blank">View Receipt</a><?php else: ?>-<?php endif; ?></td>
+                                        <td><?= $pay['amount'] ? '₱ ' . number_format((float)$pay['amount'], 2) : '-' ?></td>
+                                        <td><?= htmlspecialchars($pay['or_number'] ?? '-') ?></td>
+                                        <td><?= htmlspecialchars(ucfirst($pay['status'])) ?></td>
+                                        <td>
+                                            <?php if ($pay['status'] === 'pending'): ?>
+                                                <form method="POST" style="display:inline-block;">
+                                                    <input type="hidden" name="payment_id" value="<?= (int)$pay['id'] ?>">
+                                                    <input type="hidden" name="application_id" value="<?= (int)$applicationId ?>">
+                                                    <input type="number" step="0.01" name="amount" placeholder="Amount" value="<?= htmlspecialchars($pay['amount'] ?? '') ?>" style="width:110px;">
+                                                    <input type="text" name="or_number" placeholder="OR #" value="<?= htmlspecialchars($pay['or_number'] ?? '') ?>" style="width:110px;">
+                                                    <button type="submit" name="payment_action" value="verify" class="btn btn-success" style="margin-left:6px;">Verify</button>
+                                                </form>
+                                                <form method="POST" style="display:inline-block; margin-left:6px;">
+                                                    <input type="hidden" name="payment_id" value="<?= (int)$pay['id'] ?>">
+                                                    <input type="hidden" name="application_id" value="<?= (int)$applicationId ?>">
+                                                    <button type="submit" name="payment_action" value="reject" class="btn btn-danger">Reject</button>
+                                                </form>
+                                            <?php else: ?>
+                                                <small>Verified by <?= htmlspecialchars($pay['verified_by'] ?? '') ?> at <?= htmlspecialchars($pay['verified_at'] ?? '') ?></small>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
+                </div>
+
             </div>
 
         </div>
 
         <div id="tab-2" class="tab-content">
             <div class="form-container">
-                <form method="POST" action="view_application.php?id=<?= $applicationId ?>" class="business-permit-form">
-                    <input type="hidden" name="application_id" value="<?= $applicationId ?>">
+                <form method="POST" action="view_application.php?id=<?= $applicationId ?>" class="business-permit-form">                    <input type="hidden" name="application_id" value="<?= $applicationId ?>">
                     <input type="hidden" name="update_application" value="1">
                     <input type="hidden" name="old_status" value="<?= $application['status'] ?>">
                     <?= $lgu_message ?>

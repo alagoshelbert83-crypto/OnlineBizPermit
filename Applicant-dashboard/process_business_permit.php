@@ -77,6 +77,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 
+    // Declaration must be accepted
+    if (empty($application_data['declaration'])) {
+        $errors[] = 'You must accept the declaration before submitting the application.';
+    }
+
     if (!empty($errors)) {
         $response['errors'] = $errors;
         $response['message'] = 'Validation failed';
@@ -215,6 +220,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 }
 
                 $business_name = $application_data['business_name'];
+                $business_id = $application_data['business_id'] ?? null;
                 $business_address = $application_data['business_address'] ?? '';
                 $type_of_business = $application_data['type_of_business'] ?? '';
 
@@ -226,8 +232,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 // Insert into applications table using RETURNING clause for PostgreSQL
                 // This is more reliable than lastInsertId() especially with connection pooling
                 $stmt = $conn->prepare(
-                    "INSERT INTO applications (user_id, business_name, business_address, type_of_business, status, form_details, submitted_at)
-                     VALUES (?, ?, ?, ?, 'pending', ?, NOW())
+                    "INSERT INTO applications (user_id, business_name, business_id, business_address, type_of_business, status, form_details, submitted_at)
+                     VALUES (?, ?, ?, ?, ?, 'pending', ?, NOW())
                      RETURNING id"
                 );
 
@@ -241,7 +247,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 error_log('Form details length: ' . strlen($form_details_json) . ' bytes');
 
                 try {
-                    $execute_result = $stmt->execute([$current_user_id, $business_name, $business_address, $type_of_business, $form_details_json]);
+                    $execute_result = $stmt->execute([$current_user_id, $business_name, $business_id, $business_address, $type_of_business, $form_details_json]);
                 } catch (PDOException $execute_e) {
                     // Log the specific error immediately
                     error_log('=== INSERT EXECUTE EXCEPTION ===');

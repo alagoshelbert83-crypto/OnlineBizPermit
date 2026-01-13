@@ -53,9 +53,130 @@ if (isset($_GET['id'])) {
 
 // Handle form submission for updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_application'])) {
-    // This would ideally be in a separate processing file, but for simplicity, we handle it here.
-    // A full implementation would be similar to `process_business_permit.php` but using UPDATE instead of INSERT.
-    $message = '<div class="message success">Application updated successfully! (This is a placeholder - no data was actually changed).</div>';
+    // Process applicant-initiated update (safe subset)
+    try {
+        // Sanitize inputs
+        function sanitize_input_local($data) {
+            return htmlspecialchars(trim(stripslashes($data)));
+        }
+
+        $application_data = [];
+        foreach ($_POST as $k => $v) {
+            if (is_array($v)) {
+                $application_data[$k] = array_map('sanitize_input_local', $v);
+            } else {
+                $application_data[$k] = sanitize_input_local($v);
+            }
+        }
+
+        $business_id = $application_data['business_id'] ?? null;
+        $business_name = $application_data['business_name'] ?? ($application['business_name'] ?? '');
+        $business_address = $application_data['business_address'] ?? ($application['business_address'] ?? '');
+
+        $form_details = $application['form_details'] ? json_decode($application['form_details'], true) : [];
+        // Merge editable fields back into form_details for storage
+        foreach (['mode_of_payment','date_of_application','dti_reg_no','dti_reg_date','trade_name','b_email','b_mobile','last_name','first_name','middle_name','owner_address'] as $fld) {
+            if (isset($application_data[$fld])) $form_details[$fld] = $application_data[$fld];
+        }
+
+        $form_details_json = json_encode($form_details);
+
+        // Update application only if belongs to the current user
+        $stmt = $conn->prepare("UPDATE applications SET business_id = ?, business_name = ?, business_address = ?, form_details = ?, updated_at = NOW() WHERE id = ? AND user_id = ?");
+        $stmt->execute([$business_id, $business_name, $business_address, $form_details_json, $applicationId, $current_user_id]);
+
+        // Handle simple payment receipt upload from applicant (only allowed after approval)
+        if (isset($_FILES['payment_receipt']) && $_FILES['payment_receipt']['error'] === UPLOAD_ERR_OK) {
+            if (($application['status'] ?? '') !== 'approved') {
+                throw new Exception('Receipt uploads are only allowed after your application has been approved.');
+            }
+
+            $allowed_types = ['application/pdf','image/jpeg','image/png'];
+            $tmp = $_FILES['payment_receipt']['tmp_name'];
+            $type = mime_content_type($tmp);
+            $size = $_FILES['payment_receipt']['size'];
+            if (in_array($type, $allowed_types) && $size <= 100 * 1024 * 1024) {
+                $orig = basename($_FILES['payment_receipt']['name']);
+                $ext = pathinfo($orig, PATHINFO_EXTENSION);
+                $unique = uniqid('doc_' . $applicationId . '_payment_', true) . '.' . $ext;
+                $upload_dir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
+                if (!is_dir($upload_dir)) @mkdir($upload_dir, 0775, true);
+                if (move_uploaded_file($tmp, $upload_dir . $unique)) {
+                    $doc_stmt = $conn->prepare("INSERT INTO documents (application_id, document_name, file_path, document_type, upload_date) VALUES (?, ?, ?, 'payment_receipt', NOW())");
+                    $doc_stmt->execute([$applicationId, $orig, $unique]);
+
+                    // Get the newly created document id
+                    $doc_id = null;
+                    try {
+                        $dstmt = $conn->prepare("SELECT id FROM documents WHERE application_id = ? AND file_path = ? LIMIT 1");
+                        $dstmt->execute([$applicationId, $unique]);
+                        $drow = $dstmt->fetch(PDO::FETCH_ASSOC);
+                        $doc_id = $drow['id'] ?? null;
+                    } catch (Exception $_) {
+                        error_log('Could not fetch document id after insert for payment receipt');
+                    }
+
+                    // Record payment record
+                    $payment_amount = isset($application_data['payment_amount']) && $application_data['payment_amount'] !== '' ? (float)str_replace(',', '', $application_data['payment_amount']) : null;
+                    $or_number = $application_data['or_number'] ?? null;
+                    try {
+                        $metadata = json_encode(['uploaded_filename' => $orig, 'uploader_id' => $current_user_id]);
+                        $pstmt = $conn->prepare("INSERT INTO payments (application_id, amount, or_number, method, uploaded_by, document_id, metadata, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', NOW())");
+                        $pstmt->execute([$applicationId, $payment_amount, $or_number, null, $current_user_id, $doc_id, $metadata]);
+
+                        // Try to fetch the inserted payment id
+                        $payment_id = null;
+                        try {
+                            $payment_id = (int)$conn->lastInsertId();
+                        } catch (Exception $_) {
+                            // lastInsertId may not work depending on driver; try select
+                            try {
+                                $stmt_pid = $conn->prepare("SELECT id FROM payments WHERE application_id = ? AND document_id = ? ORDER BY created_at DESC LIMIT 1");
+                                $stmt_pid->execute([$applicationId, $doc_id]);
+                                $prow = $stmt_pid->fetch(PDO::FETCH_ASSOC);
+                                $payment_id = $prow['id'] ?? null;
+                            } catch (Exception $__e) {
+                                error_log('Could not fetch payment id: ' . $__e->getMessage());
+                            }
+                        }
+
+                        // Notify staff about new payment
+                        $notification_message = "Payment receipt uploaded for application #{$applicationId} by {$current_user_name}.";
+                        $notification_link = "../Staff-dashboard/view_application.php?id={$applicationId}";
+                        try {
+                            $notify_stmt = $conn->prepare("INSERT INTO notifications (user_id, message, link) VALUES (NULL, ?, ?)");
+                            $notify_stmt->execute([$notification_message, $notification_link]);
+                        } catch (Exception $nex) {
+                            error_log('Failed to create payment notification: ' . $nex->getMessage());
+                        }
+
+                        // --- Audit logging: payment upload and file upload ---
+                        try {
+                            if (file_exists(__DIR__ . '/../audit_logger.php')) {
+                                require_once __DIR__ . '/../audit_logger.php';
+                                $logger = AuditLogger::getInstance();
+                                // Log generic file upload context
+                                $logger->logFileUpload($orig, $size, $type, $current_user_id, 'user', 'payment_receipt');
+                                // Log payment upload event with metadata
+                                $logger->log('payment_uploaded', "Payment receipt uploaded", ['application_id'=>$applicationId,'document_id'=>$doc_id,'payment_id'=>$payment_id,'amount'=>$payment_amount,'or_number'=>$or_number], $current_user_id, 'user');
+                            }
+                        } catch (Exception $ae) {
+                            error_log('Audit log failure (payment upload): ' . $ae->getMessage());
+                        }
+
+                    } catch (Exception $pe) {
+                        error_log('Failed to insert payment record: ' . $pe->getMessage());
+                    }
+                }
+            } else {
+                throw new Exception('Invalid receipt file type or size.');
+            }
+        }
+
+        $message = '<div class="message success">Application updated successfully.</div>';
+    } catch (Exception $e) {
+        $message = '<div class="message error">Update failed: ' . htmlspecialchars($e->getMessage()) . '</div>';
+    }
 }
 
 
@@ -92,7 +213,7 @@ require_once __DIR__ . '/applicant_sidebar.php';
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Application Type:</label>
+                                <label>Application Type: <span class="required">*</span></label>
                                 <div class="radio-options">
                                     <input type="radio" id="new" name="application_type" value="New" <?= ($form_details['application_type'] ?? '') === 'New' ? 'checked' : '' ?> required> 
                                     <label for="new">New</label>
@@ -101,7 +222,7 @@ require_once __DIR__ . '/applicant_sidebar.php';
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label>Mode of Payment:</label>
+                                <label>Mode of Payment: <span class="required">*</span></label>
                                 <div class="radio-options">
                                     <input type="radio" id="annually" name="mode_of_payment" value="Annually" <?= ($form_details['mode_of_payment'] ?? '') === 'Annually' ? 'checked' : '' ?> required> 
                                     <label for="annually">Annually</label>
@@ -115,7 +236,7 @@ require_once __DIR__ . '/applicant_sidebar.php';
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="date_of_application">Date of Application:</label>
+                                <label for="date_of_application">Date of Application: <span class="required">*</span></label>
                                 <input type="date" id="date_of_application" name="date_of_application" value="<?= htmlspecialchars($form_details['date_of_application'] ?? date('Y-m-d')) ?>" required>
                             </div>
                             <div class="form-group">
@@ -137,7 +258,7 @@ require_once __DIR__ . '/applicant_sidebar.php';
 
                         <div class="form-row">
                             <div class="form-group" style="flex: 2;">
-                                <label for="business_name">Business Name:</label>
+                                <label for="business_name">Business Name: <span class="required">*</span></label>
                                 <input type="text" id="business_name" name="business_name" value="<?= htmlspecialchars($application['business_name'] ?? '') ?>" required>
                             </div>
                             <div class="form-group" style="flex: 1;">
@@ -175,11 +296,11 @@ require_once __DIR__ . '/applicant_sidebar.php';
                         <h4>Taxpayer/Registrant Information</h4>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="last_name">Last Name:</label>
+                                <label for="last_name">Last Name: <span class="required">*</span></label>
                                 <input type="text" id="last_name" name="last_name" value="<?= htmlspecialchars($form_details['last_name'] ?? '') ?>" required>
                             </div>
                             <div class="form-group">
-                                <label for="first_name">First Name:</label>
+                                <label for="first_name">First Name: <span class="required">*</span></label>
                                 <input type="text" id="first_name" name="first_name" value="<?= htmlspecialchars($form_details['first_name'] ?? '') ?>" required>
                             </div>
                             <div class="form-group">
@@ -369,8 +490,14 @@ require_once __DIR__ . '/applicant_sidebar.php';
                     <?php endif; ?>
 
                     <div class="document-upload-section">
+                        <?php if (in_array($application['status'], ['approved'])): ?>
                         <div class="document-item-upload">
-                            <label for="payment_receipt">Official Receipt:</label>
+                            <label for="payment_amount">Amount Paid (PHP):</label>
+                            <input type="number" step="0.01" name="payment_amount" id="payment_amount" placeholder="e.g., 1500.00" value="<?= htmlspecialchars($form_details['payment_amount'] ?? '') ?>">
+                            <label for="or_number">Official Receipt No. (OR #):</label>
+                            <input type="text" name="or_number" id="or_number" placeholder="e.g., OR-2026-001" value="<?= htmlspecialchars($form_details['or_number'] ?? '') ?>">
+
+                            <label for="payment_receipt">Official Receipt File:</label>
                             <div class="file-upload-wrapper">
                                 <input type="file" id="payment_receipt" name="payment_receipt" class="file-input" accept=".pdf,.jpg,.jpeg,.png">
                                 <label for="payment_receipt" class="file-label">
@@ -379,6 +506,11 @@ require_once __DIR__ . '/applicant_sidebar.php';
                                 <span class="file-name">No file selected</span>
                             </div>
                         </div>
+                    <?php else: ?>
+                        <div class="document-item-upload">
+                            <p class="notes">You can upload your payment receipt here only after your application has been <strong>Approved</strong>. Current status: <strong><?= htmlspecialchars(ucfirst($application['status'])) ?></strong></p>
+                        </div>
+                    <?php endif; ?>
                     </div>
                 </div>
 

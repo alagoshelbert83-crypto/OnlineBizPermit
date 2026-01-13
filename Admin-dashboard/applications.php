@@ -90,6 +90,45 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                         
                         if ($new_status === 'approved') {
                             $email_body .= "<p style='color: #10b981; font-weight: 600;'>Congratulations! Your application has been approved.</p>";
+
+                            // --- Add assessed fee breakdown if available ---
+                            $assessed_total = 0;
+                            $fee_rows = '';
+                            try {
+                                $fee_stmt = $conn->prepare("SELECT form_data FROM staff_form_data WHERE application_id = ?");
+                                $fee_stmt->execute([$applicationId]);
+                                $fee_row = $fee_stmt->fetch(PDO::FETCH_ASSOC);
+                                if ($fee_row && !empty($fee_row['form_data'])) {
+                                    $staff_form = json_decode($fee_row['form_data'], true) ?? [];
+                                    if (!empty($staff_form['fees']) && is_array($staff_form['fees'])) {
+                                        foreach ($staff_form['fees'] as $fee_label => $fee_data) {
+                                            $amount = $fee_data['total'] ?? $fee_data['amount'] ?? 0;
+                                            if (is_numeric($amount) && (float)$amount > 0) {
+                                                $assessed_total += (float)$amount;
+                                                $fee_rows .= "<tr><td style='padding:6px 8px;border-bottom:1px solid #eee;">" . htmlspecialchars($fee_label) . "</td><td style='padding:6px 8px;border-bottom:1px solid #eee;text-align:right;'>₱ " . number_format((float)$amount, 2) . "</td></tr>";
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (Exception $feeEx) {
+                                error_log('Failed to fetch staff form fees for application ' . $applicationId . ': ' . $feeEx->getMessage());
+                            }
+
+                            if (!empty($fee_rows)) {
+                                $email_body .= "<div style='margin:20px 0;'><h4 style='margin:6px 0 10px 0;color:#1e3a8a;'>Assessed Fees</h4><table style='width:100%;border-collapse:collapse;border:1px solid #f1f1f1;border-radius:6px;overflow:hidden;'><tbody>" . $fee_rows . "<tr><td style='padding:8px;border-top:2px solid #eee;'><strong>Total</strong></td><td style='padding:8px;border-top:2px solid #eee;text-align:right;'><strong>₱ " . number_format($assessed_total, 2) . "</strong></td></tr></tbody></table></div>";
+
+                                // Next steps and upload link
+                                $upload_link = "{$protocol}://{$host}/Applicant-dashboard/edit_application.php?id={$applicationId}";
+                                $email_body .= "<div style='background:#f8fafc;padding:12px;border-radius:6px;margin-top:12px;'><p style='margin:0 0 8px 0;'><strong>Next steps:</strong></p><ol style='margin:0 0 0 18px;padding:0;'>";
+                                $email_body .= "<li>Pay the <strong>assessed fees (₱ " . number_format($assessed_total,2) . ")</strong> at the Municipal Treasurer's Office or at authorized banks.</li>";
+                                $email_body .= "<li>After payment, please upload your official receipt using the link below to create a payment record and notify staff for verification.</li>";
+                                $email_body .= "<li>Our staff will verify the payment and proceed with permit release. You will be notified when your permit is ready for printing.</li>";
+                                $email_body .= "</ol><p style='margin-top:10px;text-align:center;'><a href='" . htmlspecialchars($upload_link) . "' style='background-color:#4a69bd;color:#fff;padding:10px 16px;border-radius:5px;text-decoration:none;font-weight:600;'>Upload Official Receipt</a></p></div>";
+                            } else {
+                                // If no fees found, give general next steps
+                                $email_body .= "<div style='background:#f8fafc;padding:12px;border-radius:6px;margin-top:12px;'><p style='margin:0;'><strong>Next steps:</strong> Your application has been approved; assessment details will be available on your application page. Once assessed, please follow the payment instructions and upload your official receipt via your application page.</p></div>";
+                            }
+
                         } else {
                             $email_body .= "<p>If you have any questions about this decision, please contact our support team.</p>";
                         }
@@ -197,6 +236,21 @@ $stmt = $conn->prepare($sql);
 $stmt->execute($params);
 $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Fetch payments summary for displayed applications (pending/verified counts)
+$payments_summary = [];
+$app_ids = array_column($applications, 'id');
+if (!empty($app_ids)) {
+    // Build parameter placeholders
+    $placeholders = implode(',', array_fill(0, count($app_ids), '?'));
+    $psql = "SELECT application_id, SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_count, SUM(CASE WHEN status = 'verified' THEN 1 ELSE 0 END) AS verified_count FROM payments WHERE application_id IN ($placeholders) GROUP BY application_id";
+    $pstmt = $conn->prepare($psql);
+    $pstmt->execute($app_ids);
+    $rows = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as $r) {
+        $payments_summary[(int)$r['application_id']] = ['pending' => (int)$r['pending_count'], 'verified' => (int)$r['verified_count']];
+    }
+}
+
 // Include Sidebar
 require_once __DIR__ . '/admin_sidebar.php';
 ?>
@@ -226,6 +280,12 @@ require_once __DIR__ . '/admin_sidebar.php';
 
     <?php if (!empty($message)) echo $message; ?>
 
+    <style>
+        .payment-badge { display: inline-flex; align-items: center; gap:6px; margin-left:12px; padding:4px 8px; border-radius:12px; font-size:0.8rem; font-weight:600; }
+        .payment-badge.payment-pending { background: #fff7ed; color: #b45309; border: 1px solid #fde68a; }
+        .payment-badge.payment-verified { background: #ecfdf5; color: #065f46; border: 1px solid #bbf7d0; }
+    </style>
+
     <!-- Filter Tabs -->
     <div class="filter-tabs">
         <a href="?filter=all" class="tab-item <?= ($filter === 'all') ? 'active' : '' ?>">All Applications</a>
@@ -249,6 +309,12 @@ require_once __DIR__ . '/admin_sidebar.php';
                         <div class="business-info">
                             <strong><?= htmlspecialchars($app['business_name']) ?></strong>
                             <small><i class="fas fa-map-marker-alt"></i> <?= htmlspecialchars($app['business_address'] ?? 'No address') ?></small>
+                            <?php $ps = $payments_summary[$app['id']] ?? ['pending'=>0,'verified'=>0]; ?>
+                            <?php if ($ps['pending'] > 0): ?>
+                                <span class="payment-badge payment-pending"><i class="fas fa-exclamation-circle"></i> <?= $ps['pending'] ?></span>
+                            <?php elseif ($ps['verified'] > 0): ?>
+                                <span class="payment-badge payment-verified"><i class="fas fa-check-circle"></i> <?= $ps['verified'] ?></span>
+                            <?php endif; ?>
                         </div>
                         <span class="status-badge status-<?= strtolower(str_replace(' ', '-', $app['status'])) ?>">
                             <?= htmlspecialchars(ucfirst($app['status'])) ?>

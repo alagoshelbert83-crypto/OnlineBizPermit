@@ -59,7 +59,8 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE TABLE IF NOT EXISTS feedback (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id),
-    message TEXT NOT NULL,
+    rating SMALLINT NULL,
+    message TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

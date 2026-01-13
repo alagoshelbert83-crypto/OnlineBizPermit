@@ -112,6 +112,15 @@ try {
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="applicant_style.css"> <!-- Main applicant styles -->
   <style>
+    /* Topbar & brand styles */
+    .topbar { background: #fff; border-bottom: 1px solid var(--border-color); padding: 8px 20px; }
+    .header-brand { display: flex; align-items: center; gap: 12px; max-width: 1200px; margin: auto; }
+    .site-logo { width: 44px; height: 44px; flex: 0 0 44px; border-radius: 8px; }
+    .brand-text { line-height: 1; }
+    .brand-title { margin: 0; font-size: 1.05rem; color: var(--text-primary); }
+    .brand-sub { color: var(--text-muted); font-size: 0.8rem; }
+    .municipal-logo { width: 44px; height: 44px; object-fit: contain; margin-left: auto; display: block; }
+
     /* Global Responsive Styles for Applicant Dashboard */
     @media (max-width: 768px) {
         /* Header adjustments */
@@ -251,4 +260,23 @@ try {
   </style>
 </head>
 <body>
+  <div class="topbar">
+    <div class="header-brand">
+      <a href="/" class="site-logo-link" aria-label="OnlineBizPermit home">
+        <!-- Inline SVG site logo as fallback -->
+        <svg class="site-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="44" height="44" role="img" aria-hidden="false">
+          <rect width="48" height="48" rx="8" fill="#1e40af"></rect>
+          <text x="24" y="30" text-anchor="middle" font-family="Inter, Arial" font-size="18" fill="#fff" font-weight="700">OBP</text>
+        </svg>
+      </a>
+
+      <div class="brand-text">
+        <h1 class="brand-title">OnlineBizPermit</h1>
+        <small class="brand-sub">Municipality of San Miguel, Catanduanes</small>
+      </div>
+
+      <img src="/public/applicant/images/San Miguel.png" alt="Municipality of San Miguel Logo" class="municipal-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+    </div>
+  </div>
+
   <div class="wrapper">
