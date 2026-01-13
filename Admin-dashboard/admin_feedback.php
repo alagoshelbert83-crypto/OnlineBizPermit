@@ -133,9 +133,7 @@ require_once __DIR__ . '/admin_sidebar.php';
                             <?php endfor; ?>
                         </div>
                         <?php if (!empty($item['message'])): ?>
-                            <div><a href="#" class="view-comment" onclick="event.preventDefault(); this.nextElementSibling.classList.toggle('hidden');">View comment</a>
-                                <div class="comment hidden" style="margin-top:8px;"><?= nl2br(htmlspecialchars($item['message'])) ?></div>
-                            </div>
+                            <div class="comment" style="margin-top:8px;"><?= nl2br(htmlspecialchars($item['message'])) ?></div>
                         <?php endif; ?>
                     </div>
                     <div class="feedback-footer">
