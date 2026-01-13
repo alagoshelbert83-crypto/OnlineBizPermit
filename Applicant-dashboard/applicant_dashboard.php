@@ -241,8 +241,22 @@ require_once __DIR__ . '/applicant_sidebar.php';
                             <td data-label="Type of Business"><?= htmlspecialchars($app['type_of_business']) ?></td>
                             <td data-label="Status">
                                 <span class="status-badge status-<?= strtolower(preg_replace('/[^a-z]/', '', $app['status'])) ?>">
-                                    <i class="fas fa-<?= $app['status'] === 'approved' ? 'check' : ($app['status'] === 'pending' ? 'clock' : ($app['status'] === 'rejected' ? 'times' : 'file')) ?>"></i>
-                                    <?= ucfirst(htmlspecialchars($app['status'])) ?>
+                                  <?php
+                                  $status_icon = 'file';
+                                  $status_label = ucfirst(htmlspecialchars($app['status']));
+                                  if ($app['status'] === 'approved') {
+                                    $status_icon = 'check';
+                                  } elseif ($app['status'] === 'pending') {
+                                    $status_icon = 'clock';
+                                  } elseif ($app['status'] === 'rejected') {
+                                    $status_icon = 'times';
+                                  } elseif ($app['status'] === 'payment_submitted') {
+                                    $status_icon = 'receipt';
+                                    $status_label = 'Payment Submitted';
+                                  }
+                                  ?>
+                                  <i class="fas fa-<?= $status_icon ?>"></i>
+                                  <?= $status_label ?>
                                 </span>
                             </td>
                             <td>

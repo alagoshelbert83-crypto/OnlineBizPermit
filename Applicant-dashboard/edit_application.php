@@ -102,8 +102,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_application'])
                 $upload_dir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
                 if (!is_dir($upload_dir)) @mkdir($upload_dir, 0775, true);
                 if (move_uploaded_file($tmp, $upload_dir . $unique)) {
+
                     $doc_stmt = $conn->prepare("INSERT INTO documents (application_id, document_name, file_path, document_type, upload_date) VALUES (?, ?, ?, 'payment_receipt', NOW())");
                     $doc_stmt->execute([$applicationId, $orig, $unique]);
+
+                    // Update application status to 'payment_submitted'
+                    $status_update_stmt = $conn->prepare("UPDATE applications SET status = 'payment_submitted', updated_at = NOW() WHERE id = ?");
+                    $status_update_stmt->execute([$applicationId]);
 
                     // Get the newly created document id
                     $doc_id = null;
@@ -174,6 +179,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_application'])
         }
 
         $message = '<div class="message success">Application updated successfully.</div>';
+            if (isset($status_update_stmt) && $status_update_stmt->rowCount() > 0) {
+                $message = '<div class="message success">Payment receipt uploaded successfully. Your payment is now pending verification by staff.</div>';
+            }
     } catch (Exception $e) {
         $message = '<div class="message error">Update failed: ' . htmlspecialchars($e->getMessage()) . '</div>';
     }
