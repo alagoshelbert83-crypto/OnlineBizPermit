@@ -63,7 +63,7 @@ require_once __DIR__ . '/admin_sidebar.php';
             <h1>User Feedback</h1>
         </div>
         <div class="header-right">
-            <form action="feedback.php" method="GET" class="filter-controls">
+            <form action="admin_feedback.php" method="GET" class="filter-controls">
                 <div class="search-form">
                 <input type="text" name="search" placeholder="Search by user or message..." value="<?= htmlspecialchars($search_term) ?>">
                 <button type="submit" aria-label="Search"><i class="fas fa-search"></i></button>
@@ -141,7 +141,7 @@ require_once __DIR__ . '/admin_sidebar.php';
                             <i class="fas fa-reply"></i> Reply via Email
                         </a>
                         <?php if ($current_user_role === 'admin'): ?>
-                            <a href="feedback.php?action=delete&id=<?= $item['id'] ?>" class="btn btn-sm btn-danger-outline" onclick="return confirm('Are you sure you want to delete this feedback?');" title="Delete Feedback">
+                            <a href="admin_feedback.php?action=delete&id=<?= $item['id'] ?>" class="btn btn-sm btn-danger-outline" onclick="return confirm('Are you sure you want to delete this feedback?');" title="Delete Feedback">
                                 <i class="fas fa-trash-alt"></i> Delete
                             </a>
                         <?php endif; ?>
