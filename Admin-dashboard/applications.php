@@ -89,7 +89,9 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                                 </div>";
                         
                         if ($new_status === 'approved') {
+
                             $email_body .= "<p style='color: #10b981; font-weight: 600;'>Congratulations! Your application has been approved.</p>";
+                            $email_body .= "<p style='font-weight: bold; color: #1e3a8a;'>You will now proceed to pay the fees for the business permit.</p>";
 
                             // --- Add assessed fee breakdown if available ---
                             $assessed_total = 0;
