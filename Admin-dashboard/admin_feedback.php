@@ -31,8 +31,8 @@ $sort_order = (strtolower($_GET['order'] ?? '') === 'asc') ? 'asc' : 'desc';
 
 // Build SQL query
 $sql = "SELECT f.id, f.rating, f.message, f.created_at, u.name, u.email 
-        FROM feedback f
-        JOIN users u ON f.user_id = u.id"
+    FROM feedback f
+    JOIN users u ON f.user_id = u.id";
 $params = [];
 $types = "";
 
