@@ -45,76 +45,91 @@ require_once './staff_sidebar.php';
     .feedback-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
     .feedback-card {
       background: #fff;
-      border-radius: 18px;
-      box-shadow: 0 4px 24px 0 rgba(60,72,88,0.10), 0 1.5px 4px 0 rgba(60,72,88,0.08);
-      padding: 32px 28px 28px 28px;
-      transition: box-shadow 0.2s, transform 0.2s;
-      border: 1.5px solid #f2f4f8;
+      border-radius: 20px;
+      box-shadow: 0 6px 32px 0 rgba(60,72,88,0.13), 0 2px 8px 0 rgba(60,72,88,0.10);
+      padding: 36px 30px 30px 30px;
+      transition: box-shadow 0.18s, transform 0.18s;
+      border: 1.5px solid #e8eaf0;
       position: relative;
+      min-height: 260px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
     .feedback-card:hover {
-      box-shadow: 0 8px 32px 0 rgba(60,72,88,0.18), 0 2px 8px 0 rgba(60,72,88,0.12);
-      transform: translateY(-2px) scale(1.01);
-      border-color: #e0e7ef;
+      box-shadow: 0 12px 36px 0 rgba(60,72,88,0.20), 0 4px 16px 0 rgba(60,72,88,0.13);
+      transform: translateY(-3px) scale(1.012);
+      border-color: #c7d0e0;
     }
     .feedback-header {
       display: flex;
       align-items: center;
-      gap: 18px;
-      margin-bottom: 18px;
+      gap: 20px;
+      margin-bottom: 20px;
     }
     .user-avatar {
-      width: 56px;
-      height: 56px;
+      width: 60px;
+      height: 60px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #4f8cff 60%, #38cfa6 100%);
+      background: linear-gradient(135deg, #4f8cff 0%, #38cfa6 100%);
       color: #fff;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.7rem;
+      font-size: 1.6rem;
       font-weight: 700;
-      box-shadow: 0 2px 8px 0 rgba(79,140,255,0.10);
-      letter-spacing: 1px;
+      box-shadow: 0 2px 8px 0 rgba(79,140,255,0.13);
+      letter-spacing: 1.5px;
       text-transform: uppercase;
+      border: 2.5px solid #fff;
     }
     .user-info h3 {
-      font-size: 1.18rem;
+      font-size: 1.15rem;
       font-weight: 700;
-      color: #2d3a4a;
+      color: #1a2a3a;
       margin: 0 0 2px 0;
+      letter-spacing: 0.2px;
     }
     .user-info p {
-      color: #7a869a;
+      color: #6a7a99;
       font-size: 0.97rem;
       margin: 0;
+      font-weight: 500;
     }
     .feedback-body .message {
-      line-height: 1.8;
-      color: #3a3a3a;
-      font-size: 1.05rem;
-      margin-bottom: 8px;
+      line-height: 1.85;
+      color: #2d3a4a;
+      font-size: 1.08rem;
+      margin-bottom: 10px;
+      min-height: 48px;
+      word-break: break-word;
     }
     .feedback-footer {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-top: 22px;
-      padding-top: 13px;
-      border-top: 1.5px solid #f2f4f8;
+      margin-top: 24px;
+      padding-top: 14px;
+      border-top: 1.5px solid #e8eaf0;
     }
     .rating .stars {
       color: #ffc107;
-      font-size: 1.15rem;
+      font-size: 1.18rem;
+      letter-spacing: 1.5px;
     }
     .rating .stars .far {
       color: #e0e7ef;
     }
     .feedback-footer .time {
-      font-size: 0.93rem;
-      color: #8a99b3;
-      font-weight: 500;
-      letter-spacing: 0.5px;
+      font-size: 0.97rem;
+      color: #7a8ca3;
+      font-weight: 600;
+      letter-spacing: 0.6px;
+    }
+    @media (max-width: 600px) {
+      .feedback-card { padding: 22px 10px 18px 10px; }
+      .user-avatar { width: 44px; height: 44px; font-size: 1.1rem; }
+      .feedback-header { gap: 10px; }
     }
   </style>
 
@@ -142,10 +157,10 @@ require_once './staff_sidebar.php';
               <div class="feedback-header">
                 <div class="user-avatar"><span>
                   <?php
-                    $names = explode(' ', trim($feedback['name']));
+                    $names = preg_split('/\s+/', trim($feedback['name']));
                     $initials = '';
                     foreach ($names as $n) {
-                      if ($n !== '') $initials .= strtoupper($n[0]);
+                      if ($n !== '' && strlen($initials) < 2) $initials .= strtoupper($n[0]);
                     }
                     echo htmlspecialchars($initials);
                   ?>
