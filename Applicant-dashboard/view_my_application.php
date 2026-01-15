@@ -93,12 +93,78 @@ require_once __DIR__ . '/applicant_sidebar.php';
                     <i class="fas fa-print"></i> Print Your Permit
                 </a>
             </div>
-        <?php elseif (in_array($application['status'], ['approved', 'complete'])): ?>
+        <?php elseif ($application['status'] === 'approved'): ?>
+
+            <?php
+                // Fetch assessed fees if any
+                $assessed_total = 0;
+                $fee_rows = '';
+                try {
+                    $fstmt = $conn->prepare("SELECT form_data FROM staff_form_data WHERE application_id = ?");
+                    $fstmt->execute([$application['id']]);
+                    $frow = $fstmt->fetch(PDO::FETCH_ASSOC);
+                    if ($frow && !empty($frow['form_data'])) {
+                        $staff_form = json_decode($frow['form_data'], true) ?? [];
+                        if (!empty($staff_form['fees']) && is_array($staff_form['fees'])) {
+                            foreach ($staff_form['fees'] as $label => $data) {
+                                $amt = $data['total'] ?? $data['amount'] ?? 0;
+                                if (is_numeric($amt) && (float)$amt > 0) {
+                                    $assessed_total += (float)$amt;
+                                    $fee_rows .= "<tr><td style='padding:6px 8px;border-bottom:1px solid #eee;">" . htmlspecialchars($label) . "</td><td style='padding:6px 8px;border-bottom:1px solid #eee;text-align:right;'>₱ " . number_format((float)$amt,2) . "</td></tr>";
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    error_log('Failed to fetch staff fees: ' . $e->getMessage());
+                }
+
+                // Get payment instructions from settings
+                $payment_instructions = '';
+                if (function_exists('get_setting')) {
+                    $payment_instructions = get_setting($conn, 'payment_instructions', '');
+                }
+                if (empty(trim($payment_instructions))) {
+                    $payment_instructions = '<p>Please pay the assessed fees at the Municipal Treasurer\'s Office or at authorized banks. Upload your official receipt on your application page for verification.</p>';
+                }
+
+            ?>
+
             <div class="message info">
                 <i class="fas fa-info-circle"></i>
                 <div>
-                    <h4>Your application has been approved!</h4>
-                    <p>A staff member is preparing your official business permit. You will receive a notification here once it has been released.</p>
+                    <h4>Your application has been approved</h4>
+                    <p>Please follow the payment instructions below to complete the process.</p>
+                </div>
+            </div>
+
+            <?php if (!empty($fee_rows)): ?>
+                <div class="payment-card" style="margin:12px 0;padding:14px;border:1px solid #e6eef8;background:#f8fbff;border-radius:6px;">
+                    <h4 style="margin:0 0 8px 0;color:#1e3a8a;">Assessed Fees</h4>
+                    <table style="width:100%;border-collapse:collapse;border:1px solid #f1f1f1;border-radius:6px;overflow:hidden;">
+                        <tbody>
+                            <?= $fee_rows ?>
+                            <tr><td style="padding:8px;border-top:2px solid #eee;"><strong>Total</strong></td><td style="padding:8px;border-top:2px solid #eee;text-align:right;"><strong>₱ <?= number_format($assessed_total,2) ?></strong></td></tr>
+                        </tbody>
+                    </table>
+                    <div style="margin-top:10px;"><?= $payment_instructions ?></div>
+                    <p style="text-align:center;margin-top:12px;"><a class="btn btn-primary" href="edit_application.php?id=<?= $application['id'] ?>">Upload Official Receipt</a></p>
+                </div>
+            <?php else: ?>
+                <div class="message muted">
+                    <div>
+                        <p>Assessment will be communicated here. Please check back or contact the office for guidance. You can upload your payment receipt once assessment details are available.</p>
+                        <p style="margin-top:8px"><a class="btn" href="edit_application.php?id=<?= $application['id'] ?>">Upload Official Receipt</a></p>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+        <?php elseif ($application['status'] === 'payment_submitted'): ?>
+            <div class="message info">
+                <i class="fas fa-exclamation-circle"></i>
+                <div>
+                    <h4>Payment Submitted</h4>
+                    <p>Your payment receipt has been submitted and is pending verification by our staff. You will be notified once it has been verified.</p>
                 </div>
             </div>
         <?php endif; ?>
