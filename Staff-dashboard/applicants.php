@@ -19,6 +19,7 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['staff', 'admi
 // Include mail config and functions
 require_once __DIR__ . '/../config_mail.php';
 require_once __DIR__ . '/email_functions.php';
+require_once __DIR__ . '/../audit_logger.php';
 
 // Handle POST requests BEFORE including header (which outputs HTML)
 if (isset($_POST['update_status'])) {
