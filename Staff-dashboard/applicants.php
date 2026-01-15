@@ -61,7 +61,7 @@ if (isset($_POST['update_status'])) {
             $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
             $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
             $absolute_link = "{$protocol}://{$host}/Applicant-dashboard/view_my_application.php?id={$id}";
-            
+
             // Status color mapping
             $status_colors = [
                 'pending' => '#f59e0b',
@@ -70,35 +70,161 @@ if (isset($_POST['update_status'])) {
                 'complete' => '#10b981'
             ];
             $status_color = $status_colors[strtolower($status)] ?? '#64748b';
-            
-            // Send notification email with HTML formatting
-            $subject = "Application Status Updated - " . htmlspecialchars($application_data['business_name']);
-            $message_body_html = "
-            <div style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
-                <div style='max-width: 600px; margin: 20px auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px; background-color: #ffffff;'>
-                    <h2 style='color: #4a69bd; margin-top: 0;'>Application Status Updated</h2>
-                    <p>Dear " . htmlspecialchars($application_data['name']) . ",</p>
-                    <p>Your application for <strong>" . htmlspecialchars($application_data['business_name']) . "</strong> has been updated.</p>
-                    <div style='background-color: #f8f9fa; border-left: 4px solid {$status_color}; padding: 15px; margin: 20px 0; border-radius: 4px;'>
-                        <p style='margin: 0;'><strong>New Status:</strong> <span style='color: {$status_color}; font-weight: bold; text-transform: uppercase;'>" . htmlspecialchars(ucfirst($status)) . "</span></p>
+
+            // Special handling for approved status - send detailed approval notification
+            if (strtolower($status) === 'approved') {
+                // Get application details for payment information
+                $app_details_stmt = $conn->prepare("SELECT form_details FROM applications WHERE id = ?");
+                $app_details_stmt->execute([$id]);
+                $app_details = $app_details_stmt->fetch(PDO::FETCH_ASSOC);
+                $form_details = json_decode($app_details['form_details'] ?? '{}', true);
+
+                // Calculate payment amount based on mode of payment (simplified calculation)
+                $mode_of_payment = $form_details['mode_of_payment'] ?? 'Annually';
+                $base_fee = 1500.00; // Base annual fee - can be configured
+
+                switch ($mode_of_payment) {
+                    case 'Semi-Annually':
+                        $payment_amount = $base_fee / 2;
+                        break;
+                    case 'Quarterly':
+                        $payment_amount = $base_fee / 4;
+                        break;
+                    default: // Annually
+                        $payment_amount = $base_fee;
+                        break;
+                }
+
+                $subject = "Congratulations! Your Business Permit Application Has Been Approved - " . htmlspecialchars($application_data['business_name']);
+
+                // Load email template
+                $template_path = __DIR__ . '/email_templates/approval_notification.html';
+                if (file_exists($template_path)) {
+                    $message_body_html = file_get_contents($template_path);
+
+                    // Replace placeholders
+                    $replacements = [
+                        '{{APPLICANT_NAME}}' => htmlspecialchars($application_data['name']),
+                        '{{BUSINESS_NAME}}' => htmlspecialchars($application_data['business_name']),
+                        '{{PAYMENT_AMOUNT}}' => number_format($payment_amount, 2),
+                        '{{PAYMENT_FREQUENCY}}' => htmlspecialchars($mode_of_payment),
+                        '{{APPLICATION_REFERENCE}}' => 'APP-' . str_pad($id, 6, '0', STR_PAD_LEFT),
+                        '{{APPLICATION_LINK}}' => htmlspecialchars($absolute_link),
+                        '{{CURRENT_DATE}}' => date('F d, Y')
+                    ];
+
+                    $message_body_html = str_replace(array_keys($replacements), array_values($replacements), $message_body_html);
+                } else {
+                    // Fallback to inline template if file doesn't exist
+                    $message_body_html = "
+                    <div style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
+                        <div style='max-width: 600px; margin: 20px auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px; background-color: #ffffff;'>
+                            <div style='text-align: center; margin-bottom: 30px;'>
+                                <h1 style='color: #10b981; margin: 0; font-size: 24px;'>🎉 APPROVED! 🎉</h1>
+                                <h2 style='color: #4a69bd; margin: 10px 0 0; font-size: 18px;'>Your Business Permit Application</h2>
+                            </div>
+
+                            <p>Dear " . htmlspecialchars($application_data['name']) . ",</p>
+
+                            <p>We are pleased to inform you that your application for <strong>" . htmlspecialchars($application_data['business_name']) . "</strong> has been <span style='color: #10b981; font-weight: bold;'>APPROVED</span>!</p>
+
+                            <div style='background-color: #f0f9ff; border: 2px solid #10b981; border-radius: 8px; padding: 20px; margin: 25px 0;'>
+                                <h3 style='color: #10b981; margin-top: 0; text-align: center;'>Payment Information</h3>
+                                <div style='background-color: #ffffff; border-radius: 6px; padding: 15px; margin: 15px 0;'>
+                                    <p style='margin: 10px 0; font-size: 16px;'><strong>Payment Amount:</strong> <span style='color: #dc2626; font-size: 18px; font-weight: bold;'>₱ " . number_format($payment_amount, 2) . "</span></p>
+                                    <p style='margin: 10px 0;'><strong>Payment Frequency:</strong> " . htmlspecialchars($mode_of_payment) . "</p>
+                                </div>
+
+                                <h4 style='color: #1e40af; margin: 20px 0 10px;'>Where to Pay:</h4>
+                                <ul style='margin: 0; padding-left: 20px;'>
+                                    <li>Municipal Treasurer's Office</li>
+                                    <li>Authorized Bank Partners</li>
+                                    <li>Online Payment Portal (coming soon)</li>
+                                </ul>
+
+                                <h4 style='color: #1e40af; margin: 20px 0 10px;'>How to Pay:</h4>
+                                <ol style='margin: 0; padding-left: 20px;'>
+                                    <li>Visit the Municipal Treasurer's Office or authorized bank</li>
+                                    <li>Present your application reference number: <strong>APP-" . str_pad($id, 6, '0', STR_PAD_LEFT) . "</strong></li>
+                                    <li>Pay the assessed fee of ₱ " . number_format($payment_amount, 2) . "</li>
+                                    <li>Obtain an official receipt (OR) from the payment</li>
+                                </ol>
+                            </div>
+
+                            <div style='background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;'>
+                                <h4 style='color: #92400e; margin-top: 0;'>Next Steps:</h4>
+                                <p style='margin: 10px 0 0;'>1. Make your payment using the instructions above<br>
+                                2. Upload your official payment receipt through your dashboard<br>
+                                3. Our staff will verify your payment within 1-2 business days<br>
+                                4. Once verified, your business permit will be issued</p>
+                            </div>
+
+                            <p>You can now upload your payment receipt and track your application progress by clicking the button below:</p>
+
+                            <p style='text-align: center; margin: 30px 0;'>
+                                <a href='" . htmlspecialchars($absolute_link) . "' style='background-color: #10b981; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);'>Upload Payment Receipt & View Application</a>
+                            </p>
+
+                            <hr style='border: none; border-top: 1px solid #eee; margin: 30px 0;'>
+
+                            <div style='text-align: center;'>
+                                <p style='font-size: 0.9em; color: #777; margin: 10px 0;'>
+                                    Thank you for choosing our service.<br>
+                                    <strong>The OnlineBizPermit Team</strong>
+                                </p>
+                                <p style='font-size: 0.8em; color: #999; margin: 5px 0;'>
+                                    Reference Number: APP-" . str_pad($id, 6, '0', STR_PAD_LEFT) . "<br>
+                                    Application Date: " . date('F d, Y') . "
+                                </p>
+                            </div>
+                        </div>
+                    </div>";
+                }
+
+                // Log the approval action
+                try {
+                    $logger = AuditLogger::getInstance();
+                    $logger->log('application_approved', "Application approved with payment notification sent", [
+                        'application_id' => $id,
+                        'business_name' => $application_data['business_name'],
+                        'applicant_email' => $application_data['email'],
+                        'payment_amount' => $payment_amount,
+                        'mode_of_payment' => $mode_of_payment
+                    ], $_SESSION['user_id'], 'staff');
+                } catch (Exception $logEx) {
+                    error_log('Audit logging failed for application approval: ' . $logEx->getMessage());
+                }
+            } else {
+                // For non-approved status changes, use the generic notification
+                $subject = "Application Status Updated - " . htmlspecialchars($application_data['business_name']);
+                $message_body_html = "
+                <div style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
+                    <div style='max-width: 600px; margin: 20px auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px; background-color: #ffffff;'>
+                        <h2 style='color: #4a69bd; margin-top: 0;'>Application Status Updated</h2>
+                        <p>Dear " . htmlspecialchars($application_data['name']) . ",</p>
+                        <p>Your application for <strong>" . htmlspecialchars($application_data['business_name']) . "</strong> has been updated.</p>
+                        <div style='background-color: #f8f9fa; border-left: 4px solid {$status_color}; padding: 15px; margin: 20px 0; border-radius: 4px;'>
+                            <p style='margin: 0;'><strong>New Status:</strong> <span style='color: {$status_color}; font-weight: bold; text-transform: uppercase;'>" . htmlspecialchars(ucfirst($status)) . "</span></p>
+                        </div>
+                        <p>You can view your application and check for any additional details or required actions by clicking the button below:</p>
+                        <p style='text-align: center; margin: 30px 0;'>
+                            <a href='" . htmlspecialchars($absolute_link) . "' style='background-color: #4a69bd; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;'>View My Application</a>
+                        </p>
+                        <hr style='border: none; border-top: 1px solid #eee; margin: 20px 0;'>
+                        <p style='font-size: 0.9em; color: #777; margin-bottom: 0;'>Thank you for using our service.<br><strong>The OnlineBizPermit Team</strong></p>
                     </div>
-                    <p>You can view your application and check for any additional details or required actions by clicking the button below:</p>
-                    <p style='text-align: center; margin: 30px 0;'>
-                        <a href='" . htmlspecialchars($absolute_link) . "' style='background-color: #4a69bd; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;'>View My Application</a>
-                    </p>
-                    <hr style='border: none; border-top: 1px solid #eee; margin: 20px 0;'>
-                    <p style='font-size: 0.9em; color: #777; margin-bottom: 0;'>Thank you for using our service.<br><strong>The OnlineBizPermit Team</strong></p>
-                </div>
-            </div>";
+                </div>";
+            }
 
             // Try to send email - don't let email failures break the status update
             // Capture any debug output from PHPMailer to prevent "headers already sent" errors
             ob_start();
             $email_sent = @sendApplicationEmail($application_data['email'], $application_data['name'], $subject, $message_body_html);
             $debug_output = ob_get_clean(); // Capture and discard debug output
-            
+
             if ($email_sent) {
-                $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Status updated and notification email sent to ' . htmlspecialchars($application_data['email']) . '!'];
+                $status_msg = (strtolower($status) === 'approved') ? 'approved and notification email sent' : 'updated and notification email sent';
+                $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Status ' . $status_msg . ' to ' . htmlspecialchars($application_data['email']) . '!'];
                 error_log("Status update email sent successfully to {$application_data['email']} for application ID {$id}");
             } else {
                 // Email failed but status was updated - show warning but don't break the flow

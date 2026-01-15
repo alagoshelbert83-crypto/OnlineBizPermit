@@ -94,77 +94,64 @@ require_once __DIR__ . '/applicant_sidebar.php';
                 </a>
             </div>
         <?php elseif ($application['status'] === 'approved'): ?>
-
             <?php
-                // Fetch assessed fees if any
-                $assessed_total = 0;
-                $fee_rows = '';
-                try {
-                    $fstmt = $conn->prepare("SELECT form_data FROM staff_form_data WHERE application_id = ?");
-                    $fstmt->execute([$application['id']]);
-                    $frow = $fstmt->fetch(PDO::FETCH_ASSOC);
-                    if ($frow && !empty($frow['form_data'])) {
-                        $staff_form = json_decode($frow['form_data'], true) ?? [];
-                        if (!empty($staff_form['fees']) && is_array($staff_form['fees'])) {
-                            foreach ($staff_form['fees'] as $label => $data) {
-                                $amt = $data['total'] ?? $data['amount'] ?? 0;
-                                if (is_numeric($amt) && (float)$amt > 0) {
-                                    $assessed_total += (float)$amt;
-                                    $fee_rows .= "<tr><td style='padding:6px 8px;border-bottom:1px solid #eee;">" . htmlspecialchars($label) . "</td><td style='padding:6px 8px;border-bottom:1px solid #eee;text-align:right;'>₱ " . number_format((float)$amt,2) . "</td></tr>";
-                                }
-                            }
-                        }
-                    }
-                } catch (Exception $e) {
-                    error_log('Failed to fetch staff fees: ' . $e->getMessage());
-                }
+            // Calculate payment amount for approved applications
+            $mode_of_payment = $form_details['mode_of_payment'] ?? 'Annually';
+            $base_fee = 1500.00; // Base annual fee - should match staff calculation
 
-                // Get payment instructions from settings
-                $payment_instructions = '';
-                if (function_exists('get_setting')) {
-                    $payment_instructions = get_setting($conn, 'payment_instructions', '');
-                }
-                if (empty(trim($payment_instructions))) {
-                    $payment_instructions = '<p>Please pay the assessed fees at the Municipal Treasurer\'s Office or at authorized banks. Upload your official receipt on your application page for verification.</p>';
-                }
-
+            switch ($mode_of_payment) {
+                case 'Semi-Annually':
+                    $payment_amount = $base_fee / 2;
+                    break;
+                case 'Quarterly':
+                    $payment_amount = $base_fee / 4;
+                    break;
+                default: // Annually
+                    $payment_amount = $base_fee;
+                    break;
+            }
             ?>
-
-            <div class="message info">
-                <i class="fas fa-info-circle"></i>
-                <div>
-                    <h4>Your application has been approved</h4>
-                    <p>Please follow the payment instructions below to complete the process.</p>
+            <div class="payment-required-banner">
+                <div class="icon">
+                    <i class="fas fa-credit-card"></i>
                 </div>
-            </div>
-
-            <?php if (!empty($fee_rows)): ?>
-                <div class="payment-card" style="margin:12px 0;padding:14px;border:1px solid #e6eef8;background:#f8fbff;border-radius:6px;">
-                    <h4 style="margin:0 0 8px 0;color:#1e3a8a;">Assessed Fees</h4>
-                    <table style="width:100%;border-collapse:collapse;border:1px solid #f1f1f1;border-radius:6px;overflow:hidden;">
-                        <tbody>
-                            <?= $fee_rows ?>
-                            <tr><td style="padding:8px;border-top:2px solid #eee;"><strong>Total</strong></td><td style="padding:8px;border-top:2px solid #eee;text-align:right;"><strong>₱ <?= number_format($assessed_total,2) ?></strong></td></tr>
-                        </tbody>
-                    </table>
-                    <div style="margin-top:10px;"><?= $payment_instructions ?></div>
-                    <p style="text-align:center;margin-top:12px;"><a class="btn btn-primary" href="edit_application.php?id=<?= $application['id'] ?>">Upload Official Receipt</a></p>
-                </div>
-            <?php else: ?>
-                <div class="message muted">
-                    <div>
-                        <p>Assessment will be communicated here. Please check back or contact the office for guidance. You can upload your payment receipt once assessment details are available.</p>
-                        <p style="margin-top:8px"><a class="btn" href="edit_application.php?id=<?= $application['id'] ?>">Upload Official Receipt</a></p>
+                <div class="text">
+                    <h4>🎉 Your Application Has Been Approved!</h4>
+                    <p>Please complete your payment to proceed with permit issuance.</p>
+                    <div class="payment-summary">
+                        <div class="payment-amount">
+                            <span class="label">Amount Due:</span>
+                            <span class="amount">₱ <?= number_format($payment_amount, 2) ?></span>
+                        </div>
+                        <div class="payment-frequency">
+                            <span class="label">Payment Frequency:</span>
+                            <span class="frequency"><?= htmlspecialchars($mode_of_payment) ?></span>
+                        </div>
                     </div>
                 </div>
-            <?php endif; ?>
-
-        <?php elseif ($application['status'] === 'payment_submitted'): ?>
+                <div class="payment-actions">
+                    <button onclick="showPaymentInstructions()" class="btn btn-info">
+                        <i class="fas fa-info-circle"></i> Payment Instructions
+                    </button>
+                    <a href="#payment-section" class="btn btn-success">
+                        <i class="fas fa-upload"></i> Upload Receipt
+                    </a>
+                </div>
+            </div>
+        <?php elseif (in_array($application['status'], ['payment_submitted'])): ?>
             <div class="message info">
-                <i class="fas fa-exclamation-circle"></i>
+                <i class="fas fa-clock"></i>
                 <div>
-                    <h4>Payment Submitted</h4>
-                    <p>Your payment receipt has been submitted and is pending verification by our staff. You will be notified once it has been verified.</p>
+                    <h4>Payment Submitted - Under Review</h4>
+                    <p>Your payment receipt has been submitted and is being reviewed by our staff. You will be notified once verification is complete.</p>
+                </div>
+            </div>
+        <?php elseif (in_array($application['status'], ['complete'])): ?>
+            <div class="message success">
+                <i class="fas fa-check-circle"></i>
+                <div>
+                    <h4>Payment Verified - Permit Processing</h4>
+                    <p>Your payment has been verified! A staff member is now preparing your official business permit. You will receive a notification once it has been released.</p>
                 </div>
             </div>
         <?php endif; ?>
@@ -493,9 +480,94 @@ require_once __DIR__ . '/applicant_sidebar.php';
                 </div>
             </div>
 
-            <!-- Section III: Application Status & Actions -->
+            <!-- Section III: PAYMENT INFORMATION (only for approved applications) -->
+            <?php if ($application['status'] === 'approved'): ?>
+            <div id="payment-section" class="form-section">
+                <h2>III. PAYMENT INFORMATION</h2>
+
+                <div class="payment-info-card">
+                    <div class="payment-header">
+                        <h3><i class="fas fa-credit-card"></i> Payment Required</h3>
+                        <p>Your application has been approved! Please complete your payment to proceed with permit issuance.</p>
+                    </div>
+
+                    <div class="payment-details-grid">
+                        <div class="payment-detail-item">
+                            <label>Amount Due:</label>
+                            <span class="amount">₱ <?= number_format($payment_amount, 2) ?></span>
+                        </div>
+                        <div class="payment-detail-item">
+                            <label>Payment Frequency:</label>
+                            <span class="frequency"><?= htmlspecialchars($mode_of_payment) ?></span>
+                        </div>
+                        <div class="payment-detail-item">
+                            <label>Application Reference:</label>
+                            <span class="reference">APP-<?= str_pad($application['id'], 6, '0', STR_PAD_LEFT) ?></span>
+                        </div>
+                    </div>
+
+                    <div class="payment-instructions">
+                        <h4><i class="fas fa-info-circle"></i> How to Pay:</h4>
+                        <ol>
+                            <li>Visit the Municipal Treasurer's Office or authorized bank partner</li>
+                            <li>Present your application reference number: <strong>APP-<?= str_pad($application['id'], 6, '0', STR_PAD_LEFT) ?></strong></li>
+                            <li>Pay the assessed fee of <strong>₱ <?= number_format($payment_amount, 2) ?></strong></li>
+                            <li>Obtain an official receipt (OR) from the payment</li>
+                        </ol>
+
+                        <div class="payment-locations">
+                            <h4><i class="fas fa-map-marker-alt"></i> Where to Pay:</h4>
+                            <ul>
+                                <li>Municipal Treasurer's Office</li>
+                                <li>Authorized Bank Partners</li>
+                                <li>Online Payment Portal (coming soon)</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="payment-upload-section">
+                        <h4><i class="fas fa-upload"></i> Upload Payment Receipt</h4>
+                        <p>Please upload a clear photo or scan of your official payment receipt (OR).</p>
+
+                        <form action="edit_application.php?id=<?= $application['id'] ?>" method="POST" enctype="multipart/form-data" class="payment-upload-form">
+                            <div class="upload-area">
+                                <input type="file" id="payment_receipt" name="payment_receipt" accept=".pdf,.jpg,.jpeg,.png" required>
+                                <label for="payment_receipt" class="upload-label">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    <span>Choose Receipt File</span>
+                                    <small>PDF, JPG, PNG up to 10MB</small>
+                                </label>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="payment_amount">Amount Paid (₱):</label>
+                                    <input type="number" step="0.01" id="payment_amount" name="payment_amount" placeholder="e.g., 1500.00" value="<?= htmlspecialchars($form_details['payment_amount'] ?? '') ?>" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="or_number">Official Receipt No. (OR #):</label>
+                                    <input type="text" id="or_number" name="or_number" placeholder="e.g., 123456789" value="<?= htmlspecialchars($form_details['or_number'] ?? '') ?>" required>
+                                </div>
+                            </div>
+
+                            <div class="upload-actions">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-upload"></i> Submit Payment Receipt
+                                </button>
+                                <p class="upload-note">
+                                    <i class="fas fa-info-circle"></i>
+                                    Your payment will be verified by staff within 1-2 business days.
+                                </p>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <!-- Section IV: Application Status & Actions -->
             <div class="form-section">
-                <h2>III. Application Status & Actions</h2>
+                <h2><?php echo ($application['status'] === 'approved') ? 'IV.' : 'III.'; ?> Application Status & Actions</h2>
                 <div class="status-details-grid">
                     <div class="status-item">
                         <label>Current Status</label>
@@ -562,6 +634,77 @@ require_once __DIR__ . '/applicant_sidebar.php';
     flex-shrink: 0;
 }
 
+/* --- Payment Required Banner --- */
+.payment-required-banner {
+    background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%);
+    color: #92400e;
+    padding: 25px;
+    border-radius: 16px;
+    margin-bottom: 25px;
+    border: 2px solid #f59e0b;
+    display: flex;
+    align-items: center;
+    gap: 25px;
+    box-shadow: 0 8px 25px rgba(245, 158, 11, 0.15);
+}
+.payment-required-banner .icon {
+    font-size: 3rem;
+    color: #f59e0b;
+    flex-shrink: 0;
+}
+.payment-required-banner .text {
+    flex-grow: 1;
+}
+.payment-required-banner h4 {
+    margin: 0 0 8px;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+.payment-required-banner p {
+    margin: 0 0 15px;
+    line-height: 1.5;
+    font-size: 1rem;
+}
+.payment-required-banner .payment-summary {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+.payment-required-banner .payment-summary .label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #78350f;
+    margin-bottom: 2px;
+}
+.payment-required-banner .amount {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #dc2626;
+}
+.payment-required-banner .frequency {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #92400e;
+}
+.payment-required-banner .payment-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-shrink: 0;
+}
+.payment-required-banner .btn {
+    padding: 12px 20px;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+.payment-required-banner .btn-info {
+    background: #0ea5e9;
+    color: #fff;
+}
+.payment-required-banner .btn-info:hover {
+    background: #0284c7;
+}
+
 /* --- Message Box Styles --- */
 .message {
     padding: 15px 20px;
@@ -587,6 +730,11 @@ require_once __DIR__ . '/applicant_sidebar.php';
     background-color: #e3f2fd;
     color: #0d6efd;
     border-color: #b6d4fe;
+}
+.message.success {
+    background-color: #d1fae5;
+    color: #065f46;
+    border-color: #a7f3d0;
 }
 
 /* --- Action Button Styles --- */
@@ -857,6 +1005,265 @@ p {
     }
 }
 
+/* --- Payment Information Section Styles --- */
+.payment-info-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    border: 1px solid #e2e8f0;
+}
+
+.payment-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.payment-header h3 {
+    color: #1e40af;
+    margin: 0 0 10px;
+    font-size: 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.payment-header h3 i {
+    color: #3b82f6;
+}
+
+.payment-header p {
+    color: #64748b;
+    margin: 0;
+    font-size: 1rem;
+}
+
+.payment-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.payment-detail-item {
+    text-align: center;
+    padding: 15px;
+    background: #ffffff;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.payment-detail-item label {
+    display: block;
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.payment-detail-item .amount {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #dc2626;
+    display: block;
+}
+
+.payment-detail-item .frequency,
+.payment-detail-item .reference {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e40af;
+    display: block;
+}
+
+.payment-instructions {
+    margin-bottom: 30px;
+}
+
+.payment-instructions h4 {
+    color: #1e40af;
+    margin: 0 0 15px;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.payment-instructions h4 i {
+    color: #3b82f6;
+}
+
+.payment-instructions ol,
+.payment-instructions ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.payment-instructions li {
+    margin-bottom: 8px;
+    color: #374151;
+    line-height: 1.5;
+}
+
+.payment-locations {
+    margin-top: 20px;
+}
+
+.payment-locations h4 {
+    color: #059669;
+    margin: 0 0 15px;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.payment-locations h4 i {
+    color: #10b981;
+}
+
+.payment-upload-section {
+    background: #f0f9ff;
+    border: 2px solid #3b82f6;
+    border-radius: 12px;
+    padding: 25px;
+    margin-top: 20px;
+}
+
+.payment-upload-section h4 {
+    color: #1e40af;
+    margin: 0 0 10px;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.payment-upload-section h4 i {
+    color: #3b82f6;
+}
+
+.payment-upload-section > p {
+    color: #64748b;
+    margin: 0 0 20px;
+    font-size: 0.95rem;
+}
+
+.payment-upload-form {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.upload-area {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.upload-area input[type="file"] {
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+}
+
+.upload-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    background: #ffffff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.upload-label:hover {
+    border-color: #3b82f6;
+    background: #f0f9ff;
+}
+
+.upload-label i {
+    font-size: 3rem;
+    color: #94a3b8;
+    margin-bottom: 10px;
+}
+
+.upload-label span {
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 5px;
+}
+
+.upload-label small {
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+.upload-actions {
+    text-align: center;
+    margin-top: 25px;
+}
+
+.upload-actions .btn {
+    padding: 15px 30px;
+    font-size: 1rem;
+    margin-bottom: 15px;
+}
+
+.upload-note {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: #64748b;
+    margin: 0;
+}
+
+.upload-note i {
+    color: #3b82f6;
+}
+
+/* Responsive adjustments for payment section */
+@media (max-width: 768px) {
+    .payment-required-banner {
+        flex-direction: column;
+        text-align: center;
+        gap: 20px;
+    }
+
+    .payment-required-banner .payment-actions {
+        flex-direction: row;
+        justify-content: center;
+    }
+
+    .payment-details-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .payment-upload-section {
+        padding: 20px;
+    }
+
+    .upload-label {
+        padding: 30px 15px;
+    }
+}
+
 /* Missing file styles */
 .image-error-placeholder {
     display: none !important;
@@ -918,6 +1325,186 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// Payment instructions modal function
+function showPaymentInstructions() {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('payment-instructions-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'payment-instructions-modal';
+        modal.innerHTML = `
+            <div class="modal-backdrop" onclick="closePaymentInstructions()"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-info-circle"></i> Payment Instructions</h3>
+                    <button onclick="closePaymentInstructions()" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="instructions-section">
+                        <h4><i class="fas fa-map-marker-alt"></i> Where to Pay:</h4>
+                        <ul>
+                            <li><strong>Municipal Treasurer's Office</strong> - Main branch located at City Hall</li>
+                            <li><strong>Authorized Bank Partners</strong> - BDO, BPI, and Landbank branches</li>
+                            <li><strong>Online Payment Portal</strong> - Coming soon for your convenience</li>
+                        </ul>
+                    </div>
+
+                    <div class="instructions-section">
+                        <h4><i class="fas fa-list-check"></i> How to Pay:</h4>
+                        <ol>
+                            <li>Visit any of the payment locations mentioned above</li>
+                            <li>Present your Application Reference Number: <strong>APP-<?= str_pad($application['id'], 6, '0', STR_PAD_LEFT) ?></strong></li>
+                            <li>Inform the cashier that you're paying for a Business Permit application</li>
+                            <li>Pay the exact amount: <strong>₱ <?= number_format($payment_amount, 2) ?></strong></li>
+                            <li>Request for an Official Receipt (OR) and keep it safe</li>
+                        </ol>
+                    </div>
+
+                    <div class="instructions-section">
+                        <h4><i class="fas fa-clock"></i> Processing Time:</h4>
+                        <p>After uploading your receipt, our staff will verify your payment within <strong>1-2 business days</strong>. You will receive a notification once verification is complete.</p>
+                    </div>
+
+                    <div class="instructions-section warning">
+                        <h4><i class="fas fa-exclamation-triangle"></i> Important Notes:</h4>
+                        <ul>
+                            <li>Ensure the receipt clearly shows the amount paid and OR number</li>
+                            <li>Upload a clear, readable photo or scan of the receipt</li>
+                            <li>Keep the original receipt safe until your permit is issued</li>
+                            <li>Contact support if you encounter any payment issues</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // Add modal styles
+        const style = document.createElement('style');
+        style.textContent = `
+            .modal-backdrop {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.5);
+                z-index: 1000;
+            }
+            .modal-content {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: white;
+                border-radius: 12px;
+                max-width: 600px;
+                width: 90%;
+                max-height: 80vh;
+                overflow-y: auto;
+                z-index: 1001;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            }
+            .modal-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 20px 25px;
+                border-bottom: 1px solid #e2e8f0;
+                background: #f8fafc;
+                border-radius: 12px 12px 0 0;
+            }
+            .modal-header h3 {
+                margin: 0;
+                color: #1e40af;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .modal-header h3 i {
+                color: #3b82f6;
+            }
+            .close-btn {
+                background: none;
+                border: none;
+                font-size: 24px;
+                cursor: pointer;
+                color: #64748b;
+                padding: 0;
+                width: 30px;
+                height: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                transition: all 0.2s ease;
+            }
+            .close-btn:hover {
+                background: #e2e8f0;
+                color: #374151;
+            }
+            .modal-body {
+                padding: 25px;
+            }
+            .instructions-section {
+                margin-bottom: 25px;
+                padding: 15px;
+                background: #f8fafc;
+                border-radius: 8px;
+                border-left: 4px solid #3b82f6;
+            }
+            .instructions-section h4 {
+                margin: 0 0 10px;
+                color: #1e40af;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .instructions-section h4 i {
+                color: #3b82f6;
+            }
+            .instructions-section ul,
+            .instructions-section ol {
+                margin: 0;
+                padding-left: 20px;
+            }
+            .instructions-section li {
+                margin-bottom: 5px;
+                color: #374151;
+                line-height: 1.5;
+            }
+            .instructions-section p {
+                margin: 0;
+                color: #374151;
+                line-height: 1.5;
+            }
+            .instructions-section.warning {
+                background: #fef3c7;
+                border-left-color: #f59e0b;
+            }
+            .instructions-section.warning h4 {
+                color: #92400e;
+            }
+            .instructions-section.warning h4 i {
+                color: #f59e0b;
+            }
+            .instructions-section.warning li {
+                color: #78350f;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    modal.style.display = 'block';
+}
+
+function closePaymentInstructions() {
+    const modal = document.getElementById('payment-instructions-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
 </script>
 
 <?php
