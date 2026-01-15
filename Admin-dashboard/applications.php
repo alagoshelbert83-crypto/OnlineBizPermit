@@ -90,7 +90,10 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                         
                         if ($new_status === 'approved') {
 
-                            // Fetch fee info (if any) and render the email using reusable template
+                            $email_body .= "<p style='color: #10b981; font-weight: 600;'>Congratulations! Your application has been approved.</p>";
+                            $email_body .= "<p style='font-weight: bold; color: #1e3a8a;'>You will now proceed to pay the fees for the business permit.</p>";
+
+                            // --- Add assessed fee breakdown if available ---
                             $assessed_total = 0;
                             $fee_rows = '';
                             try {
@@ -113,32 +116,19 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                                 error_log('Failed to fetch staff form fees for application ' . $applicationId . ': ' . $feeEx->getMessage());
                             }
 
-                            // Use external template if available for easier customization
-                            if (file_exists(__DIR__ . '/../Staff-dashboard/email_templates/approval_email.php')) {
-                                require_once __DIR__ . '/../Staff-dashboard/email_templates/approval_email.php';
-                                try {
-                                    $email_body .= renderApprovalEmail($conn, $appData, $applicationId, (float)$assessed_total, $fee_rows);
-                                } catch (Exception $tex) {
-                                    error_log('Approval email template rendering failed: ' . $tex->getMessage());
-                                    // Fallback to simple message
-                                    $email_body .= "<p style='color: #10b981; font-weight: 600;'>Congratulations! Your application has been approved.</p>";
-                                    $email_body .= "<p style='font-weight: bold; color: #1e3a8a;'>You will now proceed to pay the fees for the business permit.</p>";
-                                }
-                            } else {
-                                // Fallback inline content (legacy)
-                                $email_body .= "<p style='color: #10b981; font-weight: 600;'>Congratulations! Your application has been approved.</p>";
-                                $email_body .= "<p style='font-weight: bold; color: #1e3a8a;'>You will now proceed to pay the fees for the business permit.</p>";
-                            }
+                            if (!empty($fee_rows)) {
+                                $email_body .= "<div style='margin:20px 0;'><h4 style='margin:6px 0 10px 0;color:#1e3a8a;'>Assessed Fees</h4><table style='width:100%;border-collapse:collapse;border:1px solid #f1f1f1;border-radius:6px;overflow:hidden;'><tbody>" . $fee_rows . "<tr><td style='padding:8px;border-top:2px solid #eee;'><strong>Total</strong></td><td style='padding:8px;border-top:2px solid #eee;text-align:right;'><strong>₱ " . number_format($assessed_total, 2) . "</strong></td></tr></tbody></table></div>";
 
-                            // Audit: log application approval
-                            try {
-                                if (file_exists(__DIR__ . '/../audit_logger.php')) {
-                                    require_once __DIR__ . '/../audit_logger.php';
-                                    $logger = AuditLogger::getInstance();
-                                    $logger->logApplicationStatusChange($applicationId, 'pending', 'approved', $_SESSION['user_id'] ?? null, 'staff');
-                                }
-                            } catch (Exception $ax) {
-                                error_log('Audit log error on approval: ' . $ax->getMessage());
+                                // Next steps and upload link
+                                $upload_link = "{$protocol}://{$host}/Applicant-dashboard/edit_application.php?id={$applicationId}";
+                                $email_body .= "<div style='background:#f8fafc;padding:12px;border-radius:6px;margin-top:12px;'><p style='margin:0 0 8px 0;'><strong>Next steps:</strong></p><ol style='margin:0 0 0 18px;padding:0;'>";
+                                $email_body .= "<li>Pay the <strong>assessed fees (₱ " . number_format($assessed_total,2) . ")</strong> at the Municipal Treasurer's Office or at authorized banks.</li>";
+                                $email_body .= "<li>After payment, please upload your official receipt using the link below to create a payment record and notify staff for verification.</li>";
+                                $email_body .= "<li>Our staff will verify the payment and proceed with permit release. You will be notified when your permit is ready for printing.</li>";
+                                $email_body .= "</ol><p style='margin-top:10px;text-align:center;'><a href='" . htmlspecialchars($upload_link) . "' style='background-color:#4a69bd;color:#fff;padding:10px 16px;border-radius:5px;text-decoration:none;font-weight:600;'>Upload Official Receipt</a></p></div>";
+                            } else {
+                                // If no fees found, give general next steps
+                                $email_body .= "<div style='background:#f8fafc;padding:12px;border-radius:6px;margin-top:12px;'><p style='margin:0;'><strong>Next steps:</strong> Your application has been approved; assessment details will be available on your application page. Once assessed, please follow the payment instructions and upload your official receipt via your application page.</p></div>";
                             }
 
                         } else {
@@ -159,16 +149,6 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                         $email_sent = @sendApplicationEmail($appData['applicant_email'], $appData['applicant_name'], $email_subject, $email_body);
                         if ($email_sent) {
                             error_log("Approval email sent successfully to {$appData['applicant_email']} for application ID {$applicationId}");
-                            // Audit: record the email send event
-                            try {
-                                if (file_exists(__DIR__ . '/../audit_logger.php')) {
-                                    require_once __DIR__ . '/../audit_logger.php';
-                                    $logger = AuditLogger::getInstance();
-                                    $logger->log('email_sent', "Approval email sent to {$appData['applicant_email']}", ['application_id'=>$applicationId,'to'=>$appData['applicant_email'],'template'=>'approval'], $_SESSION['user_id'] ?? null, 'staff');
-                                }
-                            } catch (Exception $ax) {
-                                error_log('Audit log error on email send: ' . $ax->getMessage());
-                            }
                         } else {
                             error_log("Email sending failed for application ID {$applicationId} to {$appData['applicant_email']} - SMTP configuration issue");
                         }
