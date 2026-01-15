@@ -187,13 +187,15 @@ require_once __DIR__ . '/admin_sidebar.php';
                     </div>
 
                     <div class="form-group">
-                        <label for="payment_instructions">Default Payment Instructions (used in approval emails and applicant view)</label>
+                        <label for="payment_instructions">Payment Instructions</label>
                         <textarea id="payment_instructions" name="payment_instructions" rows="5" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;"><?= htmlspecialchars(get_setting($conn, 'payment_instructions', '')) ?></textarea>
                         <small>Use HTML for formatting (e.g., lists, bold). Keep instructions concise and include bank or MTO details if needed.</small>
-                        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+                        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                             <input type="number" id="preview_application_id" name="preview_application_id" placeholder="Application ID (optional)" style="width:160px;padding:8px;border:1px solid #ddd;border-radius:4px;">
                             <button type="button" id="preview_email_btn" class="btn btn-secondary">Preview Approval Email</button>
-                            <small style="margin-left:8px;color:#666">Leave blank to preview with sample data.</small>
+                            <input type="email" id="test_recipient_email" name="test_recipient_email" placeholder="Your email (for test)" value="<?= htmlspecialchars($user_info['email'] ?? '') ?>" style="width:260px;padding:8px;border:1px solid #ddd;border-radius:4px;margin-left:8px;">
+                            <button type="button" id="send_test_email_btn" class="btn btn-warning">Send Test Email</button>
+                            <small style="margin-left:8px;color:#666;min-width:240px;">Leave Application ID blank to use sample data. Click <strong>Send Test Email</strong> and type <code>SEND</code> to confirm.</small>
                         </div>
                     </div>
 
@@ -423,6 +425,12 @@ input:checked + .slider:before {
     const modal = document.getElementById('emailPreviewModal');
     const inner = document.getElementById('emailPreviewInner');
     const closeBtn = document.getElementById('closePreviewModal');
+    const sendBtn = document.getElementById('send_test_email_btn');
+    const recipientInput = document.getElementById('test_recipient_email');
+
+    function showAlert(msg) {
+        alert(msg);
+    }
 
     if (btn) {
         btn.addEventListener('click', function(){
@@ -434,14 +442,44 @@ input:checked + .slider:before {
                 .then(data => {
                     btn.disabled = false; btn.textContent = 'Preview Approval Email';
                     if (!data || data.error) {
-                        alert(data && data.error ? data.error : 'Could not load preview');
+                        showAlert(data && data.error ? data.error : 'Could not load preview');
                         return;
                     }
                     inner.innerHTML = data.html || '<em>No preview available</em>';
                     modal.style.display = 'flex';
                 }).catch(err => {
                     btn.disabled = false; btn.textContent = 'Preview Approval Email';
-                    alert('Preview failed: ' + (err.message || err));
+                    showAlert('Preview failed: ' + (err.message || err));
+                });
+        });
+    }
+
+    if (sendBtn) {
+        sendBtn.addEventListener('click', function(){
+            const id = input ? input.value.trim() : '';
+            const recipient = (recipientInput && recipientInput.value) ? recipientInput.value.trim() : '';
+            if (!recipient) { showAlert('Please enter a recipient email for test.'); return; }
+            // Ask for typed confirmation
+            const typed = prompt('To confirm sending a test email to ' + recipient + ', type SEND and press OK.');
+            if (!typed || typed.trim().toUpperCase() !== 'SEND') { showAlert('Send cancelled. Type SEND to confirm.'); return; }
+
+            sendBtn.disabled = true; sendBtn.textContent = 'Sending...';
+            const form = new FormData();
+            form.append('recipient_email', recipient);
+            if (id) form.append('application_id', id);
+
+            fetch('send_test_approval_email.php', { method: 'POST', credentials: 'same-origin', body: form })
+                .then(r => r.json())
+                .then(data => {
+                    sendBtn.disabled = false; sendBtn.textContent = 'Send Test Email';
+                    if (data && data.ok) {
+                        showAlert(data.message || 'Test email sent successfully.');
+                    } else {
+                        showAlert((data && data.error) ? data.error : 'Failed to send test email.');
+                    }
+                }).catch(err => {
+                    sendBtn.disabled = false; sendBtn.textContent = 'Send Test Email';
+                    showAlert('Send failed: ' + (err.message || err));
                 });
         });
     }
