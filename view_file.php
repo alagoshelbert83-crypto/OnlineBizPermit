@@ -117,6 +117,17 @@ if (!file_exists($file_path)) {
             if (is_dir($upload_dir)) {
                 $files_in_dir = array_slice(scandir($upload_dir), 0, 12);
                 error_log("  Files in uploads directory: " . implode(', ', $files_in_dir));
+                
+                // Count total files in uploads directory
+                $all_files = glob($upload_dir . '*');
+                $file_count = is_array($all_files) ? count($all_files) : 0;
+                error_log("  Total files in uploads directory: " . $file_count);
+            }
+            
+            // Check if this might be a cloud storage issue
+            // If file_path in DB is a URL, it should have been handled earlier
+            if (filter_var($original_request, FILTER_VALIDATE_URL)) {
+                error_log("  WARNING: File path appears to be a URL but wasn't handled as cloud storage");
             }
             
             // Return a proper "file not found" image for images

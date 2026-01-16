@@ -318,7 +318,7 @@ require_once __DIR__ . '/applicant_sidebar.php';
 <script>
     // Real-time Dashboard Updates for Applicant
     let updateInterval = null;
-    const UPDATE_INTERVAL_MS = 5000; // Update every 5 seconds
+    const UPDATE_INTERVAL_MS = 30000; // Update every 30 seconds
 
     // Update statistics cards
     function updateStats(stats) {

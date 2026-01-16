@@ -5,6 +5,7 @@
  */
 
 header('Content-Type: application/json');
+header('Cache-Control: no-cache, must-revalidate');
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/applicant_header.php';
 
