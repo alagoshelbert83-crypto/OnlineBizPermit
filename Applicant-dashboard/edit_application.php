@@ -101,10 +101,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_application'])
                 $unique = uniqid('doc_' . $applicationId . '_payment_', true) . '.' . $ext;
                 $upload_dir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
                 if (!is_dir($upload_dir)) @mkdir($upload_dir, 0775, true);
-                if (move_uploaded_file($tmp, $upload_dir . $unique)) {
+                // Use upload helper for cloud storage
+                global $upload_helper;
+                $uploaded_path = $upload_helper->uploadFile($tmp, $unique, $type);
 
+                if ($uploaded_path) {
                     $doc_stmt = $conn->prepare("INSERT INTO documents (application_id, document_name, file_path, document_type, upload_date) VALUES (?, ?, ?, 'payment_receipt', NOW())");
-                    $doc_stmt->execute([$applicationId, $orig, $unique]);
+                    $doc_stmt->execute([$applicationId, $orig, $uploaded_path]);
 
                     // Update application status to 'processing' (payment submitted for verification)
                     $status_update_stmt = $conn->prepare("UPDATE applications SET status = 'processing', updated_at = NOW() WHERE id = ?");
@@ -114,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_application'])
                     $doc_id = null;
                     try {
                         $dstmt = $conn->prepare("SELECT id FROM documents WHERE application_id = ? AND file_path = ? LIMIT 1");
-                        $dstmt->execute([$applicationId, $unique]);
+                        $dstmt->execute([$applicationId, $uploaded_path]);
                         $drow = $dstmt->fetch(PDO::FETCH_ASSOC);
                         $doc_id = $drow['id'] ?? null;
                     } catch (Exception $_) {

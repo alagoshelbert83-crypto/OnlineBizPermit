@@ -109,10 +109,15 @@ require_once __DIR__ . '/staff_sidebar.php';
                         <td><?= htmlspecialchars(ucfirst($p['status'])) ?></td>
                         <td><?= htmlspecialchars(date('Y-m-d H:i', strtotime($p['created_at']))) ?></td>
                         <td>
-                            <?php if (!empty($p['file_path']) && file_exists(__DIR__ . '/../uploads/' . $p['file_path'])): ?>
-                                <a href="../uploads/<?= rawurlencode($p['file_path']) ?>" target="_blank" rel="noopener">View</a>
-                            <?php elseif (!empty($p['file_path'])): ?>
-                                <a href="../uploads/<?= rawurlencode($p['file_path']) ?>" target="_blank" rel="noopener">View (may be missing)</a>
+                            <?php if (!empty($p['file_path'])): ?>
+                                <?php
+                                global $upload_helper;
+                                $file_url = $upload_helper->getFileUrl($p['file_path']);
+                                if (filter_var($file_url, FILTER_VALIDATE_URL) || file_exists(__DIR__ . '/../uploads/' . $p['file_path'])): ?>
+                                    <a href="<?= htmlspecialchars($file_url) ?>" target="_blank" rel="noopener">View</a>
+                                <?php else: ?>
+                                    <span class="file-missing" title="File not found on server">File not available</span>
+                                <?php endif; ?>
                             <?php else: ?>
                                 -
                             <?php endif; ?>
@@ -140,4 +145,5 @@ require_once __DIR__ . '/staff_sidebar.php';
 .card { background:#fff; padding:20px; border-radius:8px; box-shadow:0 6px 20px rgba(25,25,25,0.04); }
 .empty-state { padding: 30px; text-align:center; color:#6b7280; }
 .muted { color:#6b7280; }
+.file-missing { color: #dc3545; font-style: italic; }
 </style>
