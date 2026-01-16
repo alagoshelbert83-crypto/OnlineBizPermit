@@ -54,12 +54,17 @@ if (strpos($file, 'data:') === 0) {
     }
 }
 
-// Remove any path prefixes that might be in the database (e.g., "uploads/", "/uploads/")
-$file = str_replace(['uploads/', '/uploads/', '\\uploads\\', 'uploads\\'], '', $file);
-$file = basename($file); // Remove any directory traversal attempts - get just the filename
+// Remove any leading path prefixes that might be in the database (e.g., "uploads/", "/uploads/")
+$file = preg_replace('#^[/\\\\]*(uploads[/\\\\]+)?#i', '', $file);
+// Normalize path separators to forward slashes
+$file = str_replace('\\', '/', $file);
+// Remove any directory traversal attempts (../ or ..\)
+$file = str_replace(['../', '..\\'], '', $file);
+// Remove any leading slashes
+$file = ltrim($file, '/\\');
 
 $upload_dir = __DIR__ . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
-$file_path = $upload_dir . $file;
+$file_path = $upload_dir . str_replace('/', DIRECTORY_SEPARATOR, $file);
 
 // Check if uploads directory exists
 if (!is_dir($upload_dir)) {
@@ -82,12 +87,20 @@ if (!file_exists($file_path)) {
         // Try to find files with similar names (in case of minor variations)
         $found_file = null;
         if (is_dir($upload_dir)) {
-            $pattern = preg_quote(pathinfo($file, PATHINFO_FILENAME), '/') . '.*' . preg_quote('.' . pathinfo($file, PATHINFO_EXTENSION), '/');
-            $files = glob($upload_dir . $pattern);
-            if (!empty($files)) {
-                $found_file = basename($files[0]);
-                $file_path = $files[0];
-                error_log("File not found as '$file', but found similar: '$found_file'");
+            $filename_only = basename($file);
+            $pattern = preg_quote(pathinfo($filename_only, PATHINFO_FILENAME), '/') . '.*' . preg_quote('.' . pathinfo($filename_only, PATHINFO_EXTENSION), '/');
+            // Search recursively using RecursiveDirectoryIterator
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($upload_dir, RecursiveDirectoryIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::SELF_FIRST
+            );
+            foreach ($iterator as $path) {
+                if ($path->isFile() && preg_match('/' . $pattern . '/i', $path->getFilename())) {
+                    $found_file = str_replace($upload_dir, '', $path->getPathname());
+                    $file_path = $path->getPathname();
+                    error_log("File not found as '$file', but found similar: '$found_file'");
+                    break;
+                }
             }
         }
         
@@ -106,14 +119,18 @@ if (!file_exists($file_path)) {
                 error_log("  Files in uploads directory: " . implode(', ', $files_in_dir));
             }
             
-            // Return a transparent 1x1 PNG for images to prevent broken image icons
+            // Return a proper "file not found" image for images
             $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
             if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif'])) {
-                http_response_code(200);
-                header('Content-Type: image/png');
+                http_response_code(404);
+                header('Content-Type: image/svg+xml');
                 header('Cache-Control: no-cache, no-store, must-revalidate');
-                // Output a transparent 1x1 PNG
-                echo base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
+                // Output a simple SVG error image
+                echo '<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="100" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="100" fill="#f0f0f0"/>
+  <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="14" fill="#999" text-anchor="middle" dominant-baseline="middle">Image Not Found</text>
+</svg>';
                 exit;
             }
             
