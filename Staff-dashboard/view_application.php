@@ -455,7 +455,7 @@ if (isset($_GET['status']) && $_GET['status'] === 'updated') {
                             $doc_label = isset($document_type_labels[$doc_type_key]) ? $document_type_labels[$doc_type_key] : ucfirst(str_replace('_', ' ', $doc_type));
                             $file_extension = strtolower(pathinfo($doc['document_name'], PATHINFO_EXTENSION));
                             // Use absolute path from root
-                            $file_path = 'view_file.php?file=' . rawurlencode($doc['file_path']);
+                            $file_path = '../view_file.php?file=' . rawurlencode($doc['file_path']);
                             ?>
                             <div class="document-item" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; background: #fff; display: flex; flex-direction: column; align-items: center; text-align: center; transition: all 0.2s ease;">
                                 <div class="doc-preview" style="height: 100px; width: 100%; display: flex; align-items: center; justify-content: center; background: #f8fafc; border-radius: 8px; margin-bottom: 10px;">
