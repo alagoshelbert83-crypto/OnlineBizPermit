@@ -18,6 +18,13 @@ if (empty($file)) {
 // Store original request for logging
 $original_request = $file;
 
+// Check if this is already a full URL (from cloud storage like Vercel Blob)
+if (filter_var($file, FILTER_VALIDATE_URL)) {
+    // Redirect to the cloud storage URL
+    header('Location: ' . $file);
+    exit;
+}
+
 // Remove any path prefixes that might be in the database (e.g., "uploads/", "/uploads/")
 $file = str_replace(['uploads/', '/uploads/', '\\uploads\\', 'uploads\\'], '', $file);
 $file = basename($file); // Remove any directory traversal attempts - get just the filename
@@ -137,4 +144,3 @@ if (ob_get_level()) {
 
 readfile($file_path);
 exit;
-
