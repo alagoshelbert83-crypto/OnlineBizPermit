@@ -1,5 +1,86 @@
 <?php
 require_once 'db.php';
+require_once '../Admin-dashboard/functions.php';
+
+// Maintenance Mode Check: Block applicants if maintenance mode is enabled
+$maintenance_mode = (bool)get_setting($conn, 'maintenance_mode', '0');
+if ($maintenance_mode) {
+    // Show maintenance page for applicants
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Maintenance Mode - OnlineBizPermit</title>
+        <style>
+            body {
+                font-family: 'Inter', sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                margin: 0;
+                padding: 0;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #333;
+            }
+            .maintenance-container {
+                background: #fff;
+                border-radius: 20px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                padding: 3rem;
+                text-align: center;
+                max-width: 500px;
+                width: 90%;
+            }
+            .maintenance-icon {
+                font-size: 4rem;
+                color: #667eea;
+                margin-bottom: 1rem;
+            }
+            h1 {
+                color: #333;
+                margin-bottom: 1rem;
+                font-size: 2rem;
+            }
+            p {
+                color: #666;
+                line-height: 1.6;
+                margin-bottom: 2rem;
+            }
+            .back-btn {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: #fff;
+                border: none;
+                padding: 12px 30px;
+                border-radius: 50px;
+                font-size: 1rem;
+                cursor: pointer;
+                text-decoration: none;
+                display: inline-block;
+                transition: transform 0.2s;
+            }
+            .back-btn:hover {
+                transform: translateY(-2px);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="maintenance-container">
+            <div class="maintenance-icon">
+                <i class="fas fa-tools"></i>
+            </div>
+            <h1>Under Maintenance</h1>
+            <p>We're currently performing scheduled maintenance to improve your experience. The site will be back online shortly.</p>
+            <p>Please check back later or contact support if you need immediate assistance.</p>
+            <a href="/" class="back-btn">Go to Homepage</a>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit;
+}
 
 // If user is already logged in, redirect them
 if (isset($_SESSION['user_id'])) {
