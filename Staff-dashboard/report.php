@@ -137,7 +137,7 @@ if (!$app) {
                 <td><strong><?= htmlspecialchars($doc_label) ?></strong></td>
                 <td><?= htmlspecialchars($doc['file_name']) ?></td>
                 <td><?= htmlspecialchars($doc['uploaded_at'] ?? '-') ?></td>
-                <td><a href="../uploads/<?= htmlspecialchars($doc['file_path']) ?>" target="_blank" rel="noopener" class="btn" style="padding:6px 10px;">Open</a></td>
+                <td><a href="../view_file.php?file=<?= rawurlencode($doc['file_path']) ?>" target="_blank" rel="noopener" class="btn" style="padding:6px 10px;">Open</a></td>
               </tr>
             <?php endforeach; ?>
           </tbody>

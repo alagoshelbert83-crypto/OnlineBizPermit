@@ -110,14 +110,7 @@ require_once __DIR__ . '/staff_sidebar.php';
                         <td><?= htmlspecialchars(date('Y-m-d H:i', strtotime($p['created_at']))) ?></td>
                         <td>
                             <?php if (!empty($p['file_path'])): ?>
-                                <?php
-                                global $upload_helper;
-                                $file_url = $upload_helper->getFileUrl($p['file_path']);
-                                if (filter_var($file_url, FILTER_VALIDATE_URL) || file_exists(__DIR__ . '/../uploads/' . $p['file_path'])): ?>
-                                    <a href="<?= htmlspecialchars($file_url) ?>" target="_blank" rel="noopener">View</a>
-                                <?php else: ?>
-                                    <span class="file-missing" title="File not found on server">File not available</span>
-                                <?php endif; ?>
+                                <a href="../view_file.php?file=<?= rawurlencode($p['file_path']) ?>" target="_blank" rel="noopener">View</a>
                             <?php else: ?>
                                 -
                             <?php endif; ?>

@@ -210,7 +210,7 @@ require_once __DIR__ . '/applicant_sidebar.php';
                                     <div class="doc-preview">
                                         <?php
                                         $file_extension = strtolower(pathinfo($doc['document_name'], PATHINFO_EXTENSION));
-                                        $file_path = '../uploads/' . htmlspecialchars($doc['file_path']);
+                                        $file_path = '../view_file.php?file=' . rawurlencode($doc['file_path']);
                                         if (in_array($file_extension, ['jpg', 'jpeg', 'png', 'gif'])):
                                         ?>
                                             <img src="<?= $file_path ?>" alt="<?= htmlspecialchars($doc['document_name']) ?>">
