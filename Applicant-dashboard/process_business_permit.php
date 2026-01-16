@@ -304,23 +304,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                 // Handle File Uploads
                 $allowed_types = ['application/pdf', 'image/jpeg', 'image/png'];
-                $upload_dir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
-
-                // Ensure uploads directory exists and is writable
-                if (!is_dir($upload_dir)) {
-                    if (!mkdir($upload_dir, 0775, true)) {
-                        throw new Exception('Configuration Error: Failed to create the uploads directory at ' . $upload_dir);
-                    }
-                }
-
-                // Best-effort hardening: prevent script execution and indexing in uploads
-                $htaccess_path = $upload_dir . '.htaccess';
-                if (!file_exists($htaccess_path)) {
-                    @file_put_contents($htaccess_path, "Options -Indexes\nphp_flag engine off\n<FilesMatch \.ph(p[0-9]?|t|tml)$>\n\tDeny from all\n</FilesMatch>\n");
-                }
-
-                if (!is_writable($upload_dir)) {
-                    throw new Exception('Configuration Error: The uploads directory is not writable: ' . $upload_dir);
+                
+                // Use FileUploadHelper for cloud storage support
+                global $upload_helper;
+                if (!isset($upload_helper)) {
+                    require_once __DIR__ . '/../file_upload_helper.php';
+                    $upload_helper = new FileUploadHelper();
                 }
 
                 // Document type mapping for display labels
@@ -362,17 +351,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             $file_extension = pathinfo($original_name, PATHINFO_EXTENSION);
                             $unique_filename = uniqid('doc_' . $app_id . '_' . $document_type . '_', true) . '.' . $file_extension;
 
-                            if (!move_uploaded_file($tmp_name, $upload_dir . $unique_filename)) {
-                                throw new Exception('File System Error: Could not move uploaded file for ' . $document_label . '. Please check server permissions for the "uploads" folder.');
+                            // Use FileUploadHelper to upload (supports cloud storage)
+                            $uploaded_path = $upload_helper->uploadFile($tmp_name, $unique_filename, $file_type);
+                            
+                            if (!$uploaded_path) {
+                                throw new Exception('File System Error: Could not upload file for ' . $document_label . '. Please check server configuration and storage settings.');
                             }
 
                             // Insert document record into DB with document_type
+                            // $uploaded_path will be either a filename (local) or URL (cloud storage)
                             $doc_stmt = $conn->prepare("INSERT INTO documents (application_id, document_name, file_path, document_type, upload_date) VALUES (?, ?, ?, ?, NOW())");
                             if (!$doc_stmt) {
                                 $doc_errorInfo = $conn->errorInfo();
                                 throw new PDOException('Failed to prepare document INSERT statement: ' . ($doc_errorInfo[2] ?? 'Unknown error'), (int)($doc_errorInfo[0] ?? 0));
                             }
-                            $doc_execute_result = $doc_stmt->execute([$app_id, $original_name, $unique_filename, $document_type]);
+                            $doc_execute_result = $doc_stmt->execute([$app_id, $original_name, $uploaded_path, $document_type]);
                             if (!$doc_execute_result) {
                                 $doc_errorInfo = $doc_stmt->errorInfo();
                                 throw new PDOException('Failed to execute document INSERT for ' . $document_label . ': ' . ($doc_errorInfo[2] ?? 'Unknown error'), (int)$doc_errorInfo[0]);
