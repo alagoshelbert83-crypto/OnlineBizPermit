@@ -11,10 +11,19 @@ class FileUploadHelper {
     private $blob_url;
 
     public function __construct() {
-        $this->storage_type = getenv('STORAGE_TYPE') ?: 'local';
-        $this->local_dir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
+        // Check for blob token first - if it exists, prefer blob storage
         $this->blob_token = getenv('BLOB_READ_WRITE_TOKEN');
         $this->blob_url = getenv('VERCEL_BLOB_URL') ?: 'https://blob.vercel-storage.com';
+        
+        // If blob token exists, use blob storage (even if STORAGE_TYPE not explicitly set)
+        if ($this->blob_token) {
+            $this->storage_type = getenv('STORAGE_TYPE') ?: 'blob';
+        } else {
+            $this->storage_type = getenv('STORAGE_TYPE') ?: 'local';
+        }
+        
+        // Use __DIR__ instead of dirname(__DIR__) to get the correct uploads directory
+        $this->local_dir = __DIR__ . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
     }
 
     public function uploadFile($tmp_path, $filename, $mime_type = null) {
@@ -30,22 +39,45 @@ class FileUploadHelper {
 
         // Ensure directory exists
         if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0775, true);
+            if (!@mkdir($upload_dir, 0775, true)) {
+                $error = error_get_last();
+                error_log("Failed to create uploads directory: " . $upload_dir . " - " . ($error['message'] ?? 'Unknown error'));
+                // Try alternative path (relative to document root)
+                $alt_dir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
+                if (!is_dir($alt_dir)) {
+                    if (!@mkdir($alt_dir, 0775, true)) {
+                        error_log("Failed to create alternative uploads directory: " . $alt_dir);
+                        return false;
+                    }
+                }
+                $upload_dir = $alt_dir;
+            }
+        }
+
+        // Check if directory is writable
+        if (!is_writable($upload_dir)) {
+            error_log("Uploads directory is not writable: " . $upload_dir);
+            return false;
         }
 
         $filepath = $upload_dir . $filename;
         if (move_uploaded_file($tmp_path, $filepath)) {
             return $filename; // Return relative path
+        } else {
+            $error = error_get_last();
+            error_log("Failed to move uploaded file: " . ($error['message'] ?? 'Unknown error'));
+            return false;
         }
-        return false;
     }
 
     private function uploadToBlob($tmp_path, $filename, $mime_type = null) {
         if (!$this->blob_token) {
             // Fallback to local if no token
-            error_log("Vercel Blob: No token found, falling back to local storage");
+            error_log("Vercel Blob: No token found (BLOB_READ_WRITE_TOKEN not set), falling back to local storage");
             return $this->uploadToLocal($tmp_path, $filename);
         }
+        
+        error_log("Vercel Blob: Attempting to upload $filename to cloud storage");
 
         // Vercel Blob API endpoint - try PUT method first
         $url = 'https://blob.vercel-storage.com/' . urlencode($filename);

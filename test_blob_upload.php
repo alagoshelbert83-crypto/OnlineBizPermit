@@ -30,10 +30,32 @@ header('Content-Type: text/html; charset=utf-8');
         
         // Check configuration
         echo '<h2>Configuration</h2>';
+        $storage_type_env = getenv('STORAGE_TYPE');
+        $blob_token = getenv('BLOB_READ_WRITE_TOKEN');
+        $blob_url = getenv('VERCEL_BLOB_URL');
+        
+        // Check what the helper will actually use
+        $actual_storage_type = $blob_token ? ($storage_type_env ?: 'blob') : ($storage_type_env ?: 'local');
+        
         echo '<div class="info">';
-        echo '<strong>Storage Type:</strong> ' . (getenv('STORAGE_TYPE') ?: 'local (not set)') . '<br>';
-        echo '<strong>BLOB_READ_WRITE_TOKEN:</strong> ' . (getenv('BLOB_READ_WRITE_TOKEN') ? 'Set (' . substr(getenv('BLOB_READ_WRITE_TOKEN'), 0, 10) . '...)' : 'Not set') . '<br>';
-        echo '<strong>VERCEL_BLOB_URL:</strong> ' . (getenv('VERCEL_BLOB_URL') ?: 'https://blob.vercel-storage.com (default)') . '<br>';
+        echo '<strong>STORAGE_TYPE (env):</strong> ' . ($storage_type_env ?: '<span style="color: #dc3545;">Not set</span>') . '<br>';
+        echo '<strong>BLOB_READ_WRITE_TOKEN:</strong> ' . ($blob_token ? '<span style="color: #28a745;">Set (' . substr($blob_token, 0, 10) . '...)</span>' : '<span style="color: #dc3545;">Not set</span>') . '<br>';
+        echo '<strong>VERCEL_BLOB_URL:</strong> ' . ($blob_url ?: 'https://blob.vercel-storage.com (default)') . '<br>';
+        echo '<strong>Actual Storage Type (will use):</strong> <strong>' . htmlspecialchars($actual_storage_type) . '</strong><br>';
+        
+        if ($actual_storage_type === 'blob' && !$blob_token) {
+            echo '<div style="color: #dc3545; margin-top: 10px; padding: 10px; background: #f8d7da; border-radius: 4px;">';
+            echo '<strong>⚠️ Warning:</strong> STORAGE_TYPE is set to "blob" but BLOB_READ_WRITE_TOKEN is not set. Uploads will fail!';
+            echo '</div>';
+        } elseif ($actual_storage_type === 'local' && $blob_token) {
+            echo '<div style="color: #856404; margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 4px;">';
+            echo '<strong>ℹ️ Info:</strong> BLOB_READ_WRITE_TOKEN is set but STORAGE_TYPE is "local". Set STORAGE_TYPE=blob to use cloud storage.';
+            echo '</div>';
+        } elseif ($actual_storage_type === 'blob' && $blob_token) {
+            echo '<div style="color: #155724; margin-top: 10px; padding: 10px; background: #d4edda; border-radius: 4px;">';
+            echo '<strong>✅ Ready:</strong> Cloud storage is configured and will be used for uploads.';
+            echo '</div>';
+        }
         echo '</div>';
         
         // Test file upload if form submitted
