@@ -25,6 +25,35 @@ if (filter_var($file, FILTER_VALIDATE_URL)) {
     exit;
 }
 
+// If the record holds a data URL (e.g. "data:image/png;base64,..." stored in DB), serve it directly
+if (strpos($file, 'data:') === 0) {
+    // Expected format: data:[<mediatype>][;base64],<data>
+    if (preg_match('#^data:([^;]+);base64,(.*)$#s', $file, $m)) {
+        $mime = $m[1];
+        $b64 = $m[2];
+        $data = base64_decode($b64);
+        if ($data === false) {
+            http_response_code(400);
+            header('Content-Type: text/plain');
+            error_log("Invalid data URL provided to view_file.php");
+            die('Invalid data URL');
+        }
+        // Serve decoded data with correct headers
+        header('Content-Type: ' . $mime);
+        header('Content-Length: ' . strlen($data));
+        header('Content-Disposition: inline; filename="file"');
+        header('Cache-Control: public, max-age=3600');
+        // Output the binary data and exit
+        echo $data;
+        exit;
+    } else {
+        http_response_code(400);
+        header('Content-Type: text/plain');
+        error_log("Unsupported data URL format passed to view_file.php");
+        die('Unsupported data URL format');
+    }
+}
+
 // Remove any path prefixes that might be in the database (e.g., "uploads/", "/uploads/")
 $file = str_replace(['uploads/', '/uploads/', '\\uploads\\', 'uploads\\'], '', $file);
 $file = basename($file); // Remove any directory traversal attempts - get just the filename
