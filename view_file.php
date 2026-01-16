@@ -137,11 +137,19 @@ if (!file_exists($file_path)) {
             // Return a proper "file not found" image for images
             $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
             if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif'])) {
-                http_response_code(404);
-                header('Content-Type: image/svg+xml');
-                header('Cache-Control: no-cache, no-store, must-revalidate');
+                // Clear any previous output
+                if (ob_get_level()) {
+                    ob_end_clean();
+                }
+                
+                http_response_code(200); // Use 200 so browser displays it instead of showing error
+                header('Content-Type: image/svg+xml; charset=utf-8');
+                header('Content-Disposition: inline; filename="not-found.svg"');
+                header('Cache-Control: no-cache, no-store, must-revalidate, max-age=0');
+                header('Pragma: no-cache');
+                
                 // Output a simple SVG error image with more helpful message
-                $filename_display = htmlspecialchars(basename($file));
+                $filename_display = htmlspecialchars(basename($file), ENT_XML1, 'UTF-8');
                 echo '<?xml version="1.0" encoding="UTF-8"?>
 <svg width="400" height="200" xmlns="http://www.w3.org/2000/svg">
   <rect width="400" height="200" fill="#f8f9fa"/>
@@ -196,11 +204,17 @@ $mime_types = [
 
 $mime_type = $mime_types[$extension] ?? 'application/octet-stream';
 
-// Set headers
+// Clear any previous output
+if (ob_get_level()) {
+    ob_end_clean();
+}
+
+// Set headers for inline display (not download)
 header('Content-Type: ' . $mime_type);
 header('Content-Length: ' . filesize($file_path));
 header('Content-Disposition: inline; filename="' . basename($file) . '"');
 header('Cache-Control: public, max-age=3600');
+header('X-Content-Type-Options: nosniff'); // Prevent MIME type sniffing
 
 // Disable output buffering and serve file
 if (ob_get_level()) {
