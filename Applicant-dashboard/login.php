@@ -8,7 +8,14 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Maintenance Mode Check: Block applicants if maintenance mode is enabled
-$maintenance_mode = (bool)get_setting($conn, 'maintenance_mode', '0');
+$maintenance_mode = false;
+try {
+    $maintenance_mode = (bool)get_setting($conn, 'maintenance_mode', '0');
+} catch (Exception $e) {
+    // If settings table doesn't exist or there's a DB error, assume maintenance mode is off
+    error_log('Maintenance mode check failed: ' . $e->getMessage());
+    $maintenance_mode = false;
+}
 if ($maintenance_mode) {
     // Show maintenance page for applicants
     ?>

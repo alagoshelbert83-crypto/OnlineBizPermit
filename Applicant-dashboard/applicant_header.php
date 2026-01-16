@@ -24,7 +24,14 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'user') {
 
 // Maintenance Mode Check: Block applicants if maintenance mode is enabled
 require_once __DIR__ . '/../Admin-dashboard/functions.php';
-$maintenance_mode = (bool)get_setting($conn, 'maintenance_mode', '0');
+$maintenance_mode = false;
+try {
+    $maintenance_mode = (bool)get_setting($conn, 'maintenance_mode', '0');
+} catch (Exception $e) {
+    // If settings table doesn't exist or there's a DB error, assume maintenance mode is off
+    error_log('Maintenance mode check failed: ' . $e->getMessage());
+    $maintenance_mode = false;
+}
 if ($maintenance_mode && $_SESSION['role'] === 'user') {
     // Show maintenance page for applicants
     ?>
