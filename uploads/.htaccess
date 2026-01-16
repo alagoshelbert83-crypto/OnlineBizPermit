@@ -4,13 +4,11 @@ php_flag engine off
 	Deny from all
 </FilesMatch>
 
-# Force correct MIME types for images
-<FilesMatch "\.(jpg|jpeg|png|gif)$">
-	Header set Content-Type "image/jpeg"
-</FilesMatch>
-<FilesMatch "\.png$">
-	Header set Content-Type "image/png"
-</FilesMatch>
-<FilesMatch "\.gif$">
-	Header set Content-Type "image/gif"
-</FilesMatch>
+# Force correct MIME types for images (safe)
+# Avoid using Header directives here because some servers do not have mod_headers enabled.
+# Use AddType (requires mod_mime, which is normally enabled) and wrap in <IfModule> to be safe.
+<IfModule mod_mime.c>
+	AddType image/jpeg .jpg .jpeg
+	AddType image/png .png
+	AddType image/gif .gif
+</IfModule>
