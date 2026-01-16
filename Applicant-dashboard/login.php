@@ -18,68 +18,387 @@ if ($maintenance_mode) {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Maintenance Mode - OnlineBizPermit</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
         <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
             body {
                 font-family: 'Inter', sans-serif;
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                margin: 0;
-                padding: 0;
                 min-height: 100vh;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                color: #333;
+                overflow-x: hidden;
             }
+
             .maintenance-container {
-                background: #fff;
-                border-radius: 20px;
-                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(20px);
+                border-radius: 24px;
+                box-shadow: 0 25px 50px rgba(0,0,0,0.15);
                 padding: 3rem;
                 text-align: center;
                 max-width: 500px;
                 width: 90%;
+                position: relative;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                animation: slideUp 0.8s ease-out;
             }
+
+            @keyframes slideUp {
+                from {
+                    opacity: 0;
+                    transform: translateY(30px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
             .maintenance-icon {
-                font-size: 4rem;
+                width: 120px;
+                height: 120px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 2rem;
+                position: relative;
+                box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+                animation: bounce 2s infinite;
+            }
+
+            @keyframes bounce {
+                0%, 20%, 50%, 80%, 100% {
+                    transform: translateY(0);
+                }
+                40% {
+                    transform: translateY(-10px);
+                }
+                60% {
+                    transform: translateY(-5px);
+                }
+            }
+
+            .maintenance-icon i {
+                font-size: 3rem;
+                color: white;
+            }
+
+            .status-badge {
+                background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+                color: white;
+                padding: 8px 16px;
+                border-radius: 50px;
+                font-size: 0.9rem;
+                font-weight: 600;
+                display: inline-block;
+                margin-bottom: 1.5rem;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+            }
+
+            h1 {
+                color: #1f2937;
+                margin-bottom: 1rem;
+                font-size: 2.5rem;
+                font-weight: 700;
+                line-height: 1.2;
+            }
+
+            .subtitle {
+                color: #6b7280;
+                font-size: 1.1rem;
+                margin-bottom: 2rem;
+                font-weight: 400;
+            }
+
+            p {
+                color: #4b5563;
+                line-height: 1.7;
+                margin-bottom: 1.5rem;
+                font-size: 1rem;
+            }
+
+            .progress-container {
+                margin: 2rem 0;
+                position: relative;
+            }
+
+            .progress-bar {
+                width: 100%;
+                height: 4px;
+                background: #e5e7eb;
+                border-radius: 2px;
+                overflow: hidden;
+            }
+
+            .progress-fill {
+                height: 100%;
+                background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+                border-radius: 2px;
+                animation: progress 2s ease-in-out infinite;
+            }
+
+            @keyframes progress {
+                0% { width: 0%; }
+                50% { width: 70%; }
+                100% { width: 100%; }
+            }
+
+            .features {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1.5rem;
+                margin: 2rem 0;
+            }
+
+            .feature {
+                padding: 1.5rem;
+                background: rgba(255, 255, 255, 0.8);
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.5);
+            }
+
+            .feature i {
+                font-size: 2rem;
                 color: #667eea;
                 margin-bottom: 1rem;
+                display: block;
             }
-            h1 {
-                color: #333;
-                margin-bottom: 1rem;
-                font-size: 2rem;
+
+            .feature h4 {
+                color: #1f2937;
+                margin-bottom: 0.5rem;
+                font-size: 1.1rem;
+                font-weight: 600;
             }
-            p {
-                color: #666;
-                line-height: 1.6;
-                margin-bottom: 2rem;
+
+            .feature p {
+                color: #6b7280;
+                font-size: 0.9rem;
+                line-height: 1.5;
             }
-            .back-btn {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: #fff;
-                border: none;
-                padding: 12px 30px;
+
+            .action-buttons {
+                display: flex;
+                gap: 1rem;
+                justify-content: center;
+                flex-wrap: wrap;
+                margin-top: 2rem;
+            }
+
+            .btn {
+                padding: 12px 24px;
                 border-radius: 50px;
-                font-size: 1rem;
-                cursor: pointer;
+                font-weight: 600;
                 text-decoration: none;
-                display: inline-block;
-                transition: transform 0.2s;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                transition: all 0.3s ease;
+                font-size: 0.95rem;
+                border: none;
+                cursor: pointer;
             }
-            .back-btn:hover {
+
+            .btn-primary {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            }
+
+            .btn-primary:hover {
                 transform: translateY(-2px);
+                box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+            }
+
+            .btn-secondary {
+                background: rgba(255, 255, 255, 0.9);
+                color: #4b5563;
+                border: 1px solid #d1d5db;
+            }
+
+            .btn-secondary:hover {
+                background: white;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            }
+
+            .contact-info {
+                margin-top: 2rem;
+                padding: 1.5rem;
+                background: rgba(102, 126, 234, 0.1);
+                border-radius: 12px;
+                border-left: 4px solid #667eea;
+            }
+
+            .contact-info h4 {
+                color: #1f2937;
+                margin-bottom: 0.5rem;
+                font-size: 1rem;
+            }
+
+            .contact-info p {
+                color: #4b5563;
+                font-size: 0.9rem;
+                margin: 0;
+            }
+
+            /* Floating elements animation */
+            .floating-shapes {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                overflow: hidden;
+                pointer-events: none;
+                z-index: -1;
+            }
+
+            .shape {
+                position: absolute;
+                opacity: 0.1;
+                animation: float 6s ease-in-out infinite;
+            }
+
+            .shape:nth-child(1) {
+                top: 10%;
+                left: 10%;
+                animation-delay: 0s;
+            }
+
+            .shape:nth-child(2) {
+                top: 20%;
+                right: 10%;
+                animation-delay: 2s;
+            }
+
+            .shape:nth-child(3) {
+                bottom: 20%;
+                left: 15%;
+                animation-delay: 4s;
+            }
+
+            @keyframes float {
+                0%, 100% { transform: translateY(0px) rotate(0deg); }
+                50% { transform: translateY(-20px) rotate(180deg); }
+            }
+
+            .shape.circle {
+                width: 60px;
+                height: 60px;
+                border-radius: 50%;
+                background: #667eea;
+            }
+
+            .shape.square {
+                width: 40px;
+                height: 40px;
+                background: #764ba2;
+                border-radius: 8px;
+            }
+
+            .shape.triangle {
+                width: 0;
+                height: 0;
+                border-left: 25px solid transparent;
+                border-right: 25px solid transparent;
+                border-bottom: 43px solid #f59e0b;
+            }
+
+            @media (max-width: 768px) {
+                .maintenance-container {
+                    padding: 2rem;
+                    margin: 1rem;
+                }
+
+                h1 {
+                    font-size: 2rem;
+                }
+
+                .features {
+                    grid-template-columns: 1fr;
+                    gap: 1rem;
+                }
+
+                .action-buttons {
+                    flex-direction: column;
+                }
+
+                .btn {
+                    width: 100%;
+                    justify-content: center;
+                }
             }
         </style>
     </head>
     <body>
+        <div class="floating-shapes">
+            <div class="shape circle"></div>
+            <div class="shape square"></div>
+            <div class="shape triangle"></div>
+        </div>
+
         <div class="maintenance-container">
             <div class="maintenance-icon">
                 <i class="fas fa-tools"></i>
             </div>
-            <h1>Under Maintenance</h1>
-            <p>We're currently performing scheduled maintenance to improve your experience. The site will be back online shortly.</p>
-            <p>Please check back later or contact support if you need immediate assistance.</p>
-            <a href="/" class="back-btn">Go to Homepage</a>
+
+            <div class="status-badge">Under Maintenance</div>
+
+            <h1>We'll be back soon!</h1>
+            <p class="subtitle">Our team is working hard to improve your experience</p>
+
+            <p>We're currently performing scheduled maintenance to bring you an even better OnlineBizPermit platform. This won't take long!</p>
+
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+            </div>
+
+            <div class="features">
+                <div class="feature">
+                    <i class="fas fa-clock"></i>
+                    <h4>Quick Return</h4>
+                    <p>Expected back online within a few hours</p>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-shield-alt"></i>
+                    <h4>System Updates</h4>
+                    <p>Improving security and performance</p>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-star"></i>
+                    <h4>Better Experience</h4>
+                    <p>New features coming your way</p>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <a href="/" class="btn btn-primary">
+                    <i class="fas fa-home"></i> Go to Homepage
+                </a>
+                <button onclick="window.location.reload()" class="btn btn-secondary">
+                    <i class="fas fa-refresh"></i> Check Again
+                </button>
+            </div>
+
+            <div class="contact-info">
+                <h4><i class="fas fa-envelope"></i> Need urgent assistance?</h4>
+                <p>Contact our support team at <strong>support@onlinebizpermit.com</strong> or call <strong>(02) 123-4567</strong></p>
+            </div>
         </div>
     </body>
     </html>
