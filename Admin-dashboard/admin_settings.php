@@ -78,6 +78,7 @@ if ($current_user_role === 'admin' && $_SERVER['REQUEST_METHOD'] === 'POST' && i
 
     if ($all_ok) {
         $system_message = '<div class="message success">System settings updated successfully.</div>';
+        header("Location: admin_settings.php"); exit; // Refresh to show updated info and clear POST
     } else {
         $system_message = '<div class="message error">Failed to update one or more system settings.</div>';
     }
@@ -120,7 +121,7 @@ require_once __DIR__ . '/admin_sidebar.php';
             <div class="settings-card">
                 <h3><i class="fas fa-user-edit"></i> Profile Information</h3>
                 <?php if ($profile_message) echo $profile_message; ?>
-                <form action="settings.php" method="POST">
+                <form action="admin_settings.php" method="POST">
                     <div class="form-group">
                         <label for="name">Full Name</label>
                         <input type="text" id="name" name="name" value="<?= htmlspecialchars($current_user_name) ?>" required>
@@ -138,7 +139,7 @@ require_once __DIR__ . '/admin_sidebar.php';
             <div class="settings-card">
                 <h3><i class="fas fa-shield-alt"></i> Change Password</h3>
                 <?php if ($password_message) echo $password_message; ?>
-                <form action="settings.php" method="POST">
+                <form action="admin_settings.php" method="POST">
                     <div class="form-group">
                         <label for="current_password">Current Password</label>
                         <input type="password" id="current_password" name="current_password" placeholder="Enter your current password" required>
@@ -162,7 +163,7 @@ require_once __DIR__ . '/admin_sidebar.php';
             <div class="settings-card">
                 <h3><i class="fas fa-cogs"></i> System Settings</h3>
                 <?php if ($system_message) echo $system_message; ?>
-                <form action="settings.php" method="POST">
+                <form action="admin_settings.php" method="POST">
                     <div class="form-group">
                         <label for="site_title">Site Title</label>
                         <input type="text" id="site_title" name="site_title" value="<?= htmlspecialchars($site_title) ?>">
