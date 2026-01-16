@@ -454,7 +454,7 @@ if (isset($_GET['status']) && $_GET['status'] === 'updated') {
                             $doc_type_key = strtolower(str_replace([' ', '-'], '_', $doc_type));
                             $doc_label = isset($document_type_labels[$doc_type_key]) ? $document_type_labels[$doc_type_key] : ucfirst(str_replace('_', ' ', $doc_type));
                             $file_extension = strtolower(pathinfo($doc['document_name'], PATHINFO_EXTENSION));
-                            // Use absolute path from root
+                            // Use secure file viewer - handles both local files and cloud storage URLs
                             $file_path = '../view_file.php?file=' . rawurlencode($doc['file_path']);
                             ?>
                             <div class="document-item" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; background: #fff; display: flex; flex-direction: column; align-items: center; text-align: center; transition: all 0.2s ease;">
@@ -607,7 +607,7 @@ if (isset($_GET['status']) && $_GET['status'] === 'updated') {
                                 <?php foreach ($payments as $pay): ?>
                                     <tr>
                                         <td><?= htmlspecialchars(date('M d, Y H:i', strtotime($pay['created_at']))) ?></td>
-                                        <td><?php if (!empty($pay['file_path'])): ?><a href="../view_file.php?file=<?= urlencode($pay['file_path']) ?>" target="_blank">View Receipt</a><?php else: ?>-<?php endif; ?></td>
+                                        <td><?php if (!empty($pay['file_path'])): ?><a href="../view_file.php?file=<?= rawurlencode($pay['file_path']) ?>" target="_blank">View Receipt</a><?php else: ?>-<?php endif; ?></td>
                                         <td><?= $pay['amount'] ? '₱ ' . number_format((float)$pay['amount'], 2) : '-' ?></td>
                                         <td><?= htmlspecialchars($pay['or_number'] ?? '-') ?></td>
                                         <td><?= htmlspecialchars(ucfirst($pay['status'])) ?></td>

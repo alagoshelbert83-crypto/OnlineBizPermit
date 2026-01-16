@@ -85,6 +85,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_application'])
         $stmt = $conn->prepare("UPDATE applications SET business_id = ?, business_name = ?, business_address = ?, form_details = ?, updated_at = NOW() WHERE id = ? AND user_id = ?");
         $stmt->execute([$business_id, $business_name, $business_address, $form_details_json, $applicationId, $current_user_id]);
 
+        // Ensure FileUploadHelper is available
+        global $upload_helper;
+        if (!isset($upload_helper)) {
+            require_once __DIR__ . '/../file_upload_helper.php';
+            $upload_helper = new FileUploadHelper();
+        }
+
+        // Handle document uploads (DTI, BIR, etc.)
+        $allowed_types = ['application/pdf', 'image/jpeg', 'image/png'];
+        $document_type_labels = [
+            'dti_registration' => 'DTI Registration Certificate',
+            'bir_registration' => 'BIR Registration Certificate',
+            'barangay_clearance' => 'Barangay Clearance',
+            'fire_safety_certificate' => 'Fire Safety Certificate',
+            'sanitary_permit' => 'Sanitary Permit',
+            'health_inspection' => 'Health Inspection Certificate',
+            'building_permit' => 'Building Permit',
+            'other_documents' => 'Other Document'
+        ];
+
+        if (isset($_FILES['documents']) && is_array($_FILES['documents']['name'])) {
+            foreach ($_FILES['documents']['name'] as $doc_type => $name) {
+                if (empty($name)) continue; // Skip empty uploads
+                
+                $error_key = $doc_type;
+                if (isset($_FILES['documents']['error'][$error_key]) && $_FILES['documents']['error'][$error_key] === UPLOAD_ERR_OK) {
+                    $tmp_name = $_FILES['documents']['tmp_name'][$error_key];
+                    $file_type = mime_content_type($tmp_name);
+                    $file_size = $_FILES['documents']['size'][$error_key];
+
+                    if (!in_array($file_type, $allowed_types) || $file_size > 100 * 1024 * 1024) {
+                        $doc_label = $document_type_labels[$doc_type] ?? ucfirst(str_replace('_', ' ', $doc_type));
+                        throw new Exception('Invalid file type or size for ' . $doc_label . '. Only PDF, JPG, PNG under 100MB are allowed.');
+                    }
+
+                    $original_name = basename($name);
+                    $file_extension = pathinfo($original_name, PATHINFO_EXTENSION);
+                    $unique_filename = uniqid('doc_' . $applicationId . '_' . $doc_type . '_', true) . '.' . $file_extension;
+
+                    // Use FileUploadHelper to upload (supports cloud storage)
+                    $uploaded_path = $upload_helper->uploadFile($tmp_name, $unique_filename, $file_type);
+                    
+                    if (!$uploaded_path) {
+                        $doc_label = $document_type_labels[$doc_type] ?? ucfirst(str_replace('_', ' ', $doc_type));
+                        throw new Exception('File System Error: Could not upload file for ' . $doc_label . '. Please check server configuration and storage settings.');
+                    }
+
+                    // Insert or update document record
+                    // Delete existing document of the same type first, then insert new one
+                    try {
+                        // Delete existing document of this type for this application
+                        $del_stmt = $conn->prepare("DELETE FROM documents WHERE application_id = ? AND document_type = ?");
+                        $del_stmt->execute([$applicationId, $doc_type]);
+                        
+                        // Insert new document
+                        $doc_stmt = $conn->prepare("INSERT INTO documents (application_id, document_name, file_path, document_type, upload_date) VALUES (?, ?, ?, ?, NOW())");
+                        $doc_stmt->execute([$applicationId, $original_name, $uploaded_path, $doc_type]);
+                    } catch (PDOException $e) {
+                        error_log('Failed to update document: ' . $e->getMessage());
+                        // Continue with other documents even if one fails
+                    }
+                    
+                    error_log('Document uploaded: ' . ($document_type_labels[$doc_type] ?? $doc_type) . ' (Type: ' . $doc_type . ')');
+                } elseif (isset($_FILES['documents']['error'][$error_key]) && $_FILES['documents']['error'][$error_key] !== UPLOAD_ERR_NO_FILE) {
+                    $doc_label = $document_type_labels[$doc_type] ?? 'document';
+                    error_log('File upload error for ' . $doc_label . ': Code ' . $_FILES['documents']['error'][$error_key]);
+                }
+            }
+        }
+
         // Handle simple payment receipt upload from applicant (only allowed after approval)
         if (isset($_FILES['payment_receipt']) && $_FILES['payment_receipt']['error'] === UPLOAD_ERR_OK) {
             if (($application['status'] ?? '') !== 'approved') {
@@ -99,10 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_application'])
                 $orig = basename($_FILES['payment_receipt']['name']);
                 $ext = pathinfo($orig, PATHINFO_EXTENSION);
                 $unique = uniqid('doc_' . $applicationId . '_payment_', true) . '.' . $ext;
-                $upload_dir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
-                if (!is_dir($upload_dir)) @mkdir($upload_dir, 0775, true);
-                // Use upload helper for cloud storage
-                global $upload_helper;
+                // Use upload helper for cloud storage (already initialized above)
                 $uploaded_path = $upload_helper->uploadFile($tmp, $unique, $type);
 
                 if ($uploaded_path) {
@@ -382,7 +449,8 @@ require_once __DIR__ . '/applicant_sidebar.php';
                                 $doc_label = isset($document_type_labels[$doc_type_key]) ? $document_type_labels[$doc_type_key] : ucfirst(str_replace('_', ' ', $doc_type));
                                 $file_extension = strtolower(pathinfo($doc['document_name'], PATHINFO_EXTENSION));
                                 // Use secure file viewer PHP script instead of direct file access
-                                $file_path = '../view_file.php?file=' . urlencode($doc['file_path']);
+                                // Use secure file viewer - handles both local files and cloud storage URLs
+                                $file_path = '../view_file.php?file=' . rawurlencode($doc['file_path']);
                                 ?>
                                 <div class="document-item">
                                     <div class="doc-preview">
@@ -482,9 +550,10 @@ require_once __DIR__ . '/applicant_sidebar.php';
                     $receipt_exists = false;
                     $receipt_path = '';
                     foreach ($documents as $doc) {
-                        if (strpos(strtolower($doc['document_name']), 'payment_receipt') !== false) {
+                        if (($doc['document_type'] ?? '') === 'payment_receipt' || strpos(strtolower($doc['document_name']), 'payment') !== false) {
                             $receipt_exists = true;
-                            $receipt_path = '../uploads/' . htmlspecialchars($doc['file_path']);
+                            // Use secure file viewer - handles both local files and cloud storage URLs
+                            $receipt_path = '../view_file.php?file=' . rawurlencode($doc['file_path']);
                             break;
                         }
                     }

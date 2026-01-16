@@ -19,9 +19,13 @@ if (empty($file)) {
 $original_request = $file;
 
 // Check if this is already a full URL (from cloud storage like Vercel Blob)
-if (filter_var($file, FILTER_VALIDATE_URL)) {
+// Also check for URLs that might have been URL-encoded
+$decoded_file = urldecode($file);
+if (filter_var($file, FILTER_VALIDATE_URL) || filter_var($decoded_file, FILTER_VALIDATE_URL)) {
+    // Use the decoded version if it's a valid URL
+    $url = filter_var($decoded_file, FILTER_VALIDATE_URL) ? $decoded_file : $file;
     // Redirect to the cloud storage URL
-    header('Location: ' . $file);
+    header('Location: ' . $url);
     exit;
 }
 
@@ -136,11 +140,15 @@ if (!file_exists($file_path)) {
                 http_response_code(404);
                 header('Content-Type: image/svg+xml');
                 header('Cache-Control: no-cache, no-store, must-revalidate');
-                // Output a simple SVG error image
+                // Output a simple SVG error image with more helpful message
+                $filename_display = htmlspecialchars(basename($file));
                 echo '<?xml version="1.0" encoding="UTF-8"?>
-<svg width="200" height="100" xmlns="http://www.w3.org/2000/svg">
-  <rect width="200" height="100" fill="#f0f0f0"/>
-  <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="14" fill="#999" text-anchor="middle" dominant-baseline="middle">Image Not Found</text>
+<svg width="400" height="200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="200" fill="#f8f9fa"/>
+  <rect x="10" y="10" width="380" height="180" fill="#fff" stroke="#dee2e6" stroke-width="2" rx="8"/>
+  <text x="50%" y="35%" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#dc3545" text-anchor="middle" dominant-baseline="middle">File Not Found</text>
+  <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="12" fill="#6c757d" text-anchor="middle" dominant-baseline="middle">' . $filename_display . '</text>
+  <text x="50%" y="65%" font-family="Arial, sans-serif" font-size="11" fill="#999" text-anchor="middle" dominant-baseline="middle">This file may have been lost due to server restart</text>
 </svg>';
                 exit;
             }
