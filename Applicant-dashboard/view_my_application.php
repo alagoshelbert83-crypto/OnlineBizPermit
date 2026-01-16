@@ -138,7 +138,7 @@ require_once __DIR__ . '/applicant_sidebar.php';
                     </a>
                 </div>
             </div>
-        <?php elseif (in_array($application['status'], ['payment_submitted'])): ?>
+        <?php elseif (in_array($application['status'], ['processing'])): ?>
             <div class="message info">
                 <i class="fas fa-clock"></i>
                 <div>

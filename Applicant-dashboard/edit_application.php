@@ -106,8 +106,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_application'])
                     $doc_stmt = $conn->prepare("INSERT INTO documents (application_id, document_name, file_path, document_type, upload_date) VALUES (?, ?, ?, 'payment_receipt', NOW())");
                     $doc_stmt->execute([$applicationId, $orig, $unique]);
 
-                    // Update application status to 'payment_submitted'
-                    $status_update_stmt = $conn->prepare("UPDATE applications SET status = 'payment_submitted', updated_at = NOW() WHERE id = ?");
+                    // Update application status to 'processing' (payment submitted for verification)
+                    $status_update_stmt = $conn->prepare("UPDATE applications SET status = 'processing', updated_at = NOW() WHERE id = ?");
                     $status_update_stmt->execute([$applicationId]);
 
                     // Get the newly created document id

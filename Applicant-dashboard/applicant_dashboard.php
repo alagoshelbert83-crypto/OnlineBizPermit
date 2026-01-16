@@ -250,7 +250,7 @@ require_once __DIR__ . '/applicant_sidebar.php';
                                     $status_icon = 'clock';
                                   } elseif ($app['status'] === 'rejected') {
                                     $status_icon = 'times';
-                                  } elseif ($app['status'] === 'payment_submitted') {
+                                  } elseif ($app['status'] === 'processing') {
                                     $status_icon = 'receipt';
                                     $status_label = 'Payment Submitted';
                                   }
